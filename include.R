@@ -171,7 +171,8 @@ plot_corr_matrix <- function(data, filename) {
 }
 
 plot_timecourse <- function(data, save_filename) {
-	df <- psmelt(data)
+	p <- apply_proportion(data)
+	df <- psmelt(p)
 	df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
 
 	# replace Sample ID's with their dates for readability
@@ -188,7 +189,7 @@ plot_timecourse <- function(data, save_filename) {
 	for(i in 1:dim(df3)[1]) {
 		# show labels as order/family/genus
 		# species is NA for all
-		df3$OTU[i] <- paste(as.vector(tax_table(p)[df3$OTU[i],4:6]),collapse="/")
+		df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
 	}
 
 	p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
