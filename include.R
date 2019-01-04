@@ -170,13 +170,12 @@ plot_corr_matrix <- function(data, filename) {
 	ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
-plot_timecourse <- function(data) {
+plot_timecourse <- function(data, save_filename) {
 	df <- psmelt(data)
 	df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
 
 	# replace Sample ID's with their dates for readability
-	p1 <- apply_proportion(data)
-	metadata <- sample_data(p1)
+	metadata <- sample_data(data)
 	for(i in 1:dim(df2)[1]) {
 		df2$Sample[i] <- metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]]
 	}
@@ -189,7 +188,7 @@ plot_timecourse <- function(data) {
 	for(i in 1:dim(df3)[1]) {
 		# show labels as order/family/genus
 		# species is NA for all
-		df3$OTU[i] <- paste(as.vector(tax_table(p1)[df3$OTU[i],4:6]),collapse="/")
+		df3$OTU[i] <- paste(as.vector(tax_table(p)[df3$OTU[i],4:6]),collapse="/")
 	}
 
 	p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
@@ -198,7 +197,7 @@ plot_timecourse <- function(data) {
 		theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
 		theme(legend.position="bottom") +
 		theme(legend.text=element_text(size=8))
-	ggsave("timecourse.png", plot=p, scale=2, width=10, height=4, units="in")
+	ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=10, height=4, units="in")
 }
 
 histogram_indiv_samples <- function(data) {

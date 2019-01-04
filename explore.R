@@ -41,7 +41,7 @@ if(TRUE) {
 	# filter to individuals "DUI" and "ACA"
 	ACA_samples <- subset_samples(clr_f2, sname=="ACA")
 	p <- apply_proportion(ACA_samples)
-	plot_timecourse(p)
+	plot_timecourse(p, "ACA_timecourse")
 	# visualize correlation between times points (quick & dirty)
 	ACA_data <- otu_table(ACA_samples)@.Data
 	# check (visually) preservation of collection_date order
@@ -52,7 +52,7 @@ if(TRUE) {
 
 	DUI_samples <- subset_samples(clr_f2, sname=="DUI")
 	p <- apply_proportion(DUI_samples)
-	plot_timecourse(p)
+	plot_timecourse(p, "DUI_timecourse")
 	# visualize correlation between times points (quick & dirty)
 	DUI_data <- otu_table(DUI_samples)@.Data
 	# check (visually) preservation of collection_date order
