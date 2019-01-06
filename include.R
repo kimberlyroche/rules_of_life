@@ -99,6 +99,35 @@ apply_clr <- function(data) {
 }
 
 calc_autocorr <- function(data, lag.max=NULL) {
+	# mean-center the data
+	lr_data <- otu_table(transform_sample_counts(data, function(x) x - mean(x) ))@.Data
+	max.T <- dim(lr_data)[1]
+	if(is.null(lag.max)) {
+		lag.max <- max.T-1
+	}
+	ac <- numeric(lag.max+1)
+	lag.0 <- 0
+	for(lag in 0:lag.max) {
+		tot <- 0
+		measured <- 0
+		for(t in 1:(max.T-lag)) {
+			measured <- measured + 1
+			y.t <- as.vector(lr_data[t,])
+			y.tt <- sqrt(y.t%*%y.t)
+			y.h <- as.vector(lr_data[t+lag,])
+			y.hh <- sqrt(y.h%*%y.h)
+			tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+		}
+		tot <- tot/measured
+		if(lag == 0) {
+			lag.0 <- tot
+		}
+		ac[lag+1] <- tot/lag.0
+	}
+	return(ac)
+}
+
+calc_autocorr_ALT_WRONG <- function(data, lag.max=NULL) {
 	# expects samples along rows, taxa along columns
 	# this should be the correct average to take difference with respect to?
 	# Prado & West pg. 9-10
@@ -234,10 +263,14 @@ histogram_sample_density <- function(data) {
 				if(indiv_differences[i] > max_diff) {
 					max_diff <- indiv_differences[i]
 					cat("New MAX diff",max_diff,"from individual",s,"\n")
+					print(d1)
+					print(d2)
 				}
 				if(indiv_differences[i] < min_diff) {
 					min_diff <- indiv_differences[i]
 					cat("New MIN diff",min_diff,"from individual",s,"\n")
+					print(d1)
+					print(d2)
 				}
 			}
 			differences <- c(differences, indiv_differences)

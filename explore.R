@@ -12,7 +12,7 @@ if(FALSE) {
 	#check_taxa_aggomeration(data)
 }
 
-if(TRUE) {
+if(FALSE) {
 	load("glom_data_g.RData")
 	# glom_data contains all samples agglomerated to genus level by phyloseq
 	cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
@@ -28,7 +28,7 @@ if(FALSE) {
 	histogram_abundances(clr_f1, "histogram_cutoff_3-20")
 }
 
-if(TRUE) {
+if(FALSE) {
 	# filter to samples containing at least 90% counts >= 3 and get zero counts
 	f2 <- filter_counts(glom_data, 3, 0.9)
 	cat("Zero counts (90% filtering):",(1 - get_tiny_counts(f2, 1)),"\n")
@@ -48,7 +48,8 @@ if(FALSE) {
 	check_sid_collection_order(ACA_log_ratios)
 	plot_corr_matrix(ACA_data, "ACA_cor")
 	# plot autocorrelation
-	plot_autocorrelation(ACA_data, lag.max=25, "ACA_acf")
+	plot_autocorrelation(ACA_log_ratios, lag.max=25, "ACA_acf")
+
 
 	DUI_counts <- subset_samples(f2, sname=="DUI")
 	DUI_log_ratios <- subset_samples(clr_f2, sname=="DUI")
@@ -59,7 +60,7 @@ if(FALSE) {
 	check_sid_collection_order(DUI_log_ratios)
 	plot_corr_matrix(DUI_data, "DUI_cor")
 	# plot autocorrelation
-	plot_autocorrelation(DUI_data, lag.max=25, "DUI_acf")
+	plot_autocorrelation(DUI_log_ratios, lag.max=25, "DUI_acf")
 }
 
 if(TRUE) {
