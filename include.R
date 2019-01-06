@@ -291,6 +291,7 @@ plot_autocorrelation <- function(data, lag.max, filename) {
 		geom_point() +
 		xlab("lag") +
 		ylab("ACF") +
+		ylim(c(0,1)) +
 		theme_minimal()
 	ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=3, height=3, units="in")
 }
