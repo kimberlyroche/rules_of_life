@@ -1,6 +1,6 @@
 source("include.R")
 
-if(TRUE) {
+if(FALSE) {
 	data <- read_data()
 	cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
 	# remove technical replicates (for now)
@@ -25,8 +25,8 @@ if(FALSE) {
 	cat("Zero counts (20% filtering):",(1 - get_tiny_counts(f1, 1)),"\n")
 
 	# histogram log abundance for two zero-filtering levels
-	clr_f1 <- apply_clr(f1)
-	histogram_abundances(clr_f1, "histogram_cutoff_3-20")
+	ilr_f1 <- apply_ilr(f1)
+	histogram_abundances(ilr_f1, "histogram_cutoff_3-20")
 }
 
 if(FALSE) {
@@ -34,34 +34,28 @@ if(FALSE) {
 	f2 <- filter_counts(glom_data, 3, 0.9)
 	cat("Zero counts (90% filtering):",(1 - get_tiny_counts(f2, 1)),"\n")
 
-	clr_f2 <- apply_clr(f2)
-	histogram_abundances(clr_f2, "histogram_cutoff_3-90")
+	ilr_f2 <- apply_ilr(f2)
+	histogram_abundances(ilr_f2, "histogram_cutoff_3-90")
 }
 
-if(FALSE) {
+if(TRUE) {
 	# filter to individuals "DUI" and "ACA"
 	ACA_counts <- subset_samples(f2, sname=="ACA")
-	ACA_log_ratios <- subset_samples(clr_f2, sname=="ACA")
+	ACA_log_ratios <- apply_ilr(ACA_counts)
 	plot_timecourse(ACA_counts, "ACA_timecourse")
 	# visualize correlation between times points (quick & dirty)
-	ACA_data <- otu_table(ACA_log_ratios)@.Data
 	# check (visually) preservation of collection_date order
-	check_sid_collection_order(ACA_log_ratios)
-	plot_corr_matrix(ACA_data, "ACA_cor")
+	#check_sid_collection_order(ACA_log_ratios)
+	plot_corr_matrix(t(ACA_log_ratios), "ACA_cor")
 	# plot autocorrelation
-	plot_autocorrelation(ACA_log_ratios, lag.max=25, "ACA_acf")
-
+	plot_autocorrelation(ACA_log_ratios, lag.max=NULL, "ACA_acf")
 
 	DUI_counts <- subset_samples(f2, sname=="DUI")
-	DUI_log_ratios <- subset_samples(clr_f2, sname=="DUI")
+	DUI_log_ratios <- apply_ilr(DUI_counts)
 	plot_timecourse(DUI_counts, "DUI_timecourse")
-	# visualize correlation between times points (quick & dirty)
-	DUI_data <- otu_table(DUI_log_ratios)@.Data
-	# check (visually) preservation of collection_date order
-	check_sid_collection_order(DUI_log_ratios)
-	plot_corr_matrix(DUI_data, "DUI_cor")
-	# plot autocorrelation
-	plot_autocorrelation(DUI_log_ratios, lag.max=25, "DUI_acf")
+	#check_sid_collection_order(DUI_log_ratios)
+	plot_corr_matrix(t(DUI_log_ratios), "DUI_cor")
+	plot_autocorrelation(DUI_log_ratios, lag.max=NULL, "DUI_acf")
 }
 
 if(FALSE) {

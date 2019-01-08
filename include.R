@@ -94,16 +94,18 @@ apply_proportion <- function(data) {
 	return(transform_sample_counts(data, function(x) x / sum(x) ))
 }
 
-apply_clr <- function(data) {
-	return(transform_sample_counts(data, function(x) { temp <- log(x+0.65); names(temp) <- names(x); temp; } ))
+apply_ilr <- function(data) {
+	counts <- otu_table(data)@.Data
+	return(apply(counts+0.65, 1, ilr))
 }
 
+# assumes rows are taxa, columns are samples!
 calc_autocorr <- function(data, lag.max=NULL, mean_center=TRUE) {
 	if(mean_center) {
 		# mean-center the data
-		data <- otu_table(transform_sample_counts(data, function(x) x - mean(x) ))@.Data
+		data <- t(apply(data, 1, function(x) x - mean(x)))
 	}
-	max.T <- dim(data)[1]
+	max.T <- dim(data)[2]
 	if(is.null(lag.max)) {
 		lag.max <- max.T-1
 	}
@@ -114,9 +116,9 @@ calc_autocorr <- function(data, lag.max=NULL, mean_center=TRUE) {
 		measured <- 0
 		for(t in 1:(max.T-lag)) {
 			measured <- measured + 1
-			y.t <- as.vector(data[t,])
+			y.t <- as.vector(data[,t])
 			y.tt <- sqrt(y.t%*%y.t)
-			y.h <- as.vector(data[t+lag,])
+			y.h <- as.vector(data[,t+lag])
 			y.hh <- sqrt(y.h%*%y.h)
 			tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
 		}
@@ -188,9 +190,10 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
 }
 
 histogram_abundances <- function(data, filename="histogram") {
-	df <- psmelt(data)
+	#df <- psmelt(data) # if phyloseq object
+	df <- gather_array(data)
 	p <- ggplot(df) +
-		geom_histogram(aes(x=Abundance), binwidth=0.25) +
+		geom_histogram(aes(x=var), binwidth=0.25) +
 		theme_minimal() +
 		xlab("log ratio abundance")
 	ggsave(paste(filename,".png",sep=""), plot=p)
@@ -295,13 +298,18 @@ histogram_sample_density <- function(data) {
 	return(differences)
 }
 
+# assumes rows are taxa, columns are samples!
 plot_autocorrelation <- function(data, lag.max, filename) {
+	max.T <- dim(data)[2]
+        if(is.null(lag.max)) {
+                lag.max <- max.T-1
+        }
 	ac <- calc_autocorr(data, lag.max=lag.max)
 	p <- ggplot(as.data.frame(cbind(x=seq(0,lag.max), y=ac)), aes(x=x, y=y)) +
 		geom_point() +
 		xlab("lag") +
 		ylab("ACF") +
-		ylim(c(0,1)) +
+		#scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
 		theme_minimal()
-	ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=3, height=3, units="in")
+	ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
 }
