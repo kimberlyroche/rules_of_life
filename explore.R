@@ -1,15 +1,16 @@
 source("include.R")
 
-if(FALSE) {
+if(TRUE) {
 	data <- read_data()
 	cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
 	# remove technical replicates (for now)
 	data <- subset_samples(data, sample_status==0)
 	cat("Agglomerating data...\n")
-	glom_data <- glom_counts(data)
-	save(glom_data, file="glom_data_g.RData")
-	#cat("Checking agglomeration...\n")
-	#check_taxa_aggomeration(data)
+	level <- "family"
+	glom_data <- glom_counts(data, level=level)
+	save(glom_data, file="glom_data_f.RData")
+	cat("Checking agglomeration...\n")
+	check_taxa_aggomeration(data)
 }
 
 if(FALSE) {
@@ -63,7 +64,7 @@ if(FALSE) {
 	plot_autocorrelation(DUI_log_ratios, lag.max=25, "DUI_acf")
 }
 
-if(TRUE) {
+if(FALSE) {
 	cat("Writing histograms of sampling frequency...\n")
 	histogram_indiv_samples(f2)
 	histogram_sample_density(f2)

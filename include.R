@@ -98,10 +98,12 @@ apply_clr <- function(data) {
 	return(transform_sample_counts(data, function(x) { temp <- log(x+0.65); names(temp) <- names(x); temp; } ))
 }
 
-calc_autocorr <- function(data, lag.max=NULL) {
-	# mean-center the data
-	lr_data <- otu_table(transform_sample_counts(data, function(x) x - mean(x) ))@.Data
-	max.T <- dim(lr_data)[1]
+calc_autocorr <- function(data, lag.max=NULL, mean_center=TRUE) {
+	if(mean_center) {
+		# mean-center the data
+		data <- otu_table(transform_sample_counts(data, function(x) x - mean(x) ))@.Data
+	}
+	max.T <- dim(data)[1]
 	if(is.null(lag.max)) {
 		lag.max <- max.T-1
 	}
@@ -112,9 +114,9 @@ calc_autocorr <- function(data, lag.max=NULL) {
 		measured <- 0
 		for(t in 1:(max.T-lag)) {
 			measured <- measured + 1
-			y.t <- as.vector(lr_data[t,])
+			y.t <- as.vector(data[t,])
 			y.tt <- sqrt(y.t%*%y.t)
-			y.h <- as.vector(lr_data[t+lag,])
+			y.h <- as.vector(data[t+lag,])
 			y.hh <- sqrt(y.h%*%y.h)
 			tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
 		}
@@ -126,6 +128,14 @@ calc_autocorr <- function(data, lag.max=NULL) {
 	}
 	return(ac)
 }
+
+# should (and does) return essentially zero correlation after
+# for any lag > 0
+test_autocorr <- function() {
+	test_data <- matrix(rnorm(100*30), nrow=100, ncol=30)
+	return(calc_autocorr(test_data, lag.max=10, mean_center=FALSE))
+}
+
 
 calc_autocorr_ALT_WRONG <- function(data, lag.max=NULL) {
 	# expects samples along rows, taxa along columns
