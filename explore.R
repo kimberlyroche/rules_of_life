@@ -38,7 +38,7 @@ if(FALSE) {
 	histogram_abundances(ilr_f2, "histogram_cutoff_3-90")
 }
 
-if(TRUE) {
+if(FALSE) {
 	# filter to individuals "DUI" and "ACA"
 	ACA_counts <- subset_samples(f2, sname=="ACA")
 	ACA_log_ratios <- apply_ilr(ACA_counts)
@@ -58,7 +58,7 @@ if(TRUE) {
 	plot_autocorrelation(DUI_log_ratios, lag.max=NULL, "DUI_acf")
 }
 
-if(FALSE) {
+if(TRUE) {
 	cat("Writing histograms of sampling frequency...\n")
 	histogram_indiv_samples(f2)
 	histogram_sample_density(f2)
