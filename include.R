@@ -99,8 +99,66 @@ apply_ilr <- function(data) {
 	return(apply(counts+0.65, 1, ilr))
 }
 
+calc_autocorr <- function(data, md, lag.max=NULL, mean_center=TRUE, norm_by_T=FALSE) {
+	if(mean_center) {
+		data <- t(apply(data, 1, function(x) x - mean(x)))
+	}
+	# get distances between adjacent timepoints in weeks
+	d1 <- as.Date(md$collection_date[1])
+	week_d <- numeric(length(md$collection_date)-1)
+	for(d in 2:length(md$collection_date)) {
+		d2 <- as.Date(md$collection_date[d])
+		week_d[d-1] <- round((d2-d1)/7) + 1
+		d1 <- d2
+	}
+	# calculate max lag to use
+	T <- dim(data)[2]
+	max.T <- lag.max
+	if(is.null(lag.max)) {
+	lag.max <- max(week_d)
+	}
+	# calculate autocorrelation for all (available) week lags
+	ac <- numeric(lag.max+1)
+	# calculate lag-0 as a special case
+	lag.0 <- 0
+	for(t in 1:T) {
+		y.t <- as.vector(data[,t])
+		y.tt <- sqrt(y.t%*%y.t)
+		tot <- ((y.t%*%y.t)/(y.tt*y.tt))
+		lag.0 <- lag.0 + tot
+	}
+	lag.0 <- lag.0/T
+	ac[1] <- 1
+	for(lag in 1:lag.max) {
+		idx <- which(week_d==lag)
+		if(length(idx) < 1) {
+			ac[lag+1] <- 0
+		} else {
+			tot <- 0
+			measured <- 0
+			for(t in idx) {
+				measured <- measured + 1
+				y.t <- as.vector(data[,t])
+				y.tt <- sqrt(y.t%*%y.t)
+				y.h <- as.vector(data[,t+1])
+				y.hh <- sqrt(y.h%*%y.h)
+				tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+			}
+			if(norm_by_T) {
+				tot <- tot/T
+			} else {
+				tot <- tot/measured
+			}
+			ac[lag+1] <- tot/lag.0
+		}
+	}
+	return(ac)
+}
+
+# just looks at autocorrelation of neighboring measurements; does not account
+# for irregular spacing
 # assumes rows are taxa, columns are samples!
-calc_autocorr <- function(data, lag.max=NULL, mean_center=TRUE) {
+calc_autocorr_sequential <- function(data, lag.max=NULL, mean_center=TRUE) {
 	if(mean_center) {
 		# mean-center the data
 		data <- t(apply(data, 1, function(x) x - mean(x)))
@@ -122,46 +180,12 @@ calc_autocorr <- function(data, lag.max=NULL, mean_center=TRUE) {
 			y.hh <- sqrt(y.h%*%y.h)
 			tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
 		}
-		tot <- tot/measured
+		tot <- tot/max.T
+#		tot <- tot/measured
 		if(lag == 0) {
 			lag.0 <- tot
 		}
 		ac[lag+1] <- tot/lag.0
-	}
-	return(ac)
-}
-
-# should (and does) return essentially zero correlation after
-# for any lag > 0
-test_autocorr <- function() {
-	test_data <- matrix(rnorm(100*30), nrow=100, ncol=30)
-	return(calc_autocorr(test_data, lag.max=10, mean_center=FALSE))
-}
-
-
-calc_autocorr_ALT_WRONG <- function(data, lag.max=NULL) {
-	# expects samples along rows, taxa along columns
-	# this should be the correct average to take difference with respect to?
-	# Prado & West pg. 9-10
-	y.bar <- as.vector(apply(data, 2, mean)) # mean composition over time
-	max.T <- dim(data)[1]
-	if(is.null(lag.max)) {
-		lag.max <- max.T-1
-	}
-	ac <- numeric(lag.max+1)
-	gamma.0 <- -1
-	for(lag in 0:lag.max) {
-		tot <- 0
-		for(t in 1:(max.T-lag)) {
-			y.th <- as.vector(data[t+lag,])
-			y.t <- as.vector(data[t,])
-			tot <- tot + (t(y.th - y.bar)%*%(y.t - y.bar))[1]
-		}
-		gamma.h <- tot/max.T
-		if(lag == 0) {
-			gamma.0 <- gamma.h
-		}
-		ac[lag+1] <- gamma.h/gamma.0
 	}
 	return(ac)
 }
@@ -299,17 +323,18 @@ histogram_sample_density <- function(data) {
 }
 
 # assumes rows are taxa, columns are samples!
-plot_autocorrelation <- function(data, lag.max, filename) {
+plot_autocorrelation <- function(data, md, lag.max, filename, norm_by_T=FALSE) {
 	max.T <- dim(data)[2]
         if(is.null(lag.max)) {
                 lag.max <- max.T-1
         }
-	ac <- calc_autocorr(data, lag.max=lag.max)
+	ac <- calc_autocorr(data, md, lag.max=lag.max, norm_by_T=norm_by_T)
 	p <- ggplot(as.data.frame(cbind(x=seq(0,lag.max), y=ac)), aes(x=x, y=y)) +
 		geom_point() +
-		xlab("lag") +
+		scale_x_continuous(breaks=seq(0,lag.max,1)) +
+		scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
+		xlab("lag (weeks)") +
 		ylab("ACF") +
-		#scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
 		theme_minimal()
 	ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
 }
