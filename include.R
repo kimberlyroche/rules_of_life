@@ -277,7 +277,7 @@ histogram_indiv_samples <- function(data) {
 	ggsave("histogram_per_individual_samples.png", plot=p)
 }
 
-histogram_sample_density <- function(data) {
+histogram_sample_density <- function(data, units="days") {
 	per_indiv <- psmelt(data)
 	snames <- unique(per_indiv$sname)
 	differences <- c()
@@ -295,19 +295,15 @@ histogram_sample_density <- function(data) {
 				d1 <- strptime(df[i], format="%Y-%m-%d")
 				d2 <- strptime(df[i+1], format="%Y-%m-%d")
 				diff <- d2-d1
-				units(diff) <- "days"
+				units(diff) <- units
 				indiv_differences[i] <- as.numeric(diff)
 				if(indiv_differences[i] > max_diff) {
 					max_diff <- indiv_differences[i]
 					cat("New MAX diff",max_diff,"from individual",s,"\n")
-					print(d1)
-					print(d2)
 				}
 				if(indiv_differences[i] < min_diff) {
 					min_diff <- indiv_differences[i]
 					cat("New MIN diff",min_diff,"from individual",s,"\n")
-					print(d1)
-					print(d2)
 				}
 			}
 			differences <- c(differences, indiv_differences)
@@ -317,7 +313,7 @@ histogram_sample_density <- function(data) {
         p <- ggplot(diff_df) +
                 geom_histogram(aes(x=differences), binwidth=14) +
                 theme_minimal() +
-                xlab("sample distance (days)")
+                xlab(paste("sample distance (",units,")",sep=""))
         ggsave("histogram_sample_distance.png", plot=p)
 	return(differences)
 }
