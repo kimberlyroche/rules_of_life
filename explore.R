@@ -13,7 +13,7 @@ if(FALSE) {
 	check_taxa_aggomeration(data)
 }
 
-if(TRUE) {
+if(FALSE) {
 	load("glom_data_g.RData")
 	# glom_data contains all samples agglomerated to genus level by phyloseq
 	cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
@@ -28,7 +28,7 @@ if(FALSE) {
 	#histogram_abundances(ilr_f1, "histogram_cutoff_3-20")
 }
 
-if(TRUE) {
+if(FALSE) {
 	# filter to samples containing at least 90% counts >= 3 and get zero counts
 	f2 <- filter_counts(glom_data, 3, 0.9)
 	cat("Zero counts (90% filtering):",(1 - get_tiny_counts(f2, 1)),"\n")
@@ -36,7 +36,7 @@ if(TRUE) {
 	#histogram_abundances(ilr_f2, "histogram_cutoff_3-90")
 }
 
-if(FALSE) {
+if(TRUE) {
 	baboons <- c("ACA", "DUI", "CAI", "COB", "DAS")
 	for(b in baboons) {
 		B_counts <- subset_samples(f2, sname==b)
@@ -59,7 +59,7 @@ if(FALSE) {
 	}
 }
 
-if(TRUE) {
+if(FALSE) {
 	cat("Writing histograms of sampling frequency...\n")
 	#histogram_indiv_samples(f2)
 	histogram_sample_density(f2, units="weeks")

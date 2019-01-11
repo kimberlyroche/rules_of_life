@@ -300,10 +300,14 @@ histogram_sample_density <- function(data, units="days") {
 				if(indiv_differences[i] > max_diff) {
 					max_diff <- indiv_differences[i]
 					cat("New MAX diff",max_diff,"from individual",s,"\n")
+					print(d1)
+					print(d2)
 				}
 				if(indiv_differences[i] < min_diff) {
 					min_diff <- indiv_differences[i]
 					cat("New MIN diff",min_diff,"from individual",s,"\n")
+					print(d1)
+					print(d2)
 				}
 			}
 			differences <- c(differences, indiv_differences)
@@ -311,11 +315,10 @@ histogram_sample_density <- function(data, units="days") {
 	}
 	diff_df <- as.data.frame(x=differences)
         p <- ggplot(diff_df) +
-                geom_histogram(aes(x=differences), binwidth=14) +
+                geom_histogram(aes(x=differences), binwidth=4) +
                 theme_minimal() +
                 xlab(paste("sample distance (",units,")",sep=""))
         ggsave("histogram_sample_distance.png", plot=p)
-	return(differences)
 }
 
 # assumes rows are taxa, columns are samples!
@@ -326,11 +329,13 @@ plot_autocorrelation <- function(data, md, lag.max, filename, norm_by_T=FALSE) {
         }
 	ac <- calc_autocorr(data, md, lag.max=lag.max, norm_by_T=norm_by_T)
 	p <- ggplot(as.data.frame(cbind(x=seq(0,lag.max), y=ac)), aes(x=x, y=y)) +
-		geom_point() +
+		geom_line(linetype = "dashed") +
 		scale_x_continuous(breaks=seq(0,lag.max,1)) +
 		scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
 		xlab("lag (weeks)") +
 		ylab("ACF") +
-		theme_minimal()
+		theme_minimal() +
+		theme(axis.line.x=element_line(), axis.line.y=element_line()) +
+		geom_hline(yintercept = 0)
 	ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
 }
