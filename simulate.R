@@ -78,13 +78,13 @@ simulate_matT_one <- function(it) {
   }
 
   avg_est <- 0
-  for(i in 1:10) {
+  for(i in 1:5) {
     cat("Opt it:",i,"\n")
     res <- optim(par=c(runif(1)), fn=logd_mat_t_one, vc=list(component.1), data=sample_data, N=N, P=P, method="L-BFGS-B")
     avg_est <- avg_est + res$par
   }
   cat("Actual: 2\n")
-  cat("Average estimate:",exp(avg_est/10),"\n")
+  cat("Average estimate:",exp(avg_est/5),"\n")
 }
 
 simulate_matT_two <- function(it) {
@@ -126,8 +126,8 @@ simulate_matT_two <- function(it) {
 #cat("Matrix normal:\n")
 #simulate_matrix_normal(100)
 
-#cat("Matrix-T (1):\n")
-#simulate_matT_one(1000)
+cat("Matrix-T (1):\n")
+simulate_matT_one(5000)
 
-cat("Matrix-T (2):\n")
-simulate_matT_two(100000)
+#cat("Matrix-T (2):\n")
+#simulate_matT_two(100000)

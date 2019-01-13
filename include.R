@@ -24,7 +24,6 @@ read_data <- function(write_sample=FALSE) {
 
 read_metadata <- function(data, write_sample=FALSE) {
 	# metadata: rows are samples, "sample-specific variables" are columns
-	cat("Reading metadata...\n")
 	metadata <- phyloseq::sample_data(data)
 	# sort ASC by collection date
 	metadata <- metadata[order(metadata$sname,metadata$collection_date),]
@@ -115,7 +114,7 @@ calc_autocorr <- function(data, md, lag.max=NULL, mean_center=TRUE, norm_by_T=FA
 	T <- dim(data)[2]
 	max.T <- lag.max
 	if(is.null(lag.max)) {
-	lag.max <- max(week_d)
+		lag.max <- max(week_d)
 	}
 	# calculate autocorrelation for all (available) week lags
 	ac <- numeric(lag.max+1)
