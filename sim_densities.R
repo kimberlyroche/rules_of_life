@@ -35,8 +35,7 @@ logd_mat_norm <- function(s, vc, data, P) {
 }
 
 # marginal matrix-T (one component)
-logd_mat_t_one <- function(s, vc, data, N, P) {
-  upsilon <- P + 100
+logd_mat_t_one <- function(s, vc, data, N, P, upsilon) {
   K <- diag(P)
   A <- round((exp(s[1])*vc[[1]]), digits=10)
   samples <- dim(data)[3]
@@ -49,10 +48,9 @@ logd_mat_t_one <- function(s, vc, data, N, P) {
 }
 
 # marginal matrix-T (two component)
-logd_mat_t_two <- function(s, vc, data, N, P) {
-  upsilon <- P + 100
+logd_mat_t_two <- function(s, vc, data, N, P, upsilon) {
   K <- diag(P)
-  A <- round((exp(s[1])*vc[[1]] + exp(s[2])*vc[[2]]), digits=10)
+  A <- round((exp(s[1])*vc[[1]] + exp(s[2])*vc[[2]]), digits=5)
   samples <- dim(data)[3]
   d <- 0
   for(i in 1:samples) {

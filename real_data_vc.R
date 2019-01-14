@@ -103,58 +103,45 @@ for(i in 1:ns_ACA) {
 }
 plot_cov(season_distance, "season_correlation_DUI-ACA")
 
-
-
-#perm <- sample(1:ns)
-subset <- ilr_both[1:20,1:30]
-
-N <- dim(subset)[2]
-P <- dim(subset)[1]
-mu <- apply(subset, 1, mean)
+N <- dim(ilr_both)[2]
+P <- dim(ilr_both)[1]
+mu <- apply(ilr_both, 1, mean)
 mu_mat <- matrix(0, nrow=P, ncol=N)
 for(i in 1:N) {
   mu_mat[,i] <- mu
 }
-eta <- subset - mu_mat
-K <- cov(t(eta))
-A_actual <- cov(eta) + diag(N)*0.0001
+eta <- ilr_both - mu_mat
 image(eta)
+K <- cov(t(eta))
 image(K)
-image(A_actual)
+image(cov(eta))
 
-matT_log_density <- function(s) {
-  upsilon <- P+5
-  A <- s*A_actual
-  d <- -(P/2)*log(det(A)) - ((upsilon+N+P-1)/2)*log(det(diag(P) + solve(K)%*%(eta)%*%solve(A)%*%t(eta)))
+matT_log_density <- function(s, vc, data, N, P, K) {
+  upsilon <- P + 2
+  A <- round((exp(s[1])*vc[[1]] + exp(s[2])*vc[[2]] + exp(s[3])*vc[[3]]), digits=10)
+#  cat("s1, s2, s3:",s[1],s[2],s[3],"\n")
+#  cat("\tlog(det(A)):",log(det(A)),"\n")
+#  cat("\tlog(det(solve(A))):",log(det(solve(A))),"\n")
+  cat("Tr(A):",tr(A),"\n")
+  d <- -(P/2)*log(det(A))-((upsilon+N+P-1)/2)*log(det(diag(P) + solve(K)%*%(data)%*%solve(A)%*%t(data)))
   return(-d)
 }
-res <- optim(par=runif(1), fn=matT_log_density, method="L-BFGS-B")
-res$par
 
-matNorm_density <- function(s) {
-  #return(-dmatrixnorm(eta, rep(0, P), K, s*A_actual, log=FALSE))
-  # K -> U, A -> V
-  return((1/2)*tr(solve(A)%*%t(eta)%*%solve(K)%*%(eta)) + (N/2)*log(det(A)))
+opt_it <- 1
+averages <- matrix(0, nrow=3, ncol=opt_it)
+for(s in 1:opt_it) {
+  cat("Iteration",s,"...\n")
+  res <- optim(par=c(runif(1), runif(1), runif(1)),
+               vc=list(0.5*date_distance, 0.5*indiv_distance, 0.5*season_distance),
+               data=eta, N=N, P=P, K=K, fn=matT_log_density, method="L-BFGS-B")
+  total_wgt <- exp(res$par[1]) + exp(res$par[2]) + exp(res$par[3])
+  averages[,s] <- c((exp(res$par[1])/total_wgt), (exp(res$par[2])/total_wgt), (exp(res$par[3])/total_wgt))
 }
+cat("Average percent contribution:",toString(round(apply(averages, 1, mean)*100, 1)),"\n")
 
-s <- 0
-for(i in 1:1) {
-  res <- optim(par=runif(1), fn=matNorm_density, method="L-BFGS-B")
-  s <- s + res$par
-}
-cat("Avg est:",s,"\n")
 
-#s <- 0
-#for(i in 1:10) {
-#  res <- optim(runif(1), matT_log_density, control=list(fnscale=-1))
-#  s <- s + res$par
-#}
-#cat("Average estimate:",s,"\n")
 
-# to do:
-# (0) NaNs?
-# (1) empirically decide on a better within-individual and within-season correlation
-# (2) add more baboons
-# (3) slide on model
-# (4) quick figures into PPT
+
+
+
 
