@@ -103,7 +103,7 @@ simulate_matT_two <- function(it) {
     component.1[i,i+1] <- 0.33
     component.1[i+1,i] <- 0.33
   }
-  # component 1 - AR1 seasonal distance
+  # component 1 - seasonal distance
   sigma_true.2 <- 0.8
   component.2 <- matrix(-0.2, nrow=N, ncol=N)
   component.2[1:150,1:150] <- 0.2
@@ -124,7 +124,7 @@ simulate_matT_two <- function(it) {
     res <- optim(par=c(runif(1), runif(1)),
                  fn=logd_mat_t_two,
                  vc=list(component.1, component.2),
-                 data=sample_data, N=N, P=P, upsilon=upsilon, method="L-BFGS-B")
+                 data=sample_data, N=N, P=P, upsilon=upsilon)
     avg_est.1 <- avg_est.1 + res$par[1]
     avg_est.2 <- avg_est.2 + res$par[2]
   }
@@ -143,4 +143,4 @@ simulate_matT_two <- function(it) {
 #simulate_matT_one(100)
 
 cat("Matrix-T (2):\n")
-simulate_matT_two(200)
+simulate_matT_two(20)
