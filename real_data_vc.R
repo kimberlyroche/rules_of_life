@@ -1,6 +1,6 @@
 source("include.R")
 library(driver)
-library(psych)
+#library(psych)
 library(LaplacesDemon)
 
 plot_cov <- function(datamat, filename) {
@@ -16,128 +16,98 @@ plot_cov <- function(datamat, filename) {
 
 # pull sample data for two individuals (DUI, ACA)
 
-load("sample_indiv_counts.RData")
-md_DUI <- read_metadata(DUI_counts)
-md_ACA <- read_metadata(ACA_counts)
-ilr_DUI <- apply(otu_table(DUI_counts)@.Data+0.65, 1, ilr)
-ilr_ACA <- apply(otu_table(ACA_counts)@.Data+0.65, 1, ilr)
-ilr_both <- cbind(ilr_DUI, ilr_ACA)
+#load("glom_data_g.RData")
+#f2 <- filter_counts(glom_data, 3, 0.9)
 
-nt <- dim(ilr_both)[1]
-ns_DUI <- dim(ilr_DUI)[2]
-ns_ACA <- dim(ilr_ACA)[2]
-ns <- ns_DUI + ns_ACA
-rm(ilr_DUI)
-rm(DUI_counts)
-rm(ilr_ACA)
-rm(ACA_counts)
+ilr_data <- NULL
+week_kernel <- NULL
+individual_kernel <- NULL
+season_vector <- NULL
 
-# build time kernel (distance per day)
+baboons <- c("ACA", "DUI", "CAI", "COB", "DAS")
+for(b in 1:length(baboons)) {
+  cat("Building kernels for baboon",baboons[b],"\n")
+  baboon_counts <- subset_samples(f2, sname==baboons[b])
+  baboon_metadata <- read_metadata(baboon_counts)
+  baboon_log_ratios <- apply(otu_table(baboon_counts)@.Data+0.65, 1, ilr)
 
-rho <- 1/3
-# need "distance" between samples
-date_distance <- matrix(0, nrow=ns_DUI+ns_ACA, ncol=ns_DUI+ns_ACA)
-for(i in 1:ns_DUI) {
-  for(j in 1:ns_DUI) {
-    if(i == j) {
-      date_distance[i,j] <- 1
-    } else {
-      dd <- abs(as.Date(md_DUI$collection_date[i]) - as.Date(md_DUI$collection_date[j]))
-      if(dd == 0) {
-        dd <- 1 # better fix for same-day sampling needed
+  nt <- ntaxa(baboon_counts)
+  ns <- nsamples(baboon_counts)
+
+  # build time kernel (distance per week)
+
+  rho <- 1/2
+  subset_week_kernel <- matrix(0, nrow=ns, ncol=ns)
+  for(i in 1:ns) {
+    for(j in 1:ns) {
+      d1 <- as.Date(baboon_metadata$collection_date[i])
+      d2 <- as.Date(baboon_metadata$collection_date[j])
+      week_d <- abs(round((d2-d1)/7)) + 1
+      # distance of 1 is < 7 days
+      # distance of 2 is < 14 days, etc.
+      if(week_d == 0) {
+        week_d <- 1 # treat same day sampling as < 1 week
       }
-      dd <- dd[[1]]/50
-      date_distance[i,j] <- rho^dd
+      week_d <- week_d[[1]]
+      subset_week_kernel[i,j] <- rho^week_d
+    }
+  }
+
+  if(is.null(week_kernel)) {
+    week_kernel <- subset_week_kernel
+  } else {
+    prev_r <- dim(week_kernel)[1]
+    prev_c <- dim(week_kernel)[2]
+    week_kernel <- cbind(week_kernel, matrix(0, nrow=dim(week_kernel)[1], ncol=ns))
+    week_kernel <- rbind(week_kernel, matrix(0, nrow=ns, ncol=dim(week_kernel)[2]))
+    new_r <- dim(week_kernel)[1]
+    new_c <- dim(week_kernel)[2]
+    week_kernel[(prev_r+1):new_r,(prev_c+1):new_c] <- subset_week_kernel
+  }
+  plot_cov(week_kernel, "date_correlation_test")
+
+  indiv_cov <- 0.33
+  subset_indiv_kernel <- matrix(0, nrow=ns, ncol=ns)
+  subset_indiv_kernel[1:ns,1:ns] <- diag(ns)*(1-indiv_cov) + indiv_cov
+  if(is.null(individual_kernel)) {
+    individual_kernel <- subset_indiv_kernel
+  } else {
+    prev_r <- dim(individual_kernel)[1]
+    prev_c <- dim(individual_kernel)[2]
+    individual_kernel <- cbind(individual_kernel, matrix(0, nrow=dim(individual_kernel)[1], ncol=ns))
+    individual_kernel <- rbind(individual_kernel, matrix(0, nrow=ns, ncol=dim(individual_kernel)[2]))
+    new_r <- dim(individual_kernel)[1]
+    new_c <- dim(individual_kernel)[2]
+    individual_kernel[(prev_r+1):new_r,(prev_c+1):new_c] <- subset_indiv_kernel
+  }
+  plot_cov(individual_kernel, "indiv_correlation_test")
+
+  subset_season_vector <- numeric(ns)
+  for(i in 1:ns) {
+    if(baboon_metadata$season[i] == "Wet") {
+      subset_season_vector[i] <- 1
+    } else {
+      subset_season_vector[i] <- -1
+    }
+  }
+  if(is.null(season_vector)) {
+    season_vector <- subset_season_vector
+  } else {
+    season_vector <- c(season_vector, subset_season_vector)
+  }
+}
+
+ns_all <- length(season_vector)
+season_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
+season_cov <- 0.3
+for(i in 1:ns_all) {
+  for(j in 1:ns_all) {
+    if(i == j) {
+      season_kernel[i,j] <- 1
+    } else {
+      season_kernel[i,j] <- season_vector[i]*season_vector[j]*season_cov
     }
   }
 }
-for(i in 1:ns_ACA) {
-  for(j in 1:ns_ACA) {
-    if(i == j) {
-      date_distance[i+ns_DUI,j+ns_DUI] <- 1
-    } else {
-      dd <- abs(as.Date(md_ACA$collection_date[i]) - as.Date(md_ACA$collection_date[j]))
-      if(dd == 0) {
-        dd <- 1
-      }
-      dd <- dd[[1]]/50
-      date_distance[i+ns_DUI,j+ns_DUI] <- rho^dd
-    }
-  }
-}
-plot_cov(date_distance, "date_correlation_DUI-ACA")
 
-# build individual kernel
-
-indiv_cov <- 0.33
-indiv_distance <- matrix(0, nrow=ns_DUI+ns_ACA, ncol=ns_DUI+ns_ACA)
-indiv_distance[1:ns_DUI,1:ns_DUI] <- diag(ns_DUI)*(1-indiv_cov) + indiv_cov
-indiv_distance[(ns_DUI+1):ns,(ns_DUI+1):ns] <- diag(ns_ACA)*(1-indiv_cov) + indiv_cov
-plot_cov(indiv_distance, "indiv_correlation_DUI-ACA")
-
-# build seasonal kernel
-
-season_cov <- 0.1
-season_distance <- matrix(0, nrow=ns_DUI+ns_ACA, ncol=ns_DUI+ns_ACA)
-for(i in 1:ns_DUI) {
-  for(j in 1:ns_DUI) {
-    if(i == j) {
-      season_distance[i,j] <- 1
-    } else {
-      if(md_DUI$season[i] == md_DUI$season[j]) {
-        season_distance[i,j] <- season_cov
-      }
-    }
-  }
-}
-for(i in 1:ns_ACA) {
-  for(j in 1:ns_ACA) {
-    if(i == j) {
-      season_distance[i+ns_DUI,j+ns_DUI] <- 1
-    } else {
-      if(md_ACA$season[i] == md_ACA$season[j]) {
-        season_distance[i+ns_DUI,j+ns_DUI] <- season_cov
-      }
-    }
-  }
-}
-plot_cov(season_distance, "season_correlation_DUI-ACA")
-
-ilr_subset <- ilr_both[,1:ns_DUI]
-
-N <- dim(ilr_subset)[2]
-P <- dim(ilr_subset)[1]
-mu <- apply(ilr_subset, 1, mean)
-mu_mat <- matrix(0, nrow=P, ncol=N)
-for(i in 1:N) {
-  mu_mat[,i] <- mu
-}
-eta <- ilr_subset - mu_mat
-image(eta)
-K <- cov(t(eta))
-
-matT_log_density <- function(s, vc, data, N, P, K) {
-  upsilon <- P + 2
-  A <- round((exp(s[1])*vc[[1]] + exp(s[2])*vc[[2]] + exp(s[3])*vc[[3]]), digits=10)
-  d <- (P/2)*log(det(A)) + ((upsilon+N+P-1)/2)*log(det(diag(P) + solve(K)%*%(data)%*%solve(A)%*%t(data)))
-  return(d)
-}
-
-opt_it <- 10
-averages <- matrix(0, nrow=3, ncol=opt_it)
-for(s in 1:opt_it) {
-  cat("Iteration",s,"...\n")
-  res <- optim(par=c(runif(1), runif(1), runif(1)),
-               vc=list(date_distance[1:ns_DUI,1:ns_DUI], indiv_distance[1:ns_DUI,1:ns_DUI], season_distance[1:ns_DUI,1:ns_DUI]),
-               data=eta, N=N, P=P, K=K, fn=matT_log_density)
-  total_wgt <- exp(res$par[1]) + exp(res$par[2]) + exp(res$par[3])
-  averages[,s] <- c((exp(res$par[1])/total_wgt), (exp(res$par[2])/total_wgt), (exp(res$par[3])/total_wgt))
-}
-cat("Average percent contribution:",toString(round(apply(averages, 1, mean)*100, 1)),"\n")
-
-
-
-
-
-
-
+plot_cov(season_kernel, "season_correlation_test")
