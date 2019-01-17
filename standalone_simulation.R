@@ -17,7 +17,7 @@ logd_mat_t_two <- function(s, vc, data, N, P, upsilon) {
 
 N <- 300
 P <- 20
-samples <- 10
+samples <- 1000
 upsilon <- P + 2
 M <- matrix(0, P, N)
 
