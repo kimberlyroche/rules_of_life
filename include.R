@@ -4,6 +4,9 @@ library(driver)
 library(ggplot2)
 library(scales)
 library(coda)
+library(Rcpp)
+
+sourceCpp("fastCorr.cpp")
 
 pdf(NULL)
 
@@ -208,11 +211,14 @@ histogram_corr <- function(data, filename, cov=FALSE) {
 # ====================================================================================================================
 
 plot_corr_matrix <- function(data, filename, cov=FALSE) {
-  cov_mat <- cov(t(data))
-  cor_mat <- cov2cor(cov_mat)
+  cor_mat <- fastCorr(t(data))
+  #cov_mat <- cov(t(data))
+  #cor_mat <- cov2cor(cov_mat)
   df <- gather_array(cor_mat)
   p <- ggplot(df, mapping=aes(x=dim_1, y=dim_2, fill=var)) +
     geom_tile() +
+    scale_fill_gradientn(limits = c(-1,1),
+    colours=c("navyblue", "darkmagenta", "darkorange1")) +
     xlab("samples") +
     ylab("samples") +
     theme_minimal()
@@ -221,12 +227,10 @@ plot_corr_matrix <- function(data, filename, cov=FALSE) {
   } else {
     p <- p + guides(fill=guide_legend(title="correlation"))
   }
-  ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste(filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 visualize_groupwise_covariance <- function(data, group, sample=1000000) {
-  # subset to best sampled 10 individuals
-  data <- subset_samples(data, sname %in% best_sampled)
 
   md <- read_metadata(data)
 
@@ -237,6 +241,7 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
   } else if(group == "matgrp") {
     groups <- unique(md$matgrp); partition_obj <- md$matgrp; use_no <- sample
   } else if(group == "sname") {
+    #groups <- best_sampled; partition_obj <- md$sname; use_no <- sample
     groups <- unique(md$sname); partition_obj <- md$sname; use_no <- sample
   } else if(group == "sex") {
     groups <- unique(md$sex); partition_obj <- md$sex; use_no <- sample
@@ -274,21 +279,24 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
   for(i in 1:length(groups)) {
     total_samples <- dim(partition_samples[[i]])[2]
     use_ids <- sample(total_samples)
-    cat(groups[i],"has",total_samples,"samples\n")
     use_upper <- use_no
-    if(total_samples < use_upper) {
-      use_upper <- total_samples
-    }
-    samples[[i]] <- partition_samples[[i]][,use_ids[1:use_upper]]
-    if(is.null(stacked_lr)) {
-      stacked_lr <- samples[[i]]
-    } else {
-      stacked_lr <- cbind(stacked_lr, samples[[i]])
+    #if(total_samples < use_upper) {
+    #  use_upper <- total_samples
+    #}
+    # omit groups with fewer than the requested number of samples
+    if(total_samples >= use_upper) {
+      cat(groups[i],"has",total_samples,"samples; using",use_upper,"\n")
+      samples[[i]] <- partition_samples[[i]][,use_ids[1:use_upper]]
+      if(is.null(stacked_lr)) {
+        stacked_lr <- samples[[i]]
+      } else {
+        stacked_lr <- cbind(stacked_lr, samples[[i]])
+      }
     }
   }
   cat("Sample matrix is",dim(stacked_lr)[1],"by",dim(stacked_lr)[2],"\n")
 
-  plot_corr_matrix(t(stacked_lr), paste(group, "_cov_matrix", sep=""), cov=TRUE)
+  plot_corr_matrix(t(stacked_lr), paste(group, "_cov_matrix", sep=""))
 }
 
 # ====================================================================================================================
