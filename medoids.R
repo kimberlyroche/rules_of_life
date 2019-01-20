@@ -3,21 +3,25 @@ library(Rcpp)
 source("include.R")
 sourceCpp("fastCorr.cpp")
 
-#filtered <- filter_data()
+filtered <- filter_data()
 #sample_data <- subset_samples(filtered, sname %in% c("DUI", "ACA"))
-load("sample_data.RData")
-md <- read_metadata(sample_data)
+#load("sample_data.RData")
+#md <- read_metadata(sample_data)
 
 # sample data is ordered by sname, then collection_date
 
-sample_ilr <- apply_ilr(sample_data)
+sample_ilr <- apply_ilr(filtered)
 sample_ilr <- t(apply(sample_ilr, 1, function(x) x - mean(x)))
 
 # faster to do this by hand?
 corr_mat <- fastCorr(sample_ilr)
-diss_mat <- 1-corr_mat
+png("test_whole_corr.png")
+image(corr_mat[1:5000,1:5000])
+dev.off()
 
-res <- pam(diss_mat, 10, metric="euclidean", do.swap=TRUE)
+#diss_mat <- 1-corr_mat
+
+#res <- pam(diss_mat, 10, metric="euclidean", do.swap=TRUE)
 
 # any enrichment for season?
 #c1 <- names(which(res$clustering == 1))
