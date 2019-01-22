@@ -18,7 +18,10 @@ best_sampled <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR",
 
 read_data <- function(write_sample=FALSE) {
   # rows are samples, columns are taxa
-  data <- readRDS("data/emp_baboon.RDS")
+  #data <- readRDS("data/emp_baboon.RDS")
+  data <- readRDS("data/emp_baboon_NewFiltr.RDS")
+  # for now, just remove non-Bacterial domain
+  data <- subset_taxa(data, domain=="Bacteria")
   if(write_sample) {
     write.table(otu_table(data)[1:10,1:10], file="otu_sample.txt", sep="\t")
     write.table(tax_table(data)[1:10,], file="tax_sample.txt", sep="\t")
