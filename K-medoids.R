@@ -1,7 +1,10 @@
 library(cluster)
 library(psych)
-#library(Rcpp)
+library(Rcpp)
 source("include.R")
+sourceCpp("fastCorr.cpp")
+
+pdf(NULL)
 
 # =============================================================================
 # GET REPRODUCIBILITY SCORE BETWEEN CLUSTERING RUNS
@@ -52,6 +55,7 @@ if(!exists("filtered")) {
 
 subset_to <- 100
 K <- 10
+diss <- TRUE
 
 # ILR-transform
 ilr_data <- apply_ilr(filtered)
@@ -60,13 +64,25 @@ if(subset_to > 0) {
 }
 ilr_data <- t(apply(ilr_data, 1, function(x) x - mean(x)))
 
-res <- pam(t(ilr_data), K)
+if(diss) {
+  diss_mat <- 1 - abs(fastCorr(t(ilr_data)))
+}
+
+if(diss) {
+  res <- pam(diss_mat, K, diss=TRUE)
+} else {
+  res <- pam(t(ilr_data), K)
+}
 cat("Results (run 1):\n")
 c1 <- as.vector(res$clustering)
 print(c1)
 
-shuffled_idx <- sample(dim(subset_sample)[2])
-res2 <- pam(t(ilr_data[,shuffled_idx]), K)
+if(diss) {
+  res2 <- pam(diss_mat, K, diss=TRUE)
+} else {
+  shuffled_idx <- sample(dim(subset_sample)[2])
+  res2 <- pam(t(ilr_data[,shuffled_idx]), K)
+}
 cat("Results (run 2):\n")
 c2 <- as.vector(res2$clustering)
 print(c2)
