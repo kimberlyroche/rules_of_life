@@ -7,7 +7,8 @@ sourceCpp("fastCorr.cpp")
 pdf(NULL)
 
 # =============================================================================
-# GET REPRODUCIBILITY SCORE BETWEEN CLUSTERING RUNS
+# GET REPRODUCIBILITY SCORE BETWEEN CLUSTERING RUNS;
+# WE NEED TO EVALUATE WHETHER THIS IS STABLE(ISH) BETWEEN PSEUDOCOUNT CHOICES
 # =============================================================================
 
 match_runs <- function(a1, a2) {
