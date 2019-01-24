@@ -1,14 +1,12 @@
-library(phyloseq)
-library(dplyr)
-library(driver)
-library(ggplot2)
-library(scales)
-library(coda)
-library(Rcpp)
+suppressMessages(library(phyloseq))
+suppressMessages(library(dplyr))
+suppressMessages(library(driver))
+suppressMessages(library(ggplot2))
+suppressMessages(library(scales))
+suppressMessages(library(coda))
+suppressMessages(library(Rcpp))
 
 sourceCpp("fastCorr.cpp")
-
-pdf(NULL)
 
 best_sampled <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI")
 

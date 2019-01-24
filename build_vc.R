@@ -1,9 +1,14 @@
 source("include.R")
-library(driver)
-library(psych)
-library(LaplacesDemon)
-library(mvtnorm)
-library(MCMCpack)
+suppressMessages(library(driver))
+suppressMessages(library(psych))
+suppressMessages(library(LaplacesDemon))
+suppressMessages(library(mvtnorm))
+suppressMessages(library(MCMCpack))
+suppressMessages(library(Rcpp))
+suppressMessages(library(RcppDE))
+suppressMessages(library(RcppEigen))
+
+sourceCpp("dens_optim.cpp")
 
 plot_cov <- function(datamat, filename) {
   df <- gather_array(datamat)
@@ -13,7 +18,7 @@ plot_cov <- function(datamat, filename) {
     ylab("samples") +
     theme_minimal() +
     guides(fill=guide_legend(title="covariance"))
-  ggsave(paste("plots/",filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste(filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 # ============================================================================================
@@ -32,7 +37,9 @@ if(!exists("ilr_data")) {
   indiv_vector <- NULL
 
   #baboons <- c("AMA", "AMO", "ORI")
-  baboons <- c("AMA", "AMO", "BUC", "CHE", "DAG", "EGO", "HOK", "KIW", "NOO", "ORI")
+  #baboons <- c("AMA", "AMO", "BUC", "CHE", "DAG", "EGO", "HOK", "KIW", "NOO", "ORI")
+  snames <- unique(read_metadata(f2)$sname)
+  baboons <- snames[1:20]
   for(b in 1:length(baboons)) {
     cat("Building kernels for baboon",baboons[b],"\n")
     baboon_counts <- subset_samples(f2, sname==baboons[b])
@@ -51,16 +58,17 @@ if(!exists("ilr_data")) {
     subset_week_kernel <- matrix(0, nrow=ns, ncol=ns)
     for(i in 1:ns) {
       for(j in 1:ns) {
-        d1 <- as.Date(baboon_metadata$collection_date[i])
-        d2 <- as.Date(baboon_metadata$collection_date[j])
-        week_d <- abs(round((d2-d1)/7)) + 1
-        # distance of 1 is < 7 days
-        # distance of 2 is < 14 days, etc.
-        if(week_d == 0) {
-          week_d <- 1 # treat same day sampling as < 1 week
+        if(i == j) {
+          subset_week_kernel[i,j] <- 1
+        } else {
+          d1 <- as.Date(baboon_metadata$collection_date[i])
+          d2 <- as.Date(baboon_metadata$collection_date[j])
+          # get number of 'weeks difference'
+          week_d <- abs(round((d2-d1)/7))[[1]] + 1
+          # distance of 1 is < 7 days
+          # distance of 2 is < 14 days, etc.
+          subset_week_kernel[i,j] <- rho^week_d
         }
-        week_d <- week_d[[1]]
-        subset_week_kernel[i,j] <- rho^week_d
       }
     }
 
@@ -75,7 +83,6 @@ if(!exists("ilr_data")) {
       new_c <- dim(week_kernel)[2]
       week_kernel[(prev_r+1):new_r,(prev_c+1):new_c] <- subset_week_kernel
     }
-    plot_cov(week_kernel, "date_correlation")
 
     subset_season_vector <- numeric(ns)
     subset_age_vector <- numeric(ns)
@@ -118,6 +125,8 @@ if(!exists("ilr_data")) {
       indiv_vector <- c(indiv_vector, subset_indiv_vector)
     }
   }
+
+  plot_cov(week_kernel, "date_correlation")
 
   ns_all <- length(season_vector)
 
@@ -187,32 +196,60 @@ if(!exists("ilr_data")) {
 # ============================================================================================
 
 # marginal matrix-T (two component)
-logd_mat_t_two <- function(s, vc, data) {
-  N <- dim(data)[2]
-  P <- dim(data)[1]
+logd_mat_t <- function(s) {
+  N <- dim(ilr_data)[2]
+  P <- dim(ilr_data)[1]
   upsilon <- P + 10
   K <- diag(P)
-  A <- round((exp(s[1])*vc[[1]] + exp(s[2])*vc[[2]]), digits=10)
-  # garbage workaround for numeric precision problems
-  d <- (P/2)*log(det(A)) +
-       ((upsilon+N+P-1)/2)*log(det(diag(P) +
-        (1/upsilon)*solve(K)%*%(data)%*%solve(A)%*%t(data)))
+  A <- exp(s[1])*week_kernel + exp(s[2])*season_kernel + exp(s[3])*group_kernel +
+       exp(s[4])*age_kernel + exp(s[5])*indiv_kernel
+  logdetA <- 2*sum(log(diag(chol(A))))
+  S <- diag(P) + (1/upsilon)*solve(K)%*%(ilr_data)%*%solve(A)%*%t(ilr_data)
+  logdetS <- 2*sum(log(diag(chol(S))))
+  d <- (P/2)*logdetA + ((upsilon+N+P-1)/2)*logdetS
   return(d)
 }
 
-# get real data, ILR transform
+ALT_logd_mat_t <- function(s) {
+  ret_val <- logd_matrixt(s[1], s[2], s[3], s[4], s[5], ilr_data, week_kernel, season_kernel, group_kernel, age_kernel, indiv_kernel)
+  return(ret_val)
+}
 
-it <- 10
+#A <- 0.3*week_kernel + 0.3*season_kernel + 0.3*group_kernel + 0.3*age_kernel + 0.3*indiv_kernel
+#print(2*sum(log(diag(chol(A)))))
+
+it <- 1
 estimates <- matrix(0, 5, it)
 for(i in 1:it) {
   cat("Optimization iteration",i,"\n")
-  res <- optim(par=c(runif(1), runif(1), runif(1), runif(1), runif(1)),
-             fn=logd_mat_t_two,
-             vc=list(week_kernel, season_kernel, age_kernel, group_kernel, indiv_kernel),
-             data=ilr_data)
+#  ptm <- proc.time()
+#  res <- optim(par=runif(5), fn=logd_mat_t, method="L-BFGS-B", lower=rep(-100,5), upper=rep(10,5))
+#  print(proc.time() - ptm)
+#  print(round(exp(res$par),digits=5))
+  ptm <- proc.time()
+  res <- optim(par=runif(5), fn=ALT_logd_mat_t, method="L-BFGS-B", lower=rep(0.00001,5), upper=rep(10,5))
+  print(proc.time() - ptm)
+  print(round(res$par,digits=5))
   estimates[,i] <- exp(res$par)
+  # need to figure out how to get compiled functions working with DEoptim
+  # specifically, how to we pass these arbitrary parameters?
 }
+save(estimates, file="Roptim_estimates.RData")
+
+if(FALSE) {
+kernels <- c("weekly","seasonal","group","age","individual")
 for(i in 1:it) {
-  rank <- order(estimates[,i])
-  print(rank)
+  rank <- order(estimates[,i], decreasing=TRUE)
+  cat("Iteration 1:")
+  for(j in 1:5) {
+    cat(" ",kernels[rank[j]]," (",round(estimates[rank[j],i],digits=3),")",sep="")
+  }
+  cat("\n")
 }
+}
+
+# INTERESTING QUESTIONS
+# (1) port to C++/Eigen; faster?
+# (2) how well is the ordering preserved?
+# (3) what proportion of total variance does this model capture? what does the residual variance look like?
+# (4) how sensitive is this analysis to choice of VC parameters?
