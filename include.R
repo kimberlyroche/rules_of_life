@@ -148,7 +148,7 @@ histogram_indiv_samples <- function(data) {
   ggsave("histogram_per_individual_samples.png", plot=p)
 }
 
-histogram_sample_density <- function(data, units="days") {
+histogram_sample_density <- function(data, units="weeks") {
   per_indiv <- psmelt(data)
   snames <- unique(per_indiv$sname)
   differences <- c()
@@ -185,11 +185,14 @@ histogram_sample_density <- function(data, units="days") {
     }
   }
   diff_df <- as.data.frame(x=differences)
-        p <- ggplot(diff_df) +
-                geom_histogram(aes(x=differences), binwidth=4) +
-                theme_minimal() +
-                xlab(paste("sample distance (",units,")",sep=""))
-        ggsave("histogram_sample_distance.png", plot=p)
+  p <- ggplot(diff_df) +
+          geom_histogram(aes(x=differences), binwidth=4) +
+          theme_minimal() +
+          xlab(paste("sample distance (",units,")",sep=""))
+  if(units == "weeks") {
+    p <- p + xlim(0, 100)
+  }
+  ggsave("histogram_sample_distance.png", plot=p)
 }
 
 # takes a list of correlations or covariances

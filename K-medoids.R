@@ -25,7 +25,10 @@ for(i in 1:length(pc_sweep)) {
   ilr_data <- ilr_data[,sample_idx] # subset
   ilr_data <- t(apply(ilr_data, 1, function(x) x - mean(x)))
   diss_mat <- 1 - abs(fastCorr(ilr_data))
+  start_time <- Sys.time()
   res <- pam(diss_mat, K, diss=TRUE)
+  diff <- Sys.time() - start_time
+  cat("Cluster time:",diff[[1]],attr(diff,"units"),"\n")
   # alternatively, w/o dissimilarity matrix: res <- pam(t(ilr_data), K)
   clusterings[[i]] <- as.vector(res$clustering)
 }
@@ -34,18 +37,22 @@ sweep_pairs <- combn(1:length(pc_sweep), 2)
 for(pair in 1:dim(sweep_pairs)[2]) {
   pc1_idx <- sweep_pairs[1,pair]
   pc2_idx <- sweep_pairs[2,pair]
+  c1 <- clusterings[[pc1_idx]]
+  c2 <- clusterings[[pc2_idx]]
 
   pairs_compared <- 0
   pairs_matched <- 0
   for(i in 1:subset_to) {
     for(j in 1:subset_to) {
-      # for a given pair
-      if(c1[i] == c1[j]) {
-        # if matched on the first run
-        if(c2[i] == c2[j]) {
-          pairs_matched <- pairs_matched + 1
+      if(i != j) {
+        # for a given pair
+        if(c1[i] == c1[j]) {
+          # if matched on the first run
+          if(c2[i] == c2[j]) {
+            pairs_matched <- pairs_matched + 1
+          }
+          pairs_compared <- pairs_compared + 1
         }
-        pairs_compared <- pairs_compared + 1
       }
     }
   }
