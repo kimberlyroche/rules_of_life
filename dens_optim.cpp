@@ -17,8 +17,9 @@ double logd_matrixt(double s1, double s2, double s3, double s4, double s5,
   double P = ilr_data.rows();
   double upsilon = P + 10;
   MatrixXd K = MatrixXd::Identity(P,P);
-//  MatrixXd A = exp(s1)*week_kernel + exp(s2)*season_kernel + exp(s3)*group_kernel +
-//               exp(s4)*age_kernel + exp(s5)*indiv_kernel;
+  // constrainst imposed in optim()
+  //  MatrixXd A = exp(s1)*week_kernel + exp(s2)*season_kernel + exp(s3)*group_kernel +
+  //               exp(s4)*age_kernel + exp(s5)*indiv_kernel;
   MatrixXd A = s1*week_kernel + s2*season_kernel + s3*group_kernel +
                s4*age_kernel + s5*indiv_kernel;
   // returns lower triangular L of A

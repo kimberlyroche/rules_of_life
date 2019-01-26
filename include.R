@@ -120,9 +120,9 @@ apply_proportion <- function(data) {
 }
 
 # takes a phyloseq object, returns a data.frame!
-apply_ilr <- function(data) {
+apply_ilr <- function(data, pseudocount=0.65) {
   counts <- otu_table(data)@.Data
-  return(apply(counts+0.65, 1, ilr))
+  return(apply(counts+pseudocount, 1, ilr))
 }
 
 # ====================================================================================================================

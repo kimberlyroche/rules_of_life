@@ -4,47 +4,6 @@ library(Rcpp)
 source("include.R")
 sourceCpp("fastCorr.cpp")
 
-pdf(NULL)
-
-# =============================================================================
-# GET REPRODUCIBILITY SCORE BETWEEN CLUSTERING RUNS;
-# WE NEED TO EVALUATE WHETHER THIS IS STABLE(ISH) BETWEEN PSEUDOCOUNT CHOICES
-# =============================================================================
-
-match_runs <- function(a1, a2) {
-  if(length(a1) != length(a2)) {
-    return(Inf)
-  }
-  K <- length(unique(a1)) # works as long as clusters are assigned 1:K
-  S <- matrix(0, nrow=K, ncol=K)
-  # how to vectorize?
-  for(k in 1:K) {
-    row_occur <- a2[which(a1==k)]
-    incr <- as.vector(seq(1,K))
-    incr <- as.vector(lapply(incr, function(x) { occur <- length(which(row_occur==x)); if(occur > 0) { occur } else { 0 } } ))
-    S[k,] <- unlist(incr)
-  }
-  return(S)
-}
-
-permute_cols <- function(p, a) {
-  a1 <- a[[1]]
-  a2 <- a[[2]]
-  S <- match_runs(a1, a2)
-  print(p)
-  print(S)
-  S <- S[,p]
-  return(-tr(S))
-}
-
-# WOULD NEED TO FIND A WAY TO OPTIMIZE OVER AN ORDERING OF COLUMNS
-# WHAT'S AN ALTERNATIVE WAY WE CAN JUDGE HOW WELL A CLUSTERING REPLICATES?
-
-#a1 <- as.list(res$clustering)
-#a2 <- as.list(res2$clustering)
-#K <- length(unique(a1))
-#res <- optim(par=as.vector(seq(1, K)), fn=permute_cols, a=list(a1, a2))
-
 # =============================================================================
 # RUN K-MEDOIDS CLUSTERING
 # =============================================================================
@@ -54,39 +13,41 @@ if(!exists("filtered")) {
   # data is ordered by sname, then collection_date
 }
 
-subset_to <- 100
-K <- 10
-diss <- TRUE
+set.seed(1)
+subset_to <- nsamples(filtered)
+K <- 500
+sample_idx <- sample(nsamples(filtered))[1:subset_to]
 
-# ILR-transform
-ilr_data <- apply_ilr(filtered)
-if(subset_to > 0) {
-  ilr_data <- ilr_data[,sample(dim(ilr_data)[2])[1:subset_to]]
-}
-ilr_data <- t(apply(ilr_data, 1, function(x) x - mean(x)))
-
-if(diss) {
-  diss_mat <- 1 - abs(fastCorr(t(ilr_data)))
-}
-
-if(diss) {
+pc_sweep <- c(0.1, 0.65, 1)
+clusterings <- list()
+for(i in 1:length(pc_sweep)) {
+  ilr_data <- apply_ilr(filtered, pseudocount=pc_sweep[i])
+  ilr_data <- ilr_data[,sample_idx] # subset
+  ilr_data <- t(apply(ilr_data, 1, function(x) x - mean(x)))
+  diss_mat <- 1 - abs(fastCorr(ilr_data))
   res <- pam(diss_mat, K, diss=TRUE)
-} else {
-  res <- pam(t(ilr_data), K)
+  # alternatively, w/o dissimilarity matrix: res <- pam(t(ilr_data), K)
+  clusterings[[i]] <- as.vector(res$clustering)
 }
-cat("Results (run 1):\n")
-c1 <- as.vector(res$clustering)
-print(c1)
 
-if(diss) {
-  res2 <- pam(diss_mat, K, diss=TRUE)
-} else {
-  shuffled_idx <- sample(dim(subset_sample)[2])
-  res2 <- pam(t(ilr_data[,shuffled_idx]), K)
+sweep_pairs <- combn(1:length(pc_sweep), 2)
+for(pair in 1:dim(sweep_pairs)[2]) {
+  pc1_idx <- sweep_pairs[1,pair]
+  pc2_idx <- sweep_pairs[2,pair]
+
+  pairs_compared <- 0
+  pairs_matched <- 0
+  for(i in 1:subset_to) {
+    for(j in 1:subset_to) {
+      # for a given pair
+      if(c1[i] == c1[j]) {
+        # if matched on the first run
+        if(c2[i] == c2[j]) {
+          pairs_matched <- pairs_matched + 1
+        }
+        pairs_compared <- pairs_compared + 1
+      }
+    }
+  }
+  cat("Combination",pc_sweep[pc1_idx],"vs.",pc_sweep[pc2_idx],":",round((pairs_matched/pairs_compared),digits=3),"\n")
 }
-cat("Results (run 2):\n")
-c2 <- as.vector(res2$clustering)
-print(c2)
-
-S <- match_runs(c1, c2)
-print(S)

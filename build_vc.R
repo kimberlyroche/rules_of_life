@@ -39,7 +39,7 @@ if(!exists("ilr_data")) {
   #baboons <- c("AMA", "AMO", "ORI")
   #baboons <- c("AMA", "AMO", "BUC", "CHE", "DAG", "EGO", "HOK", "KIW", "NOO", "ORI")
   snames <- unique(read_metadata(f2)$sname)
-  baboons <- snames[1:20]
+  baboons <- snames
   for(b in 1:length(baboons)) {
     cat("Building kernels for baboon",baboons[b],"\n")
     baboon_counts <- subset_samples(f2, sname==baboons[b])
@@ -126,7 +126,7 @@ if(!exists("ilr_data")) {
     }
   }
 
-  plot_cov(week_kernel, "date_correlation")
+  #plot_cov(week_kernel, "date_correlation")
 
   ns_all <- length(season_vector)
 
@@ -144,7 +144,7 @@ if(!exists("ilr_data")) {
       }
     }
   }
-  plot_cov(season_kernel, "season_correlation")
+  #plot_cov(season_kernel, "season_correlation")
 
   age_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
@@ -160,7 +160,7 @@ if(!exists("ilr_data")) {
       }
     }
   }
-  plot_cov(age_kernel, "age_correlation")
+  #plot_cov(age_kernel, "age_correlation")
 
   group_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
@@ -174,7 +174,7 @@ if(!exists("ilr_data")) {
       }
     }
   }
-  plot_cov(group_kernel, "group_correlation")
+  #plot_cov(group_kernel, "group_correlation")
 
   indiv_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
@@ -188,7 +188,7 @@ if(!exists("ilr_data")) {
       }
     }
   }
-  plot_cov(indiv_kernel, "indiv_correlation")
+  #plot_cov(indiv_kernel, "indiv_correlation")
 }
 
 # ============================================================================================
@@ -211,32 +211,20 @@ logd_mat_t <- function(s) {
 }
 
 ALT_logd_mat_t <- function(s) {
-  ret_val <- logd_matrixt(s[1], s[2], s[3], s[4], s[5], ilr_data, week_kernel, season_kernel, group_kernel, age_kernel, indiv_kernel)
-  return(ret_val)
+  return(logd_matrixt(s[1], s[2], s[3], s[4], s[5], ilr_data, week_kernel, season_kernel, group_kernel, age_kernel, indiv_kernel))
 }
-
-#A <- 0.3*week_kernel + 0.3*season_kernel + 0.3*group_kernel + 0.3*age_kernel + 0.3*indiv_kernel
-#print(2*sum(log(diag(chol(A)))))
 
 it <- 1
 estimates <- matrix(0, 5, it)
 for(i in 1:it) {
   cat("Optimization iteration",i,"\n")
-#  ptm <- proc.time()
-#  res <- optim(par=runif(5), fn=logd_mat_t, method="L-BFGS-B", lower=rep(-100,5), upper=rep(10,5))
-#  print(proc.time() - ptm)
-#  print(round(exp(res$par),digits=5))
-  ptm <- proc.time()
+  # out 3x faster if we have R optim call a compiled C++ function
+  # could probably speed up further using DEoptim instead of optim here
   res <- optim(par=runif(5), fn=ALT_logd_mat_t, method="L-BFGS-B", lower=rep(0.00001,5), upper=rep(10,5))
-  print(proc.time() - ptm)
-  print(round(res$par,digits=5))
-  estimates[,i] <- exp(res$par)
-  # need to figure out how to get compiled functions working with DEoptim
-  # specifically, how to we pass these arbitrary parameters?
+  estimates[,i] <- res$par
 }
 save(estimates, file="Roptim_estimates.RData")
 
-if(FALSE) {
 kernels <- c("weekly","seasonal","group","age","individual")
 for(i in 1:it) {
   rank <- order(estimates[,i], decreasing=TRUE)
@@ -246,10 +234,8 @@ for(i in 1:it) {
   }
   cat("\n")
 }
-}
 
 # INTERESTING QUESTIONS
-# (1) port to C++/Eigen; faster?
-# (2) how well is the ordering preserved?
-# (3) what proportion of total variance does this model capture? what does the residual variance look like?
-# (4) how sensitive is this analysis to choice of VC parameters?
+# (1) how well is the ordering preserved?
+# (2) what proportion of total variance does this model capture? what does the residual variance look like?
+# (3) how sensitive is this analysis to choice of VC parameters?
