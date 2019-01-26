@@ -49,24 +49,25 @@ if(task == 6) {
   # PCoA ordination using Bray-Curtis distance
   ord <- ordinate(baboon_counts, "PCoA", "bray")
 
-#  cat("Plotting seasonal labeling on ordination...\n")
-#  p <- plot_ordination(baboon_counts, ord, type="sample", color="season")
-#  ggsave("season_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
-#  cat("Plotting collection group-wise labeling on ordination...\n")
-#  p <- plot_ordination(baboon_counts, ord, type="sample", color="grp")
-#  ggsave("grp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
-#  cat("Plotting sex-wise labeling on ordination...\n")
-#  p <- plot_ordination(baboon_counts, ord, type="sample", color="sex")
-#  ggsave("sex_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
-#  cat("Plotting maternal group-wise labeling on ordination...\n")
-#  p <- plot_ordination(baboon_counts, ord, type="sample", color="matgrp")
-#  ggsave("matgrp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+  cat("Plotting seasonal labeling on ordination...\n")
+  p <- plot_ordination(baboon_counts, ord, type="sample", color="season")
+  ggsave("season_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+  cat("Plotting collection group-wise labeling on ordination...\n")
+  p <- plot_ordination(baboon_counts, ord, type="sample", color="grp")
+  ggsave("grp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+  cat("Plotting sex-wise labeling on ordination...\n")
+  p <- plot_ordination(baboon_counts, ord, type="sample", color="sex")
+  ggsave("sex_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+  cat("Plotting maternal group-wise labeling on ordination...\n")
+  p <- plot_ordination(baboon_counts, ord, type="sample", color="matgrp")
+  ggsave("matgrp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
 
-  snames <- unique(read_metadata(filtered)$sname)
-  baboons <- snames[sample(length(snames))[1:100]]
-  baboon_counts <- subset_samples(filtered, sname %in% baboons)
+  baboon_counts <- subset_samples(filtered, sname %in% best_sampled)
+
+  # PCoA ordination using Bray-Curtis distance
+  ord <- ordinate(baboon_counts, "PCoA", "bray")
 
   cat("Plotting individual labeling on ordination...\n")
   p <- plot_ordination(baboon_counts, ord, type="sample", color="sname")
-  ggsave("sname_ordination_100.png", plot=p, width=7, height=5, units="in", scale=1.5)
+  ggsave("sname_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
 }
