@@ -1,0 +1,6 @@
+TO DO FOR RULES OF LIFE:
+(1) bootstrap autocorrelation calculations to give estimate of uncertainty
+(2) extend autocorrelation to months and years by resolving differences at month level
+(3) redo sampled VC analysis with batch components for "plate", "flow_cell_lane", "library_pool", and perhaps "extract_dna_conc_ng"
+(4) sensitivity of these results to zero-filtering of data
+(5) what biological questions in the grant can we realistically answer?
