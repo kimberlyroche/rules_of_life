@@ -39,7 +39,8 @@ if(!exists("ilr_data")) {
   #baboons <- c("AMA", "AMO", "ORI")
   #baboons <- c("AMA", "AMO", "BUC", "CHE", "DAG", "EGO", "HOK", "KIW", "NOO", "ORI")
   snames <- unique(read_metadata(f2)$sname)
-  baboons <- snames
+  #baboons <- snames
+  baboons <- snames[sample(length(snames))[1:100]]
   for(b in 1:length(baboons)) {
     cat("Building kernels for baboon",baboons[b],"\n")
     baboon_counts <- subset_samples(f2, sname==baboons[b])

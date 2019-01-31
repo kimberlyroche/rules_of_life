@@ -32,6 +32,7 @@ for(i in 1:length(pc_sweep)) {
   # alternatively, w/o dissimilarity matrix: res <- pam(t(ilr_data), K)
   clusterings[[i]] <- as.vector(res$clustering)
 }
+save(clusterings, file="clusterings.RData")
 
 sweep_pairs <- combn(1:length(pc_sweep), 2)
 for(pair in 1:dim(sweep_pairs)[2]) {
