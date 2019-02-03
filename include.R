@@ -10,6 +10,10 @@ sourceCpp("fastCorr.cpp")
 
 best_sampled <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI")
 
+over_100 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS", "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO")
+
+over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS", "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW", "VIN", "TAL", "VEX", "VEI", "ALE", "MBE", "WHE", "WYN", "LOL", "HOL", "NOB", "VOT", "LYE", "HON", "DAG", "DUN", "OTI", "LUI", "OFR", "LAZ", "ONY", "VEL", "ELV", "FAX", "ORI", "EAG", "ODE", "NIK", "VAP", "WIP", "LOU", "NOO", "EVA", "EXO", "KOR", "NAR", "VOW", "HYM", "PAI", "LAS", "VIO", "WEA", "DOU", "LIZ", "WAS", "ZIB", "QUA", "WEN", "WOB", "WOL", "HOK", "LAV", "OBI", "POK", "SOR", "KOL", "ISR", "OMO", "SCE", "AFR", "MON", "NIN", "VEB", "ADD", "VOY", "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN", "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX", "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW")
+
 # ====================================================================================================================
 # ACCESSORS
 # ====================================================================================================================
@@ -231,7 +235,8 @@ plot_corr_matrix <- function(data, filename, cov=FALSE) {
   } else {
     p <- p + guides(fill=guide_legend(title="correlation"))
   }
-  ggsave(paste(filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  #ggsave(paste(filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 visualize_groupwise_covariance <- function(data, group, sample=1000000) {
@@ -245,20 +250,26 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
   } else if(group == "matgrp") {
     groups <- unique(md$matgrp); partition_obj <- md$matgrp; use_no <- sample
   } else if(group == "sname") {
+    # subsample the individuals
     #groups <- best_sampled; partition_obj <- md$sname; use_no <- sample
     groups <- unique(md$sname); partition_obj <- md$sname; use_no <- sample
   } else if(group == "sex") {
     groups <- unique(md$sex); partition_obj <- md$sex; use_no <- sample
   } else if(group == "age") {
     groups <- c(4.5, 19.0, 30.0); partition_obj <- md$age; use_no <- sample
+  } else if(group == "plate") {
+    # subsample the plates
+    groups <- sample(unique(md$plate))[1:20]; partition_obj <- md$plate; use_no <- sample
+  } else if(group == "flow_cell_lane") {
+    groups <- unique(md$flow_cell_lane); partition_obj <- md$flow_cell_lane; use_no <- sample
+  } else if(group == "library_pool") {
+    groups <- unique(md$library_pool); partition_obj <- md$library_pool; use_no <- sample
+  } else if(group == "extract_dna_conc_ng") {
+    groups <- c(2.5, 5, 7.5, 10, 15, 20, 25, 100); partition_obj <- md$extract_dna_conc_ng; use_no <- sample
   }
 
   partition_idx <- list()
-  if(group != "age") {
-    for(g in groups) {
-      partition_idx[[(length(partition_idx)+1)]] <- md[partition_obj==g, "sample_id"][[1]]
-    }
-  } else {
+  if(group == "age" || group == "extract_dna_conc_ng") {
     for(g in 1:length(groups)) {
       gmin <- 0
       gmax <- groups[g]
@@ -267,6 +278,10 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
       }
       partition_idx[[(length(partition_idx)+1)]] <- md[partition_obj > gmin & partition_obj <= gmax,
                                                     "sample_id"][[1]]
+    }
+  } else {
+    for(g in groups) {
+      partition_idx[[(length(partition_idx)+1)]] <- md[partition_obj==g, "sample_id"][[1]]
     }
   }
 
@@ -299,7 +314,6 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
     }
   }
   cat("Sample matrix is",dim(stacked_lr)[1],"by",dim(stacked_lr)[2],"\n")
-
   plot_corr_matrix(t(stacked_lr), paste(group, "_cov_matrix", sep=""))
 }
 
@@ -365,58 +379,117 @@ perform_mult_timecourse <- function(data, baboons) {
   }
 }
 
-plot_autocorrelation <- function(data, lag.max=26, filename="autocorrelation_all") {
+calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_units="weeks", resample_rate=0.5) {
+  if(date_diff_units != "weeks" && date_diff_units != "months") {
+    date_diff_units <- "weeks"
+  }
+
   individuals <- unique(read_metadata(data)$sname)
 
-  lag.sums <- numeric(lag.max)
-  lag.measured <- numeric(lag.max)
-  for(indiv in individuals) {
-    # this weird syntactic hack seems to be necessary for subset_samples?
-    # apparently the thing you're filtering against must be globally available
-    indiv <<- indiv
-    counts <- subset_samples(data, sname==indiv)
-    log_ratios <- apply_ilr(counts)
-    log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
-    cat(indiv[1],"has",dim(log_ratios)[2],"samples\n")
-    md <- read_metadata(counts)
-    # get distances between adjacent timepoints in weeks
-    d1 <- as.Date(md$collection_date[1])
-    week_d <- numeric(length(md$collection_date)-1)
-    for(d in 2:length(md$collection_date)) {
-      d2 <- as.Date(md$collection_date[d])
-      week_d[d-1] <- round((d2-d1)/7) + 1
-      d1 <- d2
+  rounds <- 1
+  if(resample) {
+    rounds <- 100
+  }
+  lags <- matrix(0, nrow=lag.max, ncol=rounds)
+  for(r in 1:rounds) {
+    if(resample) {
+      cat("Resampling iteration",r,"\n")
     }
-    for(lag in 1:lag.max) {
-      idx <- which(week_d==lag)
-      if(length(idx) >= 1) {
-        tot <- 0
-        for(t in idx) {
-          y.t <- as.vector(log_ratios[,t])
-          y.tt <- sqrt(y.t%*%y.t)
-          y.h <- as.vector(log_ratios[,t+1])
-          y.hh <- sqrt(y.h%*%y.h)
-          tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+    lag.sums <- numeric(lag.max)
+    lag.measured <- numeric(lag.max)
+    for(indiv in individuals) {
+      # this weird syntactic hack seems to be necessary for subset_samples?
+      # apparently the thing you're filtering against must be globally available
+      indiv <<- indiv
+      counts <- subset_samples(data, sname==indiv)
+      do_sample <- rep(1, nsamples(counts))
+      if(resample) {
+        # randomly blind ~50% of this individuals samples
+        do_sample <- rbinom(nsamples(counts), 1, resample_rate)
+      }
+      log_ratios <- apply_ilr(counts)
+      log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
+      #cat(indiv[1],"has",dim(log_ratios)[2],"samples\n")
+      md <- read_metadata(counts)
+      # get distances between adjacent timepoints in {date_diff_units}
+      d1 <- as.Date(md$collection_date[1])
+      time_diff <- numeric(length(md$collection_date)-1)
+      for(d in 2:length(md$collection_date)) {
+        d2 <- as.Date(md$collection_date[d])
+        time_diff[d-1] <- as.numeric(difftime(d2, d1), units="weeks")
+        if(date_diff_units == "weeks") {
+          time_diff[d-1] <- ceiling(time_diff[d-1])
+        } else if(date_diff_units == "months") {
+          time_diff[d-1] <- ceiling(time_diff[d-1]/4)
         }
-        lag.measured[lag] <- lag.measured[lag] + length(idx)
-        lag.sums[lag] <- lag.sums[lag] + tot
+        d1 <- d2
+      }
+      for(lag in 1:lag.max) {
+        idx <- which(time_diff==lag)
+        if(length(idx) >= 1 && do_sample[idx]) {
+          tot <- 0
+          for(t in idx) {
+            y.t <- as.vector(log_ratios[,t])
+            y.tt <- sqrt(y.t%*%y.t)
+            y.h <- as.vector(log_ratios[,t+1])
+            y.hh <- sqrt(y.h%*%y.h)
+            tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+          }
+          lag.measured[lag] <- lag.measured[lag] + length(idx)
+          lag.sums[lag] <- lag.sums[lag] + tot
+        }
+        lags[lag,r] <- lag.sums[lag]/lag.measured[lag]
       }
     }
+    if(rounds == 1) {
+      # print out autocorrelations
+      for(lag in 1:lag.max) {
+        cat("Lag",lag,"=",lags[lag,r],"\n")
+      }
+      cat("\n")
+    }
   }
-  # print out autocorrelations
-  for(lag in 1:lag.max) {
-    cat("Lag",lag,"=",(lag.sums[lag]/lag.measured[lag]),"\n")
-    lag.sums[lag] <- lag.sums[lag]/lag.measured[lag]
+
+  if(resample) {
+    # get 90% confidence intervals, summarize
+    lower_CI <- as.numeric(lag.max)
+    upper_CI <- as.numeric(lag.max)
+    avg_ac <- as.numeric(lag.max)
+    for(lag in 1:lag.max) {
+      ac_measured <- sort(lags[lag,])
+      lower_CI[lag] <- ac_measured[round(rounds*0.1)]
+      upper_CI[lag] <- ac_measured[round(rounds*0.9)]
+      avg_ac[lag] <- mean(ac_measured)
+    }
+    return(data.frame(cbind(lag=seq(1,lag.max), ac=avg_ac, lower=lower_CI, upper=upper_CI)))
+  } else {
+    return(as.data.frame(cbind(lag=seq(1,lag.max), ac=as.vector(lags))))
   }
-  # plot
-  p <- ggplot(as.data.frame(cbind(x=seq(1,lag.max), y=lag.sums)), aes(x=x, y=y)) +
+}
+
+plot_mean_autocorrelation <- function(lags, filename="autocorrelation") {
+  p <- ggplot(lags, aes(x=lag, y=ac)) +
     geom_line(linetype = "dashed") +
     scale_x_continuous(breaks=seq(0,lag.max,1)) +
     scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
-    xlab("lag (weeks)") +
+    xlab("lag") +
     ylab("ACF") +
     theme_minimal() +
     theme(axis.line.x=element_line(), axis.line.y=element_line()) +
     geom_hline(yintercept = 0)
-  ggsave("autocorrelation_all.png", plot=p, scale=2, width=4, height=3, units="in")
+  ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
+}
+
+plot_bounded_autocorrelation <- function(lags, filename="autocorrelation") {
+  p <- ggplot(lags, aes(x=lag, y=ac)) +
+    geom_line(linetype="solid") +
+    geom_ribbon(aes(ymin=lower, ymax=upper), alpha=0.2) +
+    scale_x_continuous(breaks=seq(0,dim(lags)[1],1)) +
+    scale_y_continuous(breaks=seq(-0.5,1,0.1)) +
+    xlab("lag") +
+    ylab("ACF") +
+    theme_minimal() +
+    theme(axis.line.x=element_line(), axis.line.y=element_line()) +
+    geom_hline(yintercept = 0)
+  ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
 }
