@@ -1,9 +1,0 @@
-Zero counts (original): 0.9891279 
-Agglomerating data...
-Agglomerating data to genus level...
-Agglomerated data has dimension ntaxa= 1202 x nsamples= 17247 
-Zero counts (glommed data): 0.9291597 
-Zero counts (glommed data): 0.9288802 
-Total counts: 832277555 filtered to: 685810400 
-Total taxa: 1202 filtered to: 30 
-Zero counts (filtered data): 0.033 
