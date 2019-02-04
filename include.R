@@ -380,11 +380,16 @@ perform_mult_timecourse <- function(data, baboons) {
 }
 
 calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_units="weeks", resample_rate=0.5) {
-  if(date_diff_units != "weeks" && date_diff_units != "months") {
+  if(date_diff_units != "weeks" && date_diff_units != "months" && date_diff_units != "seasons") {
     date_diff_units <- "weeks"
   }
 
   individuals <- unique(read_metadata(data)$sname)
+
+  season_boundaries <- c(200005, 200010, 200105, 200110, 200205, 200210, 200305, 200310,
+                       200405, 200410, 200505, 200510, 200605, 200610, 200705, 200710,
+                       200805, 200810, 200905, 200910, 201005, 201010, 201105, 201110,
+                       201205, 201210, 201305, 201310)
 
   rounds <- 1
   if(resample) {
@@ -397,7 +402,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
     }
     lag.sums <- numeric(lag.max)
     lag.measured <- numeric(lag.max)
-    for(indiv in individuals) {
+    for(indiv in individuals[1:50]) {
       # this weird syntactic hack seems to be necessary for subset_samples?
       # apparently the thing you're filtering against must be globally available
       indiv <<- indiv
@@ -414,13 +419,20 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
       # get distances between adjacent timepoints in {date_diff_units}
       d1 <- as.Date(md$collection_date[1])
       time_diff <- numeric(length(md$collection_date)-1)
-      for(d in 2:length(md$collection_date)) {
-        d2 <- as.Date(md$collection_date[d])
-        time_diff[d-1] <- as.numeric(difftime(d2, d1), units="weeks")
-        if(date_diff_units == "weeks") {
-          time_diff[d-1] <- ceiling(time_diff[d-1])
-        } else if(date_diff_units == "months") {
-          time_diff[d-1] <- ceiling(time_diff[d-1]/4)
+      if(length(md$collection_date) > 1) {
+        for(d in 2:length(md$collection_date)) {
+          d2 <- as.Date(md$collection_date[d])
+          time_diff[d-1] <- as.numeric(difftime(d2, d1), units="weeks")
+          if(date_diff_units == "weeks") {
+            time_diff[d-1] <- ceiling(time_diff[d-1])
+          } else if(date_diff_units == "months") {
+            time_diff[d-1] <- ceiling(time_diff[d-1]/4)
+          } else if(date_diff_units == "seasons") {
+            d1_ym <- as.numeric(format(d1, "%Y%m"))
+            d2_ym <- as.numeric(format(d2, "%Y%m"))
+            # distance is number of season boundaries between the samples
+            time_diff[d-1] <- sum(season_boundaries < d2_ym) - sum(season_boundaries < d1_ym) + 1
+          }
         }
         d1 <- d2
       }
