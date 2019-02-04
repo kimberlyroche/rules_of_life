@@ -1,23 +1,22 @@
 source("include.R")
 
-#args = commandArgs(trailingOnly=TRUE)
-#if(length(args)==0) {
-#  stop("Argument for task missing!\n")
-#}
+args = commandArgs(trailingOnly=TRUE)
+if(length(args)==0) {
+  stop("Argument for task missing!\n")
+}
 
-#task <- as.numeric(args[1])
-task <- 8
+task <- as.numeric(args[1])
 
 if(task == 1) {
   # agglomerate to genus
   perform_agglomeration()
 }
 
-#if(!exists("filtered")) {
-#  filtered <- filter_data()
-#  #filtered_subset <- subset_samples(filtered, sname %in% best_sampled)
-#  #filtered_subset <- subset_samples(filtered, sname %in% over_50)
-#}
+if(!exists("filtered")) {
+  filtered <- filter_data(sample_threshold=0.66)
+  #filtered_subset <- subset_samples(filtered, sname %in% best_sampled)
+  #filtered_subset <- subset_samples(filtered, sname %in% over_50)
+}
 
 if(task == 2) {
   # render histograms of sample frequency, etc.
@@ -33,7 +32,7 @@ if(task == 3) {
 if(task == 4) {
   # plot weekly autocorrelation out to 26 weeks
   lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.5)
-  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_26wk")
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_26wk_66")
 }
 
 if(task == 5) {

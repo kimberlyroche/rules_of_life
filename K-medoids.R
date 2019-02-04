@@ -1,4 +1,5 @@
 library(cluster)
+library(ClusterR)
 library(psych)
 library(Rcpp)
 source("include.R")
@@ -27,10 +28,19 @@ sample_idx <- sample(nsamples(filtered))[1:subset_to]
 ilr_data <- apply_ilr(filtered, pseudocount=pseudocount)
 ilr_data <- ilr_data[,sample_idx] # subset
 ilr_data <- t(apply(ilr_data, 1, function(x) x - mean(x)))
+
+# PAM from ClusterR package (Rcpp)
+
+res_cr <- Cluster_Medoids(ilr_data, K, distance_metric="pearson_correlation", verbose=FALSE, threads=4)
+save(res_cr, file=paste("cluster_results_",pseudocount,".RData",sep=""))
+
+# PAM in R
+
+if(FALSE) {
 diss_mat <- 1 - abs(fastCorr(ilr_data))
-res <- pam(diss_mat, K, diss=TRUE)
-# alternatively, w/o dissimilarity matrix: res <- pam(t(ilr_data), K)
-save(res, file=paste("clustering_",pseudocount,".RData",sep=""))
+res_pam <- pam(diss_mat, K, diss=TRUE)
+# alternatively, w/o dissimilarity matrix: res_pam <- pam(t(ilr_data), K)
+}
 
 if(FALSE) {
   sweep_pairs <- combn(1:length(pc_sweep), 2)
