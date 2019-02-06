@@ -6,8 +6,8 @@ library(ggplot2)
 # global vars
 pseudocount <- 0.65
 
-n_samples <- 20 # number of posterior samples
-interval_cutoff <- 0.8 # percent positive or negative required to be considered significantly non-zero
+n_samples <- 2000 # number of posterior samples
+interval_cutoff <- 0.99 # percent positive or negative required to be considered significantly non-zero
 
 set.seed(1)
 
@@ -18,7 +18,7 @@ NA2mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
 # parse paired sample data - 16S
 # ---------------------------------------------------------------------------------------------------------------------
 
-data_16S <- read.csv("original_data/Abundances_16S_unrarefied_OTU_table_AGG.csv", header=TRUE, stringsAsFactors=FALSE)
+data_16S <- read.csv("data/Abundances_16S_unrarefied_OTU_table_AGG.csv", header=TRUE, stringsAsFactors=FALSE)
 taxonomy <- data_16S[,"taxonomy"]
 count_table <- data_16S[, colnames(data_16S) != "taxonomy"]
 rm(data_16S)
@@ -31,7 +31,7 @@ p1 <- dim(count_table)[1]
 # parse paired sample data - enzymes; OMIT FOR NOW, THERE'S ~9K
 # ---------------------------------------------------------------------------------------------------------------------
 
-# data_enzyme <- apply(read.csv("original_data/Abundances_KEGG_enzyme_orthologs.csv", 
+# data_enzyme <- apply(read.csv("data/Abundances_KEGG_enzyme_orthologs.csv", 
 #                               header=TRUE, stringsAsFactors=FALSE), c(1,2), as.numeric)
 # data_enzyme <- data_enzyme[,colnames(data_enzyme) != "DIB"]
 # data_enzyme <- log(data_enzyme)
@@ -43,7 +43,7 @@ p1 <- dim(count_table)[1]
 # parse paired sample data - KEGG pathways
 # ---------------------------------------------------------------------------------------------------------------------
 
-data_pathways <- read.csv("original_data/Abundances_KEGG_pathways.csv", 
+data_pathways <- read.csv("data/Abundances_KEGG_pathways.csv", 
                           header=TRUE, stringsAsFactors=FALSE)
 data_pathways <- data_pathways[,colnames(data_pathways) != "DIB"]
 KEGG_labels <- rownames(data_pathways)
@@ -65,7 +65,7 @@ p3 <- dim(data_pathways)[1]
 # # parse paired sample data - KEGG modules
 # # ---------------------------------------------------------------------------------------------------------------------
 
-data_modules <- read.csv("original_data/Abundances_KEGG_modules.csv", 
+data_modules <- read.csv("data/Abundances_KEGG_modules.csv", 
                          header=TRUE, stringsAsFactors=FALSE)
 data_modules <- data_modules[,colnames(data_modules) != "DIB"]
 KEGG_labels <- c(KEGG_labels, rownames(data_modules))

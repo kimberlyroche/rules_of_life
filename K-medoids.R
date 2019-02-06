@@ -32,7 +32,7 @@ ilr_data <- apply(ilr_data, 1, function(x) x - mean(x))
 # PAM from ClusterR package (Rcpp)
 
 res_cr <- Cluster_Medoids(ilr_data, K, distance_metric="pearson_correlation", verbose=FALSE, threads=4)
-#save(res_cr, file=paste("cluster_results_",pseudocount,".RData",sep=""))
+save(res_cr, file=paste("cluster_results_",pseudocount,".RData",sep=""))
 
 # PAM in R
 
