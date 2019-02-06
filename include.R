@@ -402,7 +402,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
     }
     lag.sums <- numeric(lag.max)
     lag.measured <- numeric(lag.max)
-    for(indiv in individuals[1:50]) {
+    for(indiv in individuals) {
       # this weird syntactic hack seems to be necessary for subset_samples?
       # apparently the thing you're filtering against must be globally available
       indiv <<- indiv
@@ -414,38 +414,46 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
       }
       log_ratios <- apply_ilr(counts)
       log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
-      #cat(indiv[1],"has",dim(log_ratios)[2],"samples\n")
       md <- read_metadata(counts)
+      indiv_sample_no <- length(md$collection_date)
       # get distances between adjacent timepoints in {date_diff_units}
       d1 <- as.Date(md$collection_date[1])
-      time_diff <- numeric(length(md$collection_date)-1)
-      if(length(md$collection_date) > 1) {
-        for(d in 2:length(md$collection_date)) {
-          d2 <- as.Date(md$collection_date[d])
-          time_diff[d-1] <- as.numeric(difftime(d2, d1), units="weeks")
-          if(date_diff_units == "weeks") {
-            time_diff[d-1] <- ceiling(time_diff[d-1])
-          } else if(date_diff_units == "months") {
-            time_diff[d-1] <- ceiling(time_diff[d-1]/4)
-          } else if(date_diff_units == "seasons") {
-            d1_ym <- as.numeric(format(d1, "%Y%m"))
-            d2_ym <- as.numeric(format(d2, "%Y%m"))
-            # distance is number of season boundaries between the samples
-            time_diff[d-1] <- sum(season_boundaries < d2_ym) - sum(season_boundaries < d1_ym) + 1
+      time_diff <- matrix(0, nrow=indiv_sample_no, ncol=indiv_sample_no)
+      if(indiv_sample_no > 1) {
+        for(d1_idx in 1:(indiv_sample_no-1)) {
+          for(d2_idx in (d1_idx+1):indiv_sample_no) {
+            d1 <- as.Date(md$collection_date[d1_idx])
+            d2 <- as.Date(md$collection_date[d2_idx])
+            time_diff[d1_idx,d2_idx] <- as.numeric(difftime(d2, d1), units="weeks")
+            if(date_diff_units == "weeks") {
+              time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx])
+            } else if(date_diff_units == "months") {
+              time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx]/4)
+            } else if(date_diff_units == "seasons") {
+              d1_ym <- as.numeric(format(d1, "%Y%m"))
+              d2_ym <- as.numeric(format(d2, "%Y%m"))
+              # distance is number of season boundaries between the samples
+              time_diff[d1_idx,d2_idx] <- sum(season_boundaries < d2_ym) - sum(season_boundaries < d1_ym) + 1
+            }
           }
         }
-        d1 <- d2
       }
+      time_diff <- c(time_diff)
       for(lag in 1:lag.max) {
         idx <- which(time_diff==lag)
-        if(length(idx) >= 1 && do_sample[idx]) {
+        # convert these 1D indices to 2D
+        if(length(idx) >= 1) {
           tot <- 0
           for(t in idx) {
-            y.t <- as.vector(log_ratios[,t])
-            y.tt <- sqrt(y.t%*%y.t)
-            y.h <- as.vector(log_ratios[,t+1])
-            y.hh <- sqrt(y.h%*%y.h)
-            tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+            d1_idx <- floor(t/indiv_sample_no) + 1
+            d2_idx <- t %% indiv_sample_no
+            if(do_sample[d1_idx] && do_sample[d2_idx]) {
+              y.t <- as.vector(log_ratios[,d1_idx])
+              y.tt <- sqrt(y.t%*%y.t)
+              y.h <- as.vector(log_ratios[,d2_idx])
+              y.hh <- sqrt(y.h%*%y.h)
+              tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+            }
           }
           lag.measured[lag] <- lag.measured[lag] + length(idx)
           lag.sums[lag] <- lag.sums[lag] + tot
