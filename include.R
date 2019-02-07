@@ -379,7 +379,7 @@ perform_mult_timecourse <- function(data, baboons) {
   }
 }
 
-calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_units="weeks", resample_rate=0.5) {
+calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_units="weeks", resample_rate=0.2) {
   if(date_diff_units != "weeks" && date_diff_units != "months" && date_diff_units != "seasons") {
     date_diff_units <- "weeks"
   }
@@ -393,7 +393,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
 
   rounds <- 1
   if(resample) {
-    rounds <- 100
+    rounds <- 10
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
   for(r in 1:rounds) {
@@ -453,9 +453,9 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
               y.h <- as.vector(log_ratios[,d2_idx])
               y.hh <- sqrt(y.h%*%y.h)
               tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
+              lag.measured[lag] <- lag.measured[lag] + 1
             }
           }
-          lag.measured[lag] <- lag.measured[lag] + length(idx)
           lag.sums[lag] <- lag.sums[lag] + tot
         }
         lags[lag,r] <- lag.sums[lag]/lag.measured[lag]

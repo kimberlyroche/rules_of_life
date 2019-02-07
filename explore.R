@@ -32,52 +32,65 @@ if(task == 3) {
 }
 
 if(task == 4) {
-  # plot weekly autocorrelation out to 26 weeks; use several zero-filter thresholds
-  thresholds <- c(0.2, 0.66, 0.9)
-  thresholds <- c(0.9)
-  for(t in thresholds) {
-    filtered <- filter_data(sample_threshold=t)
-    lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.5)
-    plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_",round(100*t),sep=""))
-  }
+  # plot weekly autocorrelation out to 26 weeks; use zero-filter stringency of 20%
+  t <- 0.2
+  filtered <- filter_data(sample_threshold=t)
+  lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_",round(100*t),sep=""))
 }
 
 if(task == 5) {
-  # plot weekly autocorrelation out to 52 weeks
-  filtered <- filter_data(sample_threshold=0.9)
-  lags <- calc_autocorrelation(filtered, lag.max=52, resample=TRUE, resample_rate=0.66)
-  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_52wk")
+  # plot weekly autocorrelation out to 26 weeks; use zero-filter stringency of 20%
+  t <- 0.66
+  filtered <- filter_data(sample_threshold=t)
+  lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_",round(100*t),sep=""))
 }
 
 if(task == 6) {
+  # plot weekly autocorrelation out to 26 weeks; use zero-filter stringency of 20%
+  t <- 0.9
+  filtered <- filter_data(sample_threshold=t)
+  lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_",round(100*t),sep=""))
+}
+
+if(task == 7) {
+  # plot weekly autocorrelation out to 52 weeks
+  filtered <- filter_data(sample_threshold=0.9)
+  lags <- calc_autocorrelation(filtered, lag.max=52, resample=TRUE, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_52wk")
+}
+
+if(task == 8) {
   # plot monthly autocorrelation out to 12 months
   filtered <- filter_data(sample_threshold=0.9)
   lags <- calc_autocorrelation(filtered, lag.max=12, resample=TRUE, date_diff_units="months")
   plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_12mo")
 }
 
-if(task == 7) {
+if(task == 9) {
   # plot monthly autocorrelation out to 24 months
   filtered <- filter_data(sample_threshold=0.9)
-  lags <- calc_autocorrelation(filtered, lag.max=24, resample=TRUE, date_diff_units="months", resample_rate=0.66)
+  lags <- calc_autocorrelation(filtered, lag.max=24, resample=TRUE, date_diff_units="months", resample_rate=0.2)
   plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_24mo")
 }
 
-if(task == 8) {
+if(task == 10) {
   # plot monthly autocorrelation out to 36 months
   filtered <- filter_data(sample_threshold=0.9)
-  lags <- calc_autocorrelation(filtered, lag.max=36, resample=TRUE, date_diff_units="months", resample_rate=0.66)
+  lags <- calc_autocorrelation(filtered, lag.max=36, resample=TRUE, date_diff_units="months", resample_rate=0.2)
   plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_36mo")
 }
 
-if(task == 9) {
+if(task == 11) {
   # plot seasonal autocorrelation out to 5 years (~lag.max == 1)
   filtered <- filter_data(sample_threshold=0.9)
   lags <- calc_autocorrelation(filtered, lag.max=11, resample=TRUE, date_diff_units="seasons")
   plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_11season")
 }
 
-if(task == 10) {
+if(task == 12) {
   filtered <- filter_data(sample_threshold=0.9)
   # plot scrambled correlation matrices using grouped sample
   # batch stuff
@@ -94,7 +107,7 @@ if(task == 10) {
   visualize_groupwise_covariance(filtered, "age", sample=500)
 }
 
-if(task == 11) {
+if(task == 13) {
   # subset to a manageable sample size
   md <- read_metadata(filtered)
   sample_ids <- md$sample_id[sample(nsamples(filtered))[1:5000]]
