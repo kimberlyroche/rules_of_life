@@ -34,6 +34,7 @@ if(task == 3) {
 if(task == 4) {
   # plot weekly autocorrelation out to 26 weeks; use several zero-filter thresholds
   thresholds <- c(0.2, 0.66, 0.9)
+  thresholds <- c(0.9)
   for(t in thresholds) {
     filtered <- filter_data(sample_threshold=t)
     lags <- calc_autocorrelation(filtered, lag.max=26, resample=TRUE, resample_rate=0.5)
