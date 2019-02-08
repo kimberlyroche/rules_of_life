@@ -393,7 +393,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
 
   rounds <- 1
   if(resample) {
-    rounds <- 10
+    rounds <- 100
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
   for(r in 1:rounds) {
