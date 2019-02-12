@@ -6,19 +6,21 @@ library(ggplot2)
 # global vars
 pseudocount <- 0.65
 
-n_samples <- 2000 # number of posterior samples
-interval_cutoff <- 0.99 # percent positive or negative required to be considered significantly non-zero
+n_samples <- 20 # number of posterior samples
+interval_cutoff <- 0.8 # percent positive or negative required to be considered significantly non-zero
 
 set.seed(1)
 
 # https://stackoverflow.com/questions/25835643/replace-missing-values-with-column-mean
 NA2mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
 
+data_dir <- "original_data"
+
 # ---------------------------------------------------------------------------------------------------------------------
 # parse paired sample data - 16S
 # ---------------------------------------------------------------------------------------------------------------------
 
-data_16S <- read.csv("data/Abundances_16S_unrarefied_OTU_table_AGG.csv", header=TRUE, stringsAsFactors=FALSE)
+data_16S <- read.csv(paste(data_dir,"Abundances_16S_unrarefied_OTU_table_AGG.csv",sep="/"), header=TRUE, stringsAsFactors=FALSE)
 taxonomy <- data_16S[,"taxonomy"]
 count_table <- data_16S[, colnames(data_16S) != "taxonomy"]
 rm(data_16S)
@@ -43,7 +45,7 @@ p1 <- dim(count_table)[1]
 # parse paired sample data - KEGG pathways
 # ---------------------------------------------------------------------------------------------------------------------
 
-data_pathways <- read.csv("data/Abundances_KEGG_pathways.csv", 
+data_pathways <- read.csv(paste(data_dir,"Abundances_KEGG_pathways.csv",sep="/"), 
                           header=TRUE, stringsAsFactors=FALSE)
 data_pathways <- data_pathways[,colnames(data_pathways) != "DIB"]
 KEGG_labels <- rownames(data_pathways)
@@ -61,11 +63,11 @@ data_pathways <- t(scale(t(data_pathways)))
 
 p3 <- dim(data_pathways)[1]
 
-# # ---------------------------------------------------------------------------------------------------------------------
-# # parse paired sample data - KEGG modules
-# # ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+# parse paired sample data - KEGG modules
+# ---------------------------------------------------------------------------------------------------------------------
 
-data_modules <- read.csv("data/Abundances_KEGG_modules.csv", 
+data_modules <- read.csv(paste(data_dir,"Abundances_KEGG_modules.csv",sep="/"), 
                          header=TRUE, stringsAsFactors=FALSE)
 data_modules <- data_modules[,colnames(data_modules) != "DIB"]
 KEGG_labels <- c(KEGG_labels, rownames(data_modules))
@@ -96,7 +98,7 @@ combined_data <- rbind(clr_counts, data_pathways, data_modules)
 
 p <- p1 + p3 + p4
 
-if(FALSE) {
+if(TRUE) {
   cat("Building covariance matrix...\n")
   cov_mat <- cov(t(combined_data))
 
@@ -121,7 +123,7 @@ if(FALSE) {
 
 mu.0 <- matrix(0, nrow=p, ncol=1)
 Lambda.0 <- diag(p)
-#Lambda.0[(p1+1):p,(p1+1):p] <- diag(p2)*8 # this is the empirical variance of log-transformed OTU counts
+Lambda.0[1:p1,1:p1] <- diag(p1)*8 # this is the empirical variance of log-transformed OTU counts
 
 nu.0 <- p + 2
 kappa.0 <- 1
