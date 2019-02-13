@@ -6,15 +6,14 @@ library(ggplot2)
 # global vars
 pseudocount <- 0.65
 
-n_samples <- 20 # number of posterior samples
-interval_cutoff <- 0.8 # percent positive or negative required to be considered significantly non-zero
-
-set.seed(1)
+n_samples <- 2000 # number of posterior samples
+interval_cutoff <- 0.99 # percent positive or negative required to be considered significantly non-zero
 
 # https://stackoverflow.com/questions/25835643/replace-missing-values-with-column-mean
 NA2mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
 
 data_dir <- "original_data"
+data_dir <- "data"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # parse paired sample data - 16S
