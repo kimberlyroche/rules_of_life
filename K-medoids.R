@@ -42,31 +42,3 @@ diss_mat <- 1 - abs(fastCorr(ilr_data))
 res_pam <- pam(diss_mat, K, diss=TRUE)
 # alternatively, w/o dissimilarity matrix: res_pam <- pam(t(ilr_data), K)
 }
-
-if(FALSE) {
-  sweep_pairs <- combn(1:length(pc_sweep), 2)
-  for(pair in 1:dim(sweep_pairs)[2]) {
-    pc1_idx <- sweep_pairs[1,pair]
-    pc2_idx <- sweep_pairs[2,pair]
-    c1 <- clusterings[[pc1_idx]]
-    c2 <- clusterings[[pc2_idx]]
-
-    pairs_compared <- 0
-    pairs_matched <- 0
-    for(i in 1:subset_to) {
-      for(j in 1:subset_to) {
-        if(i != j) {
-          # for a given pair
-          if(c1[i] == c1[j]) {
-            # if matched on the first run
-            if(c2[i] == c2[j]) {
-              pairs_matched <- pairs_matched + 1
-            }
-            pairs_compared <- pairs_compared + 1
-          }
-        }
-      }
-    }
-    cat("Combination",pc_sweep[pc1_idx],"vs.",pc_sweep[pc2_idx],":",round((pairs_matched/pairs_compared),digits=3),"\n")
-  }
-}

@@ -96,6 +96,11 @@ filter_data <- function(count_threshold=3, sample_threshold=0.9) {
   return(filtered)
 }
 
+grp_by_sname <- function(data) {
+  snames <- unique(md$sname)
+  return(unlist(lapply(snames, function(x) length(unlist(unique(md[md$sname %in% x,"grp"]))))))
+}
+
 # ====================================================================================================================
 # DATA TRANSFORMATION
 # ====================================================================================================================
