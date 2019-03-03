@@ -9,7 +9,7 @@ task <- as.numeric(args[1])
 
 if(task == 1) {
   # agglomerate to genus
-  perform_agglomeration()
+  perform_agglomeration(level="species")
 }
 
 #if(!exists("filtered")) {
