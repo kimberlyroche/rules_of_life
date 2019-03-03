@@ -102,7 +102,7 @@ grp_by_sname <- function(data) {
 }
 
 # ====================================================================================================================
-# DATA TRANSFORMATION
+# DATA TRANSFORMATION, ETC.
 # ====================================================================================================================
 
 # uses phyloseq::filter_taxa to filter to taxa above a given count_threshold in at least 
@@ -132,6 +132,20 @@ apply_proportion <- function(data) {
 apply_ilr <- function(data, pseudocount=0.65) {
   counts <- otu_table(data)@.Data
   return(apply(counts+pseudocount, 1, ilr))
+}
+
+geom_mean <- function(x) {
+  return(prod(x)**(1/length(x)))
+}
+
+aitchison_dist <- function(x.i, x.j) {
+  sq.sum <- 0
+  gm.i <- geom_mean(x.i)
+  gm.j <- geom_mean(x.j)
+  for(k in 1:length(x.i)) {
+    sq.sum <- sq.sum + (log(x.i[k]/gm.i) - log(x.j[k]/gm.j))**2
+  }
+  return(sqrt(sq.sum))
 }
 
 # ====================================================================================================================
