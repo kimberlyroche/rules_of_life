@@ -354,7 +354,7 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
   ggsave(save_filename, plot=p, scale=1.5, width=5, height=3, units="in")
 }
 
-plot_timecourse <- function(data, save_filename) {
+plot_timecourse <- function(data, save_filename, legend=TRUE, legend_level="species") {
   p <- apply_proportion(data)
   df <- psmelt(p)
   df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
@@ -373,15 +373,25 @@ plot_timecourse <- function(data, save_filename) {
   for(i in 1:dim(df3)[1]) {
     # show labels as order/family/genus
     # species is NA for all
-    df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
+    if(legend_level == "species") {
+      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
+    } else if(legend_level == "genus") {
+      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:5]),collapse="/")
+    } else {
+      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4]),collapse="/")
+    }
   }
 
   p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
     geom_bar(position="fill", stat="identity") +
     scale_y_continuous(labels = percent_format()) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    theme(legend.position="bottom") +
     theme(legend.text=element_text(size=8))
+  if(legend) {
+    p <- p + theme(legend.position="bottom")
+  } else {
+    p <- p + theme(legend.position="none")
+  }
   ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=10, height=4, units="in")
 }
 
