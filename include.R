@@ -23,10 +23,13 @@ over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI
 # ACCESSORS
 # ====================================================================================================================
 
-read_data <- function(write_sample=FALSE) {
+read_data <- function(write_sample=FALSE, replicates=FALSE) {
   # rows are samples, columns are taxa
-  #data <- readRDS("data/emp_baboon.RDS")
-  data <- readRDS("data/emp_baboon_NewFiltr.RDS")
+  if(replicates) {
+    data <- readRDS("data/emp_baboon_pool_T_w_techReps.RDS")
+  } else {
+    data <- readRDS("data/emp_baboon_NewFiltr.RDS")
+  }
   # for now, just remove non-Bacterial domain
   data <- subset_taxa(data, domain=="Bacteria")
   if(write_sample) {
@@ -79,14 +82,18 @@ check_taxa_aggomeration <- function(data) {
   cat("Should == 446:",length(tt_no),"\n")
 }
 
-perform_agglomeration <- function(level="genus") {
-  data <- read_data()
+perform_agglomeration <- function(level="genus", replicates=FALSE) {
+  data <- read_data(replicates=replicates)
   cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
   # remove technical replicates (for now)
   data <- subset_samples(data, sample_status==0)
   cat("Agglomerating data...\n")
   glom_data <- glom_counts(data, level=level)
-  save(glom_data, file=paste("glom_data_",level,".RData",sep=""))
+  if(replicates) {
+    save(glom_data, file=paste("glom_data_",level,"_reps.RData",sep=""))
+  } else {
+    save(glom_data, file=paste("glom_data_",level,".RData",sep=""))
+  }
   cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
   #cat("Checking agglomeration...\n")
   #check_taxa_aggomeration(data)
@@ -422,6 +429,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
   }
 
   individuals <- unique(read_metadata(data)$sname)
+  # individuals <- individuals[1:50] # for testing
 
   season_boundaries <- c(200005, 200010, 200105, 200110, 200205, 200210, 200305, 200310,
                        200405, 200410, 200505, 200510, 200605, 200610, 200705, 200710,
@@ -430,9 +438,11 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
 
   rounds <- 1
   if(resample) {
-    rounds <- 20
+    rounds <- 100
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
+  log_ratios <- apply_ilr(data)
+  log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
   for(r in 1:rounds) {
     if(resample) {
       cat("Resampling iteration",r,"\n")
@@ -449,8 +459,11 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
         # randomly blind ~50% of this individuals samples
         do_sample <- rbinom(nsamples(counts), 1, resample_rate)
       }
-      log_ratios <- apply_ilr(counts)
-      log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
+      # this was misleading; the mean-centering should be taking place before subsetting
+      # this was deflating the autocorrelation estimates!
+      # log_ratios <- apply_ilr(counts)
+      # log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
+      sample_lr <- log_ratios[,colnames(log_ratios) %in% sample_data(counts)$sample_id]
       md <- read_metadata(counts)
       indiv_sample_no <- length(md$collection_date)
       # get distances between adjacent timepoints in {date_diff_units}
@@ -485,9 +498,12 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
             d1_idx <- floor(t/indiv_sample_no) + 1
             d2_idx <- t %% indiv_sample_no
             if(do_sample[d1_idx] && do_sample[d2_idx]) {
-              y.t <- as.vector(log_ratios[,d1_idx])
+              # removed references to the erroneous mean-centering
+              # y.t <- as.vector(log_ratios[,d1_idx])
+              y.t <- as.vector(sample_lr[,d1_idx])
               y.tt <- sqrt(y.t%*%y.t)
-              y.h <- as.vector(log_ratios[,d2_idx])
+              # y.h <- as.vector(log_ratios[,d2_idx])
+              y.h <- as.vector(sample_lr[,d2_idx])
               y.hh <- sqrt(y.h%*%y.h)
               tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
               lag.measured[lag] <- lag.measured[lag] + 1

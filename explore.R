@@ -8,8 +8,10 @@ if(length(args)==0) {
 task <- as.numeric(args[1])
 
 if(task == 1) {
-  # agglomerate to genus
-  perform_agglomeration(level="species")
+  # agglomerate taxa
+  #perform_agglomeration(level="species") # original data
+  #perform_agglomeration(level="genus", replicates=TRUE) # data with replicates
+  perform_agglomeration(level="species", replicates=TRUE) # data with replicates
 }
 
 #if(!exists("filtered")) {
