@@ -1,3 +1,4 @@
+library(driver)
 library(phyloseq)
 library(ggplot2)
 
@@ -14,6 +15,63 @@ translate_month <- function(x) {
 
 data <- readRDS("original_data/emp_baboon_pool_T_w_techReps.RDS")
 md <- sample_data(data)
+
+# get correlation for replicates
+
+# this should be agglomerated data
+filtered <- filter_data(count_threshold=3, sample_threshold=0.9, data=data)
+counts <- otu_table(filtered)@.Data
+log_ratios <- apply(counts + 0.65, 1, alr)
+log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
+
+cat("Zero-filtered taxa to:",ntaxa(filtered),"\n")
+replicate_samples <- md[md$sample_status==2,]
+unique_replicates <- unique(replicate_samples[,c("sname","collection_date")])
+corr_list <- c()
+min_corr <- c(Inf, "", "")
+max_corr <- c(-Inf, "", "")
+for(i in 1:dim(unique_replicates)[1]) {
+  sname <- unique_replicates[i]$sname
+  date <- unique_replicates[i]$collection_date
+  idx <- as.character(get_variable(replicate_samples, "sname")) == sname
+  samples <- prune_samples(idx, replicate_samples)
+  idx <- as.character(get_variable(samples, "collection_date")) == date
+  samples <- prune_samples(idx, samples)
+  # mean-center
+  sample_lr <- log_ratios[,colnames(log_ratios) %in% samples$sample_id]
+  # calculate correlation
+  # the plots of log counts against each other look good
+  # why is the "correlation" so low or even negative?
+  total_corr <- 0
+  pairs <- 0
+  for(j in 1:(dim(sample_lr)[2]-1)) {
+    for(k in 2:dim(sample_lr)[2]) {
+      if(j != k) {
+        y.t <- as.vector(sample_lr[,j])
+        y.tt <- sqrt(y.t%*%y.t)
+        y.h <- as.vector(sample_lr[,k])
+        y.hh <- sqrt(y.h%*%y.h)
+        #cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
+        total_corr <- total_corr + (y.t%*%y.h)/(y.tt*y.hh)
+        pairs <- pairs + 1
+      }
+    }
+  }
+  corr_list[i] <- total_corr/pairs
+  if(corr_list[i] > max_corr[1] && dim(samples)[1] > 3) {
+    max_corr <- c(corr_list[i], sname, date)
+  }
+  if(corr_list[i] < min_corr[1] && dim(samples)[1] > 3) {
+    min_corr <- c(corr_list[i], sname, date)
+  }
+  cat("Average correlation between replicates:",corr_list[i],"\n")
+}
+print(min_corr)
+print(max_corr)
+plot(density(corr_list))
+
+# plot replicates (proportion total abundance)
+
 replicate_months <- unlist(lapply(md[md$sample_status==2,"collection_date"]@.Data, function(x) substr(x, 6, 7)))
 reps_int <- as.numeric(replicate_months)
 
@@ -28,7 +86,8 @@ batch_vars <- c("plate", "extract_dna_conc_ng", "flow_cell_lane", "library_pool"
 replicates <- md[md$sample_status==2,]
 replicates <- replicates[order(replicates$collection_date),]
 replicates <- replicates[order(replicates$sname),]
-write.table(t(replicates[,c("sample_id","collection_date","sname","sex","age","season","plate","extract_dna_conc_ng","library_pool","flow_cell_lane")]),
+write.table(t(replicates[,c("sample_id","collection_date","sname","sex","age","season","plate",
+                            "extract_dna_conc_ng","library_pool","flow_cell_lane")]),
             file="temp.txt")
 
 # reuse
@@ -36,9 +95,9 @@ replicates <- subset_samples(data, sample_status==2)
 #glommed_reps_genus <- glom_counts(replicates, level="genus", NArm=FALSE)
 glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
 
-individual <- "OMO"
-indiv_samples <- subset_samples(glommed_reps_genus, sname==individual)
-#indiv_samples <- subset_samples(glommed_reps_family, sname==individual)
+individual <- "VIB"
+#indiv_samples <- subset_samples(glommed_reps_genus, sname==individual)
+indiv_samples <- subset_samples(glommed_reps_family, sname==individual)
 
 # collapse all lowly expressed guys into one lump
 taxa_sums <- colSums(otu_table(indiv_samples)@.Data)
