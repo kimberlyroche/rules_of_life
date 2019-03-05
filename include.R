@@ -26,8 +26,10 @@ over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI
 read_data <- function(write_sample=FALSE, replicates=FALSE) {
   # rows are samples, columns are taxa
   if(replicates) {
+    cat("Using replicates...\n")
     data <- readRDS("data/emp_baboon_pool_T_w_techReps.RDS")
   } else {
+    cat("NOT using replicates...\n")
     data <- readRDS("data/emp_baboon_NewFiltr.RDS")
   }
   # for now, just remove non-Bacterial domain
@@ -85,8 +87,8 @@ check_taxa_aggomeration <- function(data) {
 perform_agglomeration <- function(level="genus", replicates=FALSE) {
   data <- read_data(replicates=replicates)
   cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
-  # remove technical replicates (for now)
-  data <- subset_samples(data, sample_status==0)
+  # remove technical replicates
+  # data <- subset_samples(data, sample_status==0)
   cat("Agglomerating data...\n")
   glom_data <- glom_counts(data, level=level)
   if(replicates) {
@@ -573,6 +575,18 @@ plot_bounded_autocorrelation <- function(lags, filename="autocorrelation") {
 # ESTIMATION OF VARIANCE COMPONENTS
 # ====================================================================================================================
 
+# plots crude variance components (per-individual) for diagnostic purposes
+plot_cov <- function(datamat, filename) {
+  df <- gather_array(datamat)
+  p <- ggplot(df, mapping=aes(x=dim_1, y=dim_2, fill=var)) +
+    geom_tile() +
+    xlab("samples") +
+    ylab("samples") +
+    theme_minimal() +
+    guides(fill=guide_legend(title="covariance"))
+  ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+}
+
 # pass in zero-filtered data
 estimate_variance_components <- function(filtered=NULL, optim_it=1) {
   if(is.null(filtered)) {
@@ -624,7 +638,7 @@ estimate_variance_components <- function(filtered=NULL, optim_it=1) {
           week_d <- abs(round((d2-d1)/7))[[1]] + 1
           # distance of 1 is < 7 days
           # distance of 2 is < 14 days, etc.
-          subset_week_kernel[i,j] <- rho^week_d
+          subset_week_kernel[i,j] <- rho^week_d + 0.1
         }
       }
     }
