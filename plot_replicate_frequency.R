@@ -68,7 +68,65 @@ for(i in 1:dim(unique_replicates)[1]) {
 }
 print(min_corr)
 print(max_corr)
-plot(density(corr_list))
+plot_data <- data.frame(x=corr_list)
+p <- ggplot(plot_data, aes(x)) +
+  geom_density() +
+  theme_minimal() +
+  xlab("correlation between replicates") +
+  xlim(c(-1, 1))
+p
+ggsave("plots/correlation_between_replicates.png", scale=1.5, width=4, height=4, units="in")
+
+measured_cross_correlation <- c()
+# what's the correlation between individuals
+for(i in 1:(dim(unique_replicates)[1]-1)) {
+  for(j in 2:dim(unique_replicates)[1]) {
+    if(i != j) {
+      # get set of replicates i
+      sname.i <- unique_replicates[i]$sname
+      date.i <- unique_replicates[i]$collection_date
+      idx <- as.character(get_variable(replicate_samples, "sname")) == sname.i
+      samples <- prune_samples(idx, replicate_samples)
+      idx <- as.character(get_variable(samples, "collection_date")) == date.i
+      samples.i <- prune_samples(idx, samples)
+      
+      # get set of replicates j
+      sname.j <- unique_replicates[j]$sname
+      date.j <- unique_replicates[j]$collection_date
+      idx <- as.character(get_variable(replicate_samples, "sname")) == sname.j
+      samples <- prune_samples(idx, replicate_samples)
+      idx <- as.character(get_variable(samples, "collection_date")) == date.j
+      samples.j <- prune_samples(idx, samples)
+      
+      # just use the first of the pairs for now
+      sample_lr.i <- log_ratios[,colnames(log_ratios) %in% samples.i$sample_id]
+      sample_lr.j <- log_ratios[,colnames(log_ratios) %in% samples.j$sample_id]
+      total_corr <- 0
+      pairs <- 0
+      for(k in 1:(dim(sample_lr.i)[2]-1)) {
+        for(m in 2:dim(sample_lr.j)[2]) {
+          y.t <- as.vector(sample_lr.i[,k])
+          y.tt <- sqrt(y.t%*%y.t)
+          y.h <- as.vector(sample_lr.j[,m])
+          y.hh <- sqrt(y.h%*%y.h)
+          total_corr <- total_corr + (y.t%*%y.h)/(y.tt*y.hh)
+          pairs <- pairs + 1
+        }
+      }
+      cat("Avg. correl between",sname.i,"-",date.i,"and",sname.j,"-",date.j,":",(total_corr/pairs),"\n")
+      measured_cross_correlation[length(measured_cross_correlation)+1] <- total_corr/pairs
+    }
+  }
+}
+plot_data <- data.frame(x=measured_cross_correlation)
+p <- ggplot(plot_data, aes(x)) +
+  geom_density() +
+  theme_minimal() +
+  xlab("correlation across unrelated replicates") +
+  xlim(c(-1, 1))
+p
+ggsave("plots/correlation_across_replicates.png", scale=1.5, width=4, height=4, units="in")
+
 
 # plot replicates (proportion total abundance)
 
@@ -95,7 +153,7 @@ replicates <- subset_samples(data, sample_status==2)
 #glommed_reps_genus <- glom_counts(replicates, level="genus", NArm=FALSE)
 glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
 
-individual <- "VIB"
+individual <- "NAI"
 #indiv_samples <- subset_samples(glommed_reps_genus, sname==individual)
 indiv_samples <- subset_samples(glommed_reps_family, sname==individual)
 
