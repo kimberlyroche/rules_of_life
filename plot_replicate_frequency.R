@@ -13,13 +13,13 @@ translate_month <- function(x) {
   if(x == 7) { return("Jul") }
 }
 
-data <- readRDS("original_data/emp_baboon_pool_T_w_techReps.RDS")
-md <- sample_data(data)
+load("glom_data_genus_reps.RData")
+md <- sample_data(glom_data)
 
 # get correlation for replicates
 
 # this should be agglomerated data
-filtered <- filter_data(count_threshold=3, sample_threshold=0.9, data=data)
+filtered <- filter_data(count_threshold=3, sample_threshold=0.2, data=glom_data)
 counts <- otu_table(filtered)@.Data
 log_ratios <- apply(counts + 0.65, 1, alr)
 log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
