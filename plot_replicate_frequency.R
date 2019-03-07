@@ -19,7 +19,7 @@ md <- sample_data(glom_data)
 # get correlation for replicates
 
 # this should be agglomerated data
-filtered <- filter_data(data=glom_data, count_threshold=3, sample_threshold=0.9)
+filtered <- filter_data(data=glom_data, count_threshold=3, sample_threshold=0.2)
 counts <- otu_table(filtered)@.Data
 log_ratios <- apply(counts + 0.65, 1, alr)
 log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
@@ -64,7 +64,7 @@ for(i in 1:dim(unique_replicates)[1]) {
   if(corr_list[i] < min_corr[1] && dim(samples)[1] > 3) {
     min_corr <- c(corr_list[i], sname, date)
   }
-  cat("Average correlation between replicates:",corr_list[i],"\n")
+  cat("Average correlation between replicates for",sname,":",corr_list[i],"\n")
 }
 print(min_corr)
 print(max_corr)
@@ -149,7 +149,7 @@ write.table(t(replicates[,c("sample_id","collection_date","sname","sex","age","s
             file="temp.txt")
 
 # reuse
-replicates <- subset_samples(data, sample_status==2)
+replicates <- subset_samples(glom_data, sample_status==2)
 #glommed_reps_genus <- glom_counts(replicates, level="genus", NArm=FALSE)
 glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
 

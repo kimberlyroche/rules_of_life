@@ -9,7 +9,7 @@ data <- readRDS("original_data/emp_baboon_pool_T_w_techReps.RDS")
 metadata <- sample_data(data)
 
 cat("Earliest sample:",min(metadata$collection_date),"\n")
-cat("Earliest sample:",max(metadata$collection_date),"\n")
+cat("Latest sample:",max(metadata$collection_date),"\n")
 
 #min_samples <- 50
 min_samples <- 10

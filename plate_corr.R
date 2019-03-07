@@ -1,9 +1,11 @@
 source("include.R")
-load("glom_data_genus.RData")
-filtered <- filter_data(data=glom_data, sample_threshold=0.9)
+
+load("glom_data_genus_reps.RData")
+filtered <- filter_data(data=glom_data, sample_threshold=0.2)
 md <- read_metadata(filtered)
 
-limit <- 1000
+limit <- 2000
+limit <- nsamples(filtered)
 sample_idx <- sample(nsamples(filtered))[1:limit]
 
 plate <- md$plate[sample_idx]
@@ -30,7 +32,7 @@ for(covariate in covar) {
     res <- lm(plate~factor(cov_data), data)
   }
   cat("Variance explained by",covariate,":",(1-var(res$residuals)),"\n")
-  #cat("Check with model:",summary(res)$r.squared,"\n")
+  cat("Check with model:",summary(res)$r.squared,"\n")
   #print(res)
 
   if(covariate == "date") {
