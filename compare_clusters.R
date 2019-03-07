@@ -11,7 +11,8 @@ sourceCpp("fastCorr.cpp")
 
 pseudocount <- 0.1
 cat("Reading in counts\n")
-filtered <- filter_data()
+load("glom_data_genus.RData")
+filtered <- filter_data(data=glom_data)
 counts <- t(otu_table(filtered)) + pseudocount
 rm(filtered)
 

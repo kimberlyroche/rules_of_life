@@ -16,7 +16,8 @@ if(length(args)==0) {
 pseudocount <- as.numeric(args[1])
 
 if(!exists("filtered")) {
-  filtered <- filter_data()
+  load("glom_data_genus.RData")
+  filtered <- filter_data(data=glom_data)
   # data is ordered by sname, then collection_date
 }
 

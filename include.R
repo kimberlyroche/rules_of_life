@@ -101,16 +101,17 @@ perform_agglomeration <- function(level="genus", replicates=FALSE) {
   #check_taxa_aggomeration(data)
 }
 
-filter_data <- function(count_threshold=3, sample_threshold=0.9, data=NULL) {
-  if(is.null(data)) {
-    load("glom_data_genus.RData")
-    #cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
-    filtered <- filter_counts(glom_data, count_threshold, sample_threshold)
-    #cat("Zero counts (filtered data):",(1 - get_tiny_counts(filtered, 1)),"\n")
-  } else {
-    filtered <- filter_counts(data, count_threshold, sample_threshold)
-  }
-  return(filtered)
+filter_data <- function(data, count_threshold=3, sample_threshold=0.2) {
+  total_counts <- sum(otu_table(data)@.Data)
+  # get indices to collapse
+  pruned_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=T))@.Data)
+  collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=F))
+  collapse_indices <- which(collapse_indices)
+  # other is given by collapse_indices[1]
+  # need to add some bookkeeping here
+  cat("Other category collapsed into:",as.vector(tax_table(data)[collapse_indices[1]]),sep=" ","\n")
+  cat("Collapsed count total:",(total_counts-pruned_counts),"of",total_counts,"(",(total_counts-pruned_counts)/total_counts,")\n")
+  return(merge_taxa(data, collapse_indices, 1))
 }
 
 grp_by_sname <- function(data) {
@@ -121,6 +122,18 @@ grp_by_sname <- function(data) {
 # ====================================================================================================================
 # DATA TRANSFORMATION, ETC.
 # ====================================================================================================================
+
+filter_data_omit <- function(count_threshold=3, sample_threshold=0.9, data=NULL) {
+  if(is.null(data)) {
+    load("glom_data_genus.RData")
+    #cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
+    filtered <- filter_counts(glom_data, count_threshold, sample_threshold)
+    #cat("Zero counts (filtered data):",(1 - get_tiny_counts(filtered, 1)),"\n")
+  } else {
+    filtered <- filter_counts(data, count_threshold, sample_threshold)
+  }
+  return(filtered)
+}
 
 # uses phyloseq::filter_taxa to filter to taxa above a given count_threshold in at least 
 # freq_threshold observations
@@ -590,8 +603,8 @@ plot_cov <- function(datamat, filename) {
 # pass in zero-filtered data
 estimate_variance_components <- function(filtered=NULL, optim_it=1) {
   if(is.null(filtered)) {
-    load("glom_data_genus.RData")
-    filtered <- filter_counts(glom_data, 3, 0.2)
+    load("glom_data_species.RData")
+    filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
   }
 
   ilr_data <- NULL

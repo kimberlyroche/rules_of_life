@@ -1,6 +1,7 @@
-#source("include.R")
-#filtered <- filter_data(sample_threshold=0.9)
-#md <- read_metadata(filtered)
+source("include.R")
+load("glom_data_genus.RData")
+filtered <- filter_data(data=glom_data, sample_threshold=0.9)
+md <- read_metadata(filtered)
 
 limit <- 1000
 sample_idx <- sample(nsamples(filtered))[1:limit]

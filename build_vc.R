@@ -25,6 +25,6 @@ plot_cov <- function(datamat, filename) {
 # BUILD VARIANCE COMPONENTS
 # ============================================================================================
 
-load("glom_data_genus.RData")
-filtered <- filter_counts(glom_data, 3, filter_percent)
+load("glom_data_species.RData")
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 estimate_variance_components(filtered=filtered, optim_it=1)
