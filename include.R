@@ -101,17 +101,20 @@ perform_agglomeration <- function(level="genus", replicates=FALSE) {
   #check_taxa_aggomeration(data)
 }
 
-filter_data <- function(data, count_threshold=3, sample_threshold=0.2) {
+filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=FALSE) {
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
-  pruned_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=T))@.Data)
+  retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=T))@.Data)
   collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=F))
   collapse_indices <- which(collapse_indices)
-  # other is given by collapse_indices[1]
-  # need to add some bookkeeping here
-  cat("Other category collapsed into:",as.vector(tax_table(data)[collapse_indices[1]]),sep=" ","\n")
-  cat("Collapsed count total:",(total_counts-pruned_counts),"of",total_counts,"(",(total_counts-pruned_counts)/total_counts,")\n")
-  return(merge_taxa(data, collapse_indices, 1))
+  merged_data <- merge_taxa(data, collapse_indices, 1)
+  if(verbose) {
+    cat("Collapsing",length(collapse_indices),"taxa of",ntaxa(data),"\n")
+    cat("\tOther category collapsed into:",as.vector(tax_table(data)[collapse_indices[1]]),sep=" ","\n")
+    cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
+    cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
+  }
+  return(merged_data)
 }
 
 grp_by_sname <- function(data) {
