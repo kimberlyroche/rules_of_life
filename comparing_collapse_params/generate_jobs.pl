@@ -2,8 +2,7 @@ use strict;
 use warnings;
 
 my @filters = qw(0.2 0.5 0.9);
-#my @agglomerations = qw(genus species);
-my @agglomerations = qw(species);
+my @agglomerations = qw(genus species);
 
 for my $a (@agglomerations) {
   for my $f (@filters) {

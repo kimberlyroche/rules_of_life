@@ -19,7 +19,7 @@ md <- sample_data(data)
 # get correlation for replicates
 
 # this should be agglomerated data
-filtered <- filter_data(count_threshold=3, sample_threshold=0.9, data=data)
+filtered <- filter_data(data=data, count_threshold=3, sample_threshold=0.9)
 counts <- otu_table(filtered)@.Data
 log_ratios <- apply(counts + 0.65, 1, alr)
 log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))

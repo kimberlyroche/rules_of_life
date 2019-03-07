@@ -1,5 +1,7 @@
 source("include.R")
 
+# re-do this to calculate percent of counts collapsed into other!
+
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0) {
   stop("Argument for agglomeration-level missing!\n")
@@ -31,7 +33,7 @@ if(l == "genus") {
   load("glom_data_genus.RData")
 }
 
-filtered <- filter_data(sample_threshold=f, data=glom_data)
+filtered <- filter_data(data=glom_data, sample_threshold=f)
 
 # (1) compare retained counts
 retained_counts <- sum(otu_table(filtered)@.Data)
