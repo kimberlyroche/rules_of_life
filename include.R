@@ -493,7 +493,7 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
           for(d2_idx in (d1_idx+1):indiv_sample_no) {
             d1 <- as.Date(md$collection_date[d1_idx])
             d2 <- as.Date(md$collection_date[d2_idx])
-            time_diff[d1_idx,d2_idx] <- as.numeric(difftime(d2, d1), units="weeks")
+            time_diff[d1_idx,d2_idx] <- as.numeric(difftime(d2, d1, units="weeks"))
             if(date_diff_units == "weeks") {
               time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx])
             } else if(date_diff_units == "months") {

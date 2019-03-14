@@ -8,8 +8,11 @@ data <- filter_data(data=glom_data, verbose=F)
 data <- subset_samples(data, sname==indiv)
 #data <- subset_samples(data, grepl("2002", collection_date))
 
-cat("Min age:",min(sample_data(DUI)$age),"\n")
-cat("Max age:",max(sample_data(DUI)$age),"\n")
+cat("Min collection_date:",min(sample_data(data)$collection_date),"\n")
+cat("Max collection_date:",max(sample_data(data)$collection_date),"\n")
+
+cat("Min age:",min(sample_data(data)$age),"\n")
+cat("Max age:",max(sample_data(data)$age),"\n")
 
 save_filename <- paste(indiv,"_gapped_timecourse",sep="")
 legend <- TRUE
