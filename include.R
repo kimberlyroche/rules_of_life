@@ -111,6 +111,7 @@ filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=F
   if(verbose) {
     cat("Collapsing",length(collapse_indices),"taxa of",ntaxa(data),"\n")
     cat("\tOther category collapsed into:",as.vector(tax_table(data)[collapse_indices[1]]),sep=" ","\n")
+    cat("\tOther sequence variant:",rownames(tax_table(data))[collapse_indices[1]],sep=" ","\n")
     cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
     cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
   }
