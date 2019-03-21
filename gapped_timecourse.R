@@ -1,12 +1,15 @@
 library(RColorBrewer)
 
+source("include.R")
+load("glom_data_genus_reps.RData")
+
 indiv <- "DUX"
-indiv <- "DUI"
-indiv <- "ACA"
+#indiv <- "DUI"
+#indiv <- "ACA"
 
 data <- filter_data(data=glom_data, verbose=F)
 data <- subset_samples(data, sname==indiv)
-#data <- subset_samples(data, grepl("2002", collection_date))
+data <- subset_samples(data, grepl("2002", collection_date))
 
 cat("Min collection_date:",min(sample_data(data)$collection_date),"\n")
 cat("Max collection_date:",max(sample_data(data)$collection_date),"\n")
