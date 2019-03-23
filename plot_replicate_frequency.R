@@ -15,6 +15,7 @@ translate_month <- function(x) {
 
 load("glom_data_genus_reps.RData")
 md <- sample_data(glom_data)
+plot(density(md$age))
 
 # get correlation for replicates
 

@@ -56,10 +56,10 @@ read_metadata <- function(data, write_sample=FALSE) {
 # so percent zeroes is 1 - get_tiny_counts(data, 1)
 get_tiny_counts <- function(data, threshold, use_ns=500) {
   # just sample the samples
-  if(nsamples(data) < use_ns) {
-    use_ns <- nsamples(data)
+  if(phyloseq::nsamples(data) < use_ns) {
+    use_ns <- phyloseq::nsamples(data)
   }
-  sids <- sample(nsamples(data))[1:use_ns]
+  sids <- sample(phyloseq::nsamples(data))[1:use_ns]
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
@@ -104,8 +104,8 @@ perform_agglomeration <- function(level="genus", replicates=FALSE) {
 filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=FALSE) {
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
-  retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=T))@.Data)
-  collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= sample_threshold, prune=F))
+  retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=T))@.Data)
+  collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
   collapse_indices <- which(collapse_indices)
   merged_data <- merge_taxa(data, collapse_indices, 1)
   if(verbose) {
@@ -143,7 +143,7 @@ filter_data_omit <- function(count_threshold=3, sample_threshold=0.9, data=NULL)
 # freq_threshold observations
 filter_counts <- function(data, count_threshold, freq_threshold) {
   total_counts <- sum(otu_table(data)@.Data)
-  filtered_data <- filter_taxa(data, function(x) sum(x >= count_threshold)/nsamples(data) >= freq_threshold, TRUE)
+  filtered_data <- filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= freq_threshold, TRUE)
   total_counts_filtered <- sum(otu_table(filtered_data)@.Data)
   #cat("Total counts:",total_counts,"filtered to:",total_counts_filtered,"\n")
   #cat("Total taxa:",ntaxa(data),"filtered to:",ntaxa(filtered_data),"\n")
@@ -154,7 +154,7 @@ filter_counts <- function(data, count_threshold, freq_threshold) {
 glom_counts <- function(data, level="genus", NArm=FALSE) {
   cat("Agglomerating data to",level,"level...\n")
   glom_data <- tax_glom(data, taxrank=level, NArm=NArm)
-  cat("Agglomerated data has dimension ntaxa=",ntaxa(glom_data),"x nsamples=",nsamples(glom_data),"\n")
+  cat("Agglomerated data has dimension ntaxa=",ntaxa(glom_data),"x nsamples=",phyloseq::nsamples(glom_data),"\n")
   return(glom_data)
 }
 
@@ -378,7 +378,7 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
 plot_percent_threshold <- function(data, threshold=3, save_filename) {
   cat("Plotting percent counts >=",threshold,"in all ASVs...\n")
   count_table <- otu_table(data)
-  min_counts <- apply(count_table, 2, function(x) { sum(x >= threshold)/nsamples(data) })
+  min_counts <- apply(count_table, 2, function(x) { sum(x >= threshold)/phyloseq::nsamples(data) })
   min_counts <- stack(sort(min_counts, decreasing=TRUE))
   p <- min_counts %>% ggplot(aes(x=seq(1,ntaxa(data)), y=values)) +
     geom_point(size=1) +
@@ -473,10 +473,10 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
       # apparently the thing you're filtering against must be globally available
       indiv <<- indiv
       counts <- subset_samples(data, sname==indiv)
-      do_sample <- rep(1, nsamples(counts))
+      do_sample <- rep(1, phyloseq::nsamples(counts))
       if(resample) {
         # randomly blind ~50% of this individuals samples
-        do_sample <- rbinom(nsamples(counts), 1, resample_rate)
+        do_sample <- rbinom(phyloseq::nsamples(counts), 1, resample_rate)
       }
       # this was misleading; the mean-centering should be taking place before subsetting
       # this was deflating the autocorrelation estimates!
@@ -640,7 +640,7 @@ estimate_variance_components <- function(filtered=NULL, optim_it=1) {
     }
 
     nt <- ntaxa(baboon_counts)
-    ns <- nsamples(baboon_counts)
+    ns <- phyloseq::nsamples(baboon_counts)
 
     rho <- 1/2
     subset_week_kernel <- matrix(0, nrow=ns, ncol=ns)
