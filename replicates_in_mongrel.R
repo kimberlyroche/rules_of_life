@@ -6,8 +6,13 @@ library(stringr)
 
 source("include.R")
 
-level <- "genus"
-filter <- 0.9
+# evaluate at:
+#   (1) family + 0.2
+#   (2) genus + 0.5
+#   (3) genus + 0.2
+
+level <- "family"
+filter <- 0.5
 
 load(paste("glom_data_",level,"_reps.RData",sep=""))
 replicates <- subset_samples(glom_data, sample_status==2)
@@ -20,20 +25,11 @@ p <- ntaxa(filtered)
 cat("Number samples:",n,"\n")
 cat("Number taxa:",p,"\n")
 
-# does collection date predict plate?
-dates <- numeric(n)
-for(i in 1:n) {
-  # date to number
-  dates[i] <- as.numeric(as.POSIXct(md$collection_date[i], format="%Y-%m-%d"))
-}
-data <- data.frame(date=dates, plate=as.numeric(md$plate))
-fit <- lm(plate ~ date, data)
-
-devtools::load_all("C:/Users/kim/Documents/mongrel")
+#devtools::load_all("C:/Users/kim/Documents/mongrel")
+devtools::load_all("/data/mukherjeelab/Mongrel/mongrel")
 
 # for testing
-#subset_ids <- sample_data(filtered)$sample_id[50:70]
-
+#subset_ids <- sample_data(filtered)$sample_id[1:35]
 subset_ids <- sample_data(filtered)$sample_id
 subsetted <- subset_samples(filtered, sample_id %in% subset_ids)
 md <- sample_data(subsetted)
@@ -46,7 +42,7 @@ X <- t(model.matrix(~as.factor(md$sname) +
                       as.factor(md$plate) +
                       as.factor(md$library_pool) +
                       as.factor(round(md$extract_dna_conc_ng,digits=-1))))
-png(paste("design_",level,"_filter_",filter,".png",sep=""))
+png(paste("plots/replicates/design_",level,"_filter_",filter,".png",sep=""))
 image(X)
 dev.off()
 
@@ -73,25 +69,49 @@ fit <- mongrel(Y=Y, X=X, upsilon=upsilon,
                       init=random_mongrel_init(Y), n_samples=2000)
 cat("Saving fitted mongrel object...\n")
 save(fit, file=paste("mongrelfit_",level,"_filter_",filter,".RData", sep=""))
-dev.off()
 
 cat("Plotting posterior-predictive fit...\n")
 ppc(fit) + ggplot2::coord_cartesian(ylim=c(0, 30000))
-ggsave(paste("ppc_",level,"_filter_",filter,".png",sep=""), scale=1)
+ggsave(paste("plots/replicates/ppc_",level,"_filter_",filter,".png",sep=""), scale=1)
 dev.off()
 
 fit_summary <- summary(fit, pars="Lambda")$Lambda
 focus <- fit_summary[sign(fit_summary$p2.5) == sign(fit_summary$p97.5),]
 focus <- unique(focus$coord)
-plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X))
-ggsave(paste("lambda_",level,"_filter_",filter,".png",sep=""), scale=2)
-dev.off()
 
+# plot covariates in chunks
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[c(2,3,29,30)])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_indiv_season_FCL.png",sep=""), scale=1.5)
 
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[31:35])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate1.png",sep=""), scale=1.5)
 
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[36:40])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate2.png",sep=""), scale=1.5)
 
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[41:45])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate3.png",sep=""), scale=1.5)
 
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[46:50])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate4.png",sep=""), scale=1.5)
 
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[51:55])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate5.png",sep=""), scale=1.5)
+
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[56:60])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate6.png",sep=""), scale=1.5)
+
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[61:66])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate7.png",sep=""), scale=1.5)
+
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[67:70])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_librarypool1.png",sep=""), scale=1.5)
+
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[71:73])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_librarypool2.png",sep=""), scale=1.5)
+
+plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[74:76])
+ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_dnaconc.png",sep=""), scale=1.5)
 
 
 
