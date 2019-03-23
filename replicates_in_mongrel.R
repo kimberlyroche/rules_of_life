@@ -11,8 +11,8 @@ source("include.R")
 #   (2) genus + 0.5
 #   (3) genus + 0.2
 
-level <- "family"
-filter <- 0.5
+level <- "genus"
+filter <- 0.2
 
 load(paste("glom_data_",level,"_reps.RData",sep=""))
 replicates <- subset_samples(glom_data, sample_status==2)
@@ -42,7 +42,7 @@ X <- t(model.matrix(~as.factor(md$sname) +
                       as.factor(md$plate) +
                       as.factor(md$library_pool) +
                       as.factor(round(md$extract_dna_conc_ng,digits=-1))))
-png(paste("plots/replicates/design_",level,"_filter_",filter,".png",sep=""))
+png(paste("plots/replicates/",level,"_",filter,"/design_",level,"_filter_",filter,".png",sep=""))
 image(X)
 dev.off()
 
@@ -56,6 +56,8 @@ for(i in 2:length(rownames(X))) {
   new_rownames[i] <- str_replace(new_rownames[i], 'as\\.factor\\(round\\(md\\$extract_dna_conc_ng, digits = -1\\)\\)', "dna_conc_ng:")
 }
 rownames(X) <- new_rownames
+cat("Covariates are:\n")
+print(rownames(X))
 
 upsilon <- dim(Y)[1] + 2
 Theta <- matrix(0, dim(Y)[1]-1, dim(X)[1])
@@ -72,7 +74,7 @@ save(fit, file=paste("mongrelfit_",level,"_filter_",filter,".RData", sep=""))
 
 cat("Plotting posterior-predictive fit...\n")
 ppc(fit) + ggplot2::coord_cartesian(ylim=c(0, 30000))
-ggsave(paste("plots/replicates/ppc_",level,"_filter_",filter,".png",sep=""), scale=1)
+ggsave(paste("plots/replicates/",level,"_",filter,"/ppc_",level,"_filter_",filter,".png",sep=""), scale=1)
 dev.off()
 
 fit_summary <- summary(fit, pars="Lambda")$Lambda
@@ -81,38 +83,37 @@ focus <- unique(focus$coord)
 
 # plot covariates in chunks
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[c(2,3,29,30)])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_indiv_season_FCL.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_indiv_season_FCL.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[31:35])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate1.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate1.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[36:40])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate2.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate2.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[41:45])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate3.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate3.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[46:50])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate4.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate4.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[51:55])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate5.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate5.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[56:60])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate6.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate6.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[61:66])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_plate7.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_plate7.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[67:70])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_librarypool1.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_librarypool1.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[71:73])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_librarypool2.png",sep=""), scale=1.5)
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_librarypool2.png",sep=""), scale=1.5)
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[74:76])
-ggsave(paste("plots/replicates/lambda_",level,"_filter_",filter,"_dnaconc.png",sep=""), scale=1.5)
-
+ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_dnaconc.png",sep=""), scale=1.5)
 
 
 
