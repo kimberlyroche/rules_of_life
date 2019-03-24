@@ -2,50 +2,73 @@ library(matrixsampling)
 library(mvtnorm)
 library(driver)
 
-set.seed(102)
+# =======================================================================================
+# SIMULATION
+# =======================================================================================
 
-T <- 300
-D <- 10
-Q <- 2 # covariates are seasonal oscillating components
+set.seed(100)
 
-varscaledown <- 0.1
+sim <- 2
 
-upsilon <- D + 2
-Xi <- diag(D)*varscaledown + matrix(varscaledown/10, D, D) - diag(D)*varscaledown/10
+T <- 300; D <- 10; Q <- 2
 
-# structure in Sigma - does this come through? is it interpretable?
-# basically: we want to impose structure between log ratios AND recover it
+varscale <- log(1.001)
 
-# the fact that you can get ~0.5 correlation out of random interactions should be a point for caution though...
-
-#Xi <- matrix(-varscaledown/10, D, D)
-#Xi[1:5,1:5] <- varscaledown/10
-#Xi[6:10,6:10] <- varscaledown/10
-#diag(Xi) <- varscaledown
-
+upsilon <- D + 10
+Xi <- diag(D)*varscale
 Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
-C.0 <- diag(Q)*varscaledown
+C.0 <- diag(Q)*varscale
 M.0 <- matrix(0, Q, D)
-Theta.t <- rmatrixnormal(1, M.0, C.0, Sigma)[,,1] # mean, Cov(rows), Cov(columns) even though specified is confusing in docs
+
+if(sim == 1) {
+  Theta.t <- cbind(matrix(rnorm(1*(D/2), 0.15, 0.05), 1, (D/2)),
+                   matrix(rnorm(1*(D/2), -0.15, 0.05), 1, (D/2)))
+  Theta.t <- rbind(Theta.t, -Theta.t)
+} else {
+  Theta.t <- matrix(rnorm(D, 0, 0.025), 1, D)
+  Theta.t <- rbind(Theta.t, -Theta.t)
+}
+
+# want to think about how to make the oscillations themselves noisier
 
 omega.t <- 2*pi/30
 G.t <- matrix(c(cos(omega.t), -sin(omega.t), sin(omega.t), cos(omega.t)), 2, 2)
 F.t.T <- matrix(c(1, 0), 1, 2)
-W.t <- diag(Q)*varscaledown*0.5 # reducing the scale of W.t means things stay almost perfectly in phase
-                                # increasing the scale of W.t allows things to get out of phase
-                                # BUT the length of period is pretty rigid here, do we want to change that?
+if(sim == 1) {
+  W.t <- diag(Q)*varscale
+} else {
+  W.t <- diag(Q)*varscale*5
+}
 gamma.t <- 1
 
 etas <- matrix(0, D, T)
+Thetas.t <- array(0, dim=c(Q, D, T))
 for(t in 1:T) {
-  Theta.t <- G.t%*%Theta.t + rmatrixnormal(1, matrix(0, Q, D), W.t, Sigma)[,,1]
+  Omega.t <- rmatrixnormal(1, matrix(0, Q, D), W.t, Sigma)[,,1]
+  #Theta.t <- G.t%*%Theta.t
+  Theta.t <- G.t%*%Theta.t + Omega.t
+  Thetas.t[,,t] <- Theta.t
   eta.t.T <- F.t.T%*%Theta.t + rmvnorm(1, rep(0, D), gamma.t*Sigma)
   etas[,t] <- t(eta.t.T)
 }
 
-eta.df <- gather_array(etas)
-ggplot(eta.df, aes(x=dim_2, y=var, color=as.factor(dim_1))) +
+big.Theta <- matrix(0, 2*T, D)
+for(t in 1:T) {
+  idx1 <- (t-1)*2 + 1
+  idx2 <- idx1 + 1
+  big.Theta[idx1:idx2, 1:D] <- Thetas.t[,,t]
+}
+true.theta.cov <- t(big.Theta)%*%big.Theta
+true.theta.cov <- true.theta.cov/T
+#image(t(true.theta.cov))
+png("sim_01_theta_cov_true.png")
+heatmap(true.theta.cov, Colv=NA, Rowv=NA)
+dev.off()
+
+eta.df <- gather_array(etas[,1:T])
+p <- ggplot(eta.df, aes(x=dim_2, y=var, color=as.factor(dim_1))) +
   geom_line()
+ggsave("sim_02_eta_oscillating.png", width=8, height=4, units="in", scale=1.5)
 
 ys <- matrix(0, D+1, T)
 for(t in 1:T) {
@@ -53,9 +76,14 @@ for(t in 1:T) {
   alr.inv <- alr.inv/sum(alr.inv)
   ys[,t] <- rmultinom(1, 1000, alr.inv)
 }
-y.df <- gather_array(ys[,100:T])
-ggplot(y.df, aes(x=dim_2, y=var, fill=as.factor(dim_1))) + 
+y.df <- gather_array(ys[,1:T])
+p <- ggplot(y.df, aes(x=dim_2, y=var, fill=as.factor(dim_1))) + 
   geom_bar(position="fill", stat="identity", width=1)
+ggsave("sim_03_y_oscillating.png", width=8, height=4, units="in", scale=1.5)
+
+# =======================================================================================
+# PREDICTION
+# =======================================================================================
 
 # Kalman filter - learn Sigma and eta.1.T ... eta.T.T
 # start with precisely the correct parameterizations
@@ -65,8 +93,12 @@ G.t.pred <- G.t
 F.t.T.pred <- F.t.T
 gamma.t.pred <- gamma.t
 M.t <- M.0
-C.t <- C.0
-W.t.pred <- W.t
+C.t <- diag(Q)*10
+W.t.pred <- array(rep(W.t, T), dim=c(Q, Q, T))
+for(i in 1:30) {
+  W.t.pred[,,i] <- diag(Q)
+}
+
 etas.pred <- matrix(0, D, T)
 # we need to keep all these for the smoother!
 Ms <- array(0, dim=c(Q, D, T))
@@ -74,11 +106,18 @@ Cs <- array(0, dim=c(Q, Q, T))
 Rs <- array(0, dim=c(Q, Q, T))
 As <- array(0, dim=c(Q, D, T))
 Thetas <- array(0, dim=c(Q, D, T))
+
+# the trouble is this is very sensitive to *where* in the oscillation a given component starts
+# if it's initialized in the wrong spot (i.e. out of phase), all the error gets pushed into Sigma
+# (the residual)
+
+# making the state transition variance large in initial states helps enormously
+
 for(t in 1:T) {
   # prior at t
   A.t <- G.t.pred%*%M.t
   As[,,t] <- A.t
-  R.t <- G.t.pred%*%C.t%*%t(G.t.pred) + W.t.pred
+  R.t <- round(G.t.pred%*%C.t%*%t(G.t.pred) + W.t.pred[,,t], digits=10) # numerical issues, need a better hack
   Rs[,,t] <- R.t
   Sigma.pred <- rinvwishart(1, upsilon.pred, Xi.pred)[,,1]
   Theta.t <- rmatrixnormal(1, A.t, R.t, Sigma.pred)[,,1]
@@ -106,13 +145,14 @@ Thetas[,,t] <- Theta.t
 cat("Trace of true Sigma:    ",sum(diag(Sigma)),"\n")
 cat("Trace of inferred Sigma:",sum(diag(Sigma.pred)),"\n")
 
-# plot predicted etas
-for(d in 1:D) {
-  plot(etas[d,100:T], type="l")
-  lines(etas.pred[d,100:T], col="blue")
-}
+png("sim_04_Sigma_true.png")
+heatmap(Sigma, Colv=NA, Rowv=NA)
+dev.off()
 
-# simulation smoother
+png("sim_05_Sigma_pred.png")
+heatmap(Sigma.pred, Colv=NA, Rowv=NA)
+dev.off()
+
 Thetas.sim <- array(0, dim=c(Q, D, T))
 Thetas.sim[,,T] <- Theta.t
 for(t in (T-1):1) {
@@ -123,14 +163,13 @@ for(t in (T-1):1) {
   Thetas.sim[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.pred)[,,1]
 }
 
-for(d in 1:D) {
-  plot(etas[d,], type="l")
-  lines(Thetas.sim[1,d,], col="blue")
-}
+d <- 1
+temp.df <- data.frame(rbind(data.frame(t=1:T, val=etas[d,1:T], thing=rep("eta", T)),
+                            data.frame(t=1:T, val=Thetas.sim[1,d,1:T], thing=rep("Theta.sim", T))))
+p <- ggplot(temp.df, aes(x=t, y=val, color=thing)) +
+  geom_line()
+ggsave(paste("sim_06_eta-theta_pair.png", sep=""), width=8, height=4, units="in", scale=1.5)
 
-# Sigma is your residual covariance
-# estimate seasonal covariance?
-# stack thetas 1:T
 big.Theta <- matrix(0, 2*T, D)
 for(t in 1:T) {
   idx1 <- (t-1)*2 + 1
@@ -139,43 +178,39 @@ for(t in 1:T) {
 }
 est.cov <- t(big.Theta)%*%big.Theta
 est.cov <- est.cov/T
-est.cor <- cov2cor(est.cov)
+png("sim_07_theta_cov_est.png")
+heatmap(est.cov, Colv=NA, Rowv=NA)
+dev.off()
 
-print(round(est.cor, digits=5))
-image(est.cor)
-print(round(Sigma.pred.cor, digits=5))
-image(Sigma.pred.cor)
+temp.df <- rbind(data.frame(x=1:T, var=etas[1,], thing="eta1"), data.frame(x=1:T, var=etas[2,], thing="eta2"))
+p <- ggplot(temp.df, aes(x=x, y=var, color=thing)) +
+  geom_line()
+ggsave(paste("sim_08_high_pcorr_etas.png", sep=""), width=8, height=4, units="in", scale=1.5)
 
-# estimated seasonal correlation pairs
-# 1 vs. 2 have approx. +0.5 correlation
-plot(etas[1,], type="l")
-lines(etas[4,], col="red")
+temp.df <- rbind(data.frame(x=1:T, var=etas[1,], thing="eta1"), data.frame(x=1:T, var=etas[6,], thing="eta2"))
+p <- ggplot(temp.df, aes(x=x, y=var, color=thing)) +
+  geom_line()
+ggsave(paste("sim_09_high_ncorr_etas.png", sep=""), width=8, height=4, units="in", scale=1.5)
 
-# 1 vs. 4 have approx. 0 correlation
-plot(etas[1,], type="l")
-lines(etas[6,], col="red")
+# windowed correlation
+#idx1 <- 1
+#idx2 <- 2
+#window <- 30
+#cor_vec <- numeric(T-window)
+#for(t in 1:(T-window)) {
+#  rho <- stats::cor(c(Thetas.sim[,idx1,t:(t+window)]), c(Thetas.sim[,idx2,t:(t+window)]))
+#  cor_vec[t] <- rho
+#}
+#plot(cor_vec, type="l", ylim=c(-1,1))
 
-# 1 vs. 5 have approx -0.5 correlation
-plot(etas[2,], type="l")
-lines(etas[5,], col="red")
 
-# residual correlation pairs are super hard to see/interpret
 
-# if we assume these (seasonal) covariances are what we want: how variable are these over the time course?
-# 6 and 9 have very high correlation
-# should generally be the case that the only way to achieve that will be by always being in phase!
 
-# what does windowed correlation look like?
-idx1 <- 6
-idx2 <- 9
-window <- 30
-cor_vec <- numeric(T-window)
-for(t in 1:(T-window)) {
-  rho <- stats::cor(c(Thetas.sim[,idx1,t:(t+window)]), c(Thetas.sim[,idx2,t:(t+window)]))
-  cor_vec[t] <- rho
-}
-plot(cor_vec, type="l", ylim=c(-1,1))
-# these can vary a lot, as they should, because we're not building in any particular covariance (?)
+
+
+
+
+
 
 
 

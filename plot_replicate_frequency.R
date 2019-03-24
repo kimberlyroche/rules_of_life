@@ -78,6 +78,17 @@ p <- ggplot(plot_data, aes(x)) +
 p
 ggsave("plots/correlation_between_replicates.png", scale=1.5, width=4, height=4, units="in")
 
+# what is up with lower-correlation replicates: VIB (0.34), DUD (0.52)
+lc_reps <- subset_samples(filtered, sname=="VIB")
+lc_reps <- subset_samples(lc_reps, sample_status==2)
+if(length(unique(sample_data(lc_reps)$collection_date))==1) {
+  sids <- sample_data(lc_reps)$"sample_id"
+  for(i in 1:length(sids)) {
+    total_counts <- sum(otu_table(subset_samples(filtered, sample_id==sids[i]))@.Data)
+    cat("Counts rep",i,":",total_counts,"\n")
+  }
+}
+
 measured_cross_correlation <- c()
 # what's the correlation between individuals
 for(i in 1:(dim(unique_replicates)[1]-1)) {
@@ -152,9 +163,9 @@ write.table(t(replicates[,c("sample_id","collection_date","sname","sex","age","s
 # reuse
 replicates <- subset_samples(glom_data, sample_status==2)
 #glommed_reps_genus <- glom_counts(replicates, level="genus", NArm=FALSE)
-glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
+#glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
 
-individual <- "NAI"
+individual <- "VIB"
 #indiv_samples <- subset_samples(glommed_reps_genus, sname==individual)
 indiv_samples <- subset_samples(glommed_reps_family, sname==individual)
 
