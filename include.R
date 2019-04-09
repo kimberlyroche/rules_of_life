@@ -7,8 +7,7 @@ suppressMessages(library(coda))
 suppressMessages(library(Rcpp))
 suppressMessages(library(RcppEigen))
 suppressMessages(library(LaplacesDemon)) # various sampling distributions
-suppressMessages(library(mvtnorm))
-suppressMessages(library(MCMCpack))
+#suppressMessages(library(MCMCpack))
 
 sourceCpp("fastCorr.cpp")
 sourceCpp("dens_optim.cpp")
@@ -27,10 +26,10 @@ read_data <- function(write_sample=FALSE, replicates=FALSE) {
   # rows are samples, columns are taxa
   if(replicates) {
     cat("Using replicates...\n")
-    data <- readRDS("data/emp_baboon_pool_T_w_techReps.RDS")
+    data <- readRDS("original_data/emp_baboon_pool_T_w_techReps.RDS")
   } else {
     cat("NOT using replicates...\n")
-    data <- readRDS("data/emp_baboon_NewFiltr.RDS")
+    data <- readRDS("original_data/emp_baboon_NewFiltr.RDS")
   }
   # for now, just remove non-Bacterial domain
   data <- subset_taxa(data, domain=="Bacteria")

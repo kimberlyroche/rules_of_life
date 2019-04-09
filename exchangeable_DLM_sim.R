@@ -1,42 +1,59 @@
 library(matrixsampling)
 library(mvtnorm)
 library(driver)
+library(ggplot2)
 
 # =======================================================================================
-# SIMULATION
+# SIMULATION - uncollapsed model
 # =======================================================================================
 
 set.seed(100)
 
-sim <- 2
+sim <- 1
 
-T <- 300; D <- 10; Q <- 2
+T <- 100; D <- 10; Q <- 2
 
-varscale <- log(1.001)
+varscale <- 0.01
+if(sim > 0) {
+  varscale <- log(1.001)
+}
+
+delta <- 1 # hack; to get some oscillations, we need large variance somewhere
+           # one place to put it is in the initial state
 
 upsilon <- D + 10
-Xi <- diag(D)*varscale
+# add structure to Sigma through Xi
+Xi <- matrix(-0.8, D, D)
+Xi[1:(D/2),1:(D/2)] <- 0.8
+Xi[(D/2 + 1):D,(D/2 + 1):D] <- 0.8
+diag(Xi) <- 1
+Xi <- Xi*varscale
+if(sim > 0) {
+  Xi <- diag(D)*varscale
+}
 Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
 C.0 <- diag(Q)*varscale
 M.0 <- matrix(0, Q, D)
 
+Theta.t <- rmatrixnormal(1, M.0, C.0, delta*Sigma)[,,1]
 if(sim == 1) {
   Theta.t <- cbind(matrix(rnorm(1*(D/2), 0.15, 0.05), 1, (D/2)),
                    matrix(rnorm(1*(D/2), -0.15, 0.05), 1, (D/2)))
   Theta.t <- rbind(Theta.t, -Theta.t)
-} else {
+}
+if(sim == 2) {
   Theta.t <- matrix(rnorm(D, 0, 0.025), 1, D)
   Theta.t <- rbind(Theta.t, -Theta.t)
 }
+Theta.0 <- Theta.t
 
 # want to think about how to make the oscillations themselves noisier
 
 omega.t <- 2*pi/30
 G.t <- matrix(c(cos(omega.t), -sin(omega.t), sin(omega.t), cos(omega.t)), 2, 2)
 F.t.T <- matrix(c(1, 0), 1, 2)
-if(sim == 1) {
-  W.t <- diag(Q)*varscale
-} else {
+W.t <- diag(Q)*varscale*0.1
+if(sim == 2) {
   W.t <- diag(Q)*varscale*5
 }
 gamma.t <- 1
@@ -68,7 +85,8 @@ dev.off()
 eta.df <- gather_array(etas[,1:T])
 p <- ggplot(eta.df, aes(x=dim_2, y=var, color=as.factor(dim_1))) +
   geom_line()
-ggsave("sim_02_eta_oscillating.png", width=8, height=4, units="in", scale=1.5)
+p
+#ggsave("sim_02_eta_oscillating.png", width=8, height=4, units="in", scale=1.5)
 
 ys <- matrix(0, D+1, T)
 for(t in 1:T) {
@@ -79,7 +97,80 @@ for(t in 1:T) {
 y.df <- gather_array(ys[,1:T])
 p <- ggplot(y.df, aes(x=dim_2, y=var, fill=as.factor(dim_1))) + 
   geom_bar(position="fill", stat="identity", width=1)
-ggsave("sim_03_y_oscillating.png", width=8, height=4, units="in", scale=1.5)
+p
+#ggsave("sim_03_y_oscillating.png", width=8, height=4, units="in", scale=1.5)
+
+sum(diag(W.t))
+sum(diag(Sigma))
+
+# =======================================================================================
+# SIMULATION - collapsed model
+# =======================================================================================
+
+B <- matrix(0, D, T)
+for(t in 1:T) {
+  alpha.t <- F.t.T
+  for(j in t:1) {
+    alpha.t <- alpha.t%*%G.t
+  }
+  #alpha.t <- t(alpha.t%*%M.0)
+  alpha.t <- t(alpha.t%*%Theta.0)
+  B[,t] <- alpha.t
+}
+
+K <- Xi
+
+A <- matrix(0, T, T)
+# because G.t is fixed, I'm just power iterating these
+for(t in 1:T) {
+  for(tk in t:T) {
+    k <- tk - t
+    if(t == tk) {
+      sum_val <- W.t
+      for(ell in t:2) {
+        sum_val <- sum_val + G.t**abs(t - ell)%*%W.t%*%(t(G.t)**abs(ell - t))
+      }
+      sum_val <- sum_val + delta*G.t**abs(t - 1)%*%C.0%*%(t(G.t)**abs(t - 1))
+      sum_val <- F.t.T%*%sum_val%*%t(F.t.T)
+      A[t, tk] <- gamma.t + sum_val
+    } else {
+      sum_val <- G.t**abs(t - (t - k + 1))%*%W.t
+      for(ell in (t-k):2) {
+        sum_val <- sum_val + G.t**abs(t - ell)%*%W.t%*%(t(G.t)**abs(ell - (t-k)))
+      }
+      sum_val <- sum_val + delta*G.t**abs(t - 1)%*%C.0%*%(t(G.t)**abs(1 - (t-k)))
+      A[t, tk] <- F.t.T%*%sum_val%*%t(F.t.T)
+    }
+  }
+}
+for(t in 1:T) {
+  for(tk in 1:(t-1)) {
+    A[t, tk] <- A[tk, t]
+  }
+}
+
+# this sucks! A is not always positive semi-definite; depends on gamma.t, G.t, W.t relative magnitudes
+eigen(A)$values
+
+etas.collapsed <- rmatrixt(1, upsilon, B, K, A)[,,1]
+
+eta.collapsed.df <- gather_array(etas.collapsed[,1:T])
+p <- ggplot(eta.collapsed.df, aes(x=dim_2, y=var, color=as.factor(dim_1))) +
+  geom_line()
+p
+#ggsave("sim_02b_eta_oscillating.png", width=8, height=4, units="in", scale=1.5)
+
+ys.collapsed <- matrix(0, D+1, T)
+for(t in 1:T) {
+  alr.inv <- exp(c(etas.collapsed[,t], 0))
+  alr.inv <- alr.inv/sum(alr.inv)
+  ys.collapsed[,t] <- rmultinom(1, 1000, alr.inv)
+}
+y.collapsed.df <- gather_array(ys.collapsed[,1:T])
+p <- ggplot(y.collapsed.df, aes(x=dim_2, y=var, fill=as.factor(dim_1))) + 
+  geom_bar(position="fill", stat="identity", width=1)
+p
+#ggsave("sim_03b_y_oscillating.png", width=8, height=4, units="in", scale=1.5)
 
 # =======================================================================================
 # PREDICTION
