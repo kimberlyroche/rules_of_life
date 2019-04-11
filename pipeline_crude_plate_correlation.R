@@ -1,12 +1,15 @@
+# use lm() to see how well covariates season, date, grp, sname predict plate
+# demonstrates that plate is confounded by date
+
 source("include.R")
 
-load("glom_data_genus_reps.RData")
-filtered <- filter_data(data=glom_data, sample_threshold=0.2)
+glom_data <- load_glommed_data(level="species", replicates=TRUE)
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 md <- read_metadata(filtered)
 
-limit <- 2000
 limit <- nsamples(filtered)
-sample_idx <- sample(nsamples(filtered))[1:limit]
+# limit <- 2000
+# sample_idx <- sample(nsamples(filtered))[1:limit]
 
 plate <- md$plate[sample_idx]
 
@@ -33,7 +36,6 @@ for(covariate in covar) {
   }
   cat("Variance explained by",covariate,":",(1-var(res$residuals)),"\n")
   cat("Check with model:",summary(res)$r.squared,"\n")
-  #print(res)
 
   if(covariate == "date") {
     p <- data %>% ggplot(aes(x=plate, y=covariate)) +
@@ -44,12 +46,3 @@ for(covariate in covar) {
     ggsave(paste("testcov_",covariate,".png",sep=""), plot=p, scale=1.5, width=3, height=3, units="in")
   }
 }
-
-# how well does individual predict date anyway?
-date <- unlist(lapply(md$collection_date, function(x) as.integer(format(as.Date(x), "%Y%m%d"))))[sample_idx]
-date <- scale(date)
-indiv <- md$sname[sample_idx]
-data <- data.frame(x=indiv, y=date)
-res <- lm(y~factor(x), data)
-cat("Variance in collection_date explained by sname :",(1-var(res$residuals)),"\n")
-#cat("Check with model:",summary(res)$r.squared,"\n")

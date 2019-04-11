@@ -1,28 +1,42 @@
-suppressMessages(library(phyloseq))
-suppressMessages(library(dplyr))
-suppressMessages(library(driver))
-suppressMessages(library(ggplot2))
-suppressMessages(library(scales))
-suppressMessages(library(coda))
-suppressMessages(library(Rcpp))
-suppressMessages(library(RcppEigen))
-suppressMessages(library(LaplacesDemon)) # various sampling distributions
-#suppressMessages(library(MCMCpack))
+library(phyloseq)
+library(dplyr)
+library(driver)
+library(ggplot2)
+library(scales)
+library(coda)
+library(Rcpp)
+library(RcppEigen)
+library(LaplacesDemon) # various sampling distributions
+#library(MCMCpack)
+library(RColorBrewer)
 
 sourceCpp("fastCorr.cpp")
 sourceCpp("dens_optim.cpp")
 
+# these lists were generated manually
+# 10 max-sampled individuals
 best_sampled <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI")
-
-over_100 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS", "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO")
-
-over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS", "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW", "VIN", "TAL", "VEX", "VEI", "ALE", "MBE", "WHE", "WYN", "LOL", "HOL", "NOB", "VOT", "LYE", "HON", "DAG", "DUN", "OTI", "LUI", "OFR", "LAZ", "ONY", "VEL", "ELV", "FAX", "ORI", "EAG", "ODE", "NIK", "VAP", "WIP", "LOU", "NOO", "EVA", "EXO", "KOR", "NAR", "VOW", "HYM", "PAI", "LAS", "VIO", "WEA", "DOU", "LIZ", "WAS", "ZIB", "QUA", "WEN", "WOB", "WOL", "HOK", "LAV", "OBI", "POK", "SOR", "KOL", "ISR", "OMO", "SCE", "AFR", "MON", "NIN", "VEB", "ADD", "VOY", "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN", "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX", "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW")
+# individuals with # samples >= 100
+over_100 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS",
+              "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO")
+# individuals with # samples >= 50
+over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS",
+             "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW",
+             "VIN", "TAL", "VEX", "VEI", "ALE", "MBE", "WHE", "WYN", "LOL", "HOL", "NOB", "VOT", "LYE",
+             "HON", "DAG", "DUN", "OTI", "LUI", "OFR", "LAZ", "ONY", "VEL", "ELV", "FAX", "ORI", "EAG",
+             "ODE", "NIK", "VAP", "WIP", "LOU", "NOO", "EVA", "EXO", "KOR", "NAR", "VOW", "HYM", "PAI",
+             "LAS", "VIO", "WEA", "DOU", "LIZ", "WAS", "ZIB", "QUA", "WEN", "WOB", "WOL", "HOK", "LAV",
+             "OBI", "POK", "SOR", "KOL", "ISR", "OMO", "SCE", "AFR", "MON", "NIN", "VEB", "ADD", "VOY",
+             "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN",
+             "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX",
+             "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW")
 
 # ====================================================================================================================
 # ACCESSORS
 # ====================================================================================================================
 
-read_data <- function(write_sample=FALSE, replicates=FALSE) {
+# read current 16S data into a phyloseq object
+read_data <- function(write_sample=FALSE, replicates=TRUE) {
   # rows are samples, columns are taxa
   if(replicates) {
     cat("Using replicates...\n")
@@ -40,6 +54,7 @@ read_data <- function(write_sample=FALSE, replicates=FALSE) {
   return(data)
 }
 
+# pull metadata from phyloseq object
 read_metadata <- function(data, write_sample=FALSE) {
   # metadata: rows are samples, "sample-specific variables" are columns
   metadata <- phyloseq::sample_data(data)
@@ -51,10 +66,43 @@ read_metadata <- function(data, write_sample=FALSE) {
   return(metadata)
 }
 
+load_glommed_data <- function(level="species", replicates=TRUE) {
+  if(level == "species") {
+    if(replicates) {
+      if(file.exists("glom_data_species_reps.RData")) {
+        load("glom_data_species_reps.RData")
+      } else {
+        stop("Agglomerated data file foe species (+replicates) does not exist.")
+      }
+    } else {
+      if(file.exists("glom_data_species.RData")) {
+        load("glom_data_species.RData")
+      } else {
+        stop("Agglomerated data file foe species (-replicates) does not exist.")
+      }
+    }
+  }
+  if(level == "genus") {
+    if(replicates) {
+      if(file.exists("glom_data_genus_reps.RData")) {
+        load("glom_data_genus_reps.RData")
+      } else {
+        stop("Agglomerated data file foe genus (+replicates) does not exist.")
+      }
+    } else {
+      if(file.exists("glom_data_genus.RData")) {
+        load("glom_data_genus.RData")
+      } else {
+        stop("Agglomerated data file foe genus (-replicates) does not exist.")
+      }
+    }
+  }
+  return(glom_data)
+}
+
 # returns the (sampled) proportion at/above the given threshold
-# so percent zeroes is 1 - get_tiny_counts(data, 1)
+# so estimated percent zeroes is 1 - get_tiny_counts(data, 1)
 get_tiny_counts <- function(data, threshold, use_ns=500) {
-  # just sample the samples
   if(phyloseq::nsamples(data) < use_ns) {
     use_ns <- phyloseq::nsamples(data)
   }
@@ -62,32 +110,14 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
-sid_to_collection_date <- function(data, sids) {
-  metadata <- phyloseq::sample_data(data)
-  metadata <- metadata[metadata$sample_id %in% sids,"collection_date"]
-  return(unlist(metadata@.Data))
-}
-
-# check that order is preserved between sids >> collection dates
-check_sid_collection_order <- function(data) {
-  counts <- otu_table(data)@.Data
-  sids <- dimnames(counts)[1][[1]]
-  dates <- sid_to_collection_date(data, sids)
-  print(order(dates))
-}
-
-check_taxa_aggomeration <- function(data) {
-  # collapse on family produces 446 elements; check this is how many unique genus' there are
-  tt <- apply(tax_table(data), 1, function(x) { paste(x[1:5], collapse="/") })
-  tt_no <- unique(as.vector(tt))
-  cat("Should == 446:",length(tt_no),"\n")
-}
-
-perform_agglomeration <- function(level="genus", replicates=FALSE) {
+# use phyloseq::tax_glom to collapse taxa to level=level
+perform_agglomeration <- function(level="genus", replicates=TRUE) {
   data <- read_data(replicates=replicates)
   cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
-  # remove technical replicates
-  # data <- subset_samples(data, sample_status==0)
+  if(!replicates) {
+    # remove technical replicates
+    data <- subset_samples(data, sample_status==0)
+  }
   cat("Agglomerating data...\n")
   glom_data <- glom_counts(data, level=level)
   if(replicates) {
@@ -96,10 +126,12 @@ perform_agglomeration <- function(level="genus", replicates=FALSE) {
     save(glom_data, file=paste("glom_data_",level,".RData",sep=""))
   }
   cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
-  #cat("Checking agglomeration...\n")
-  #check_taxa_aggomeration(data)
 }
 
+# filter data below a count threshold in a minimum number of samples into an "Other" category
+# e.g. count_threshold=3, sample_threshold=0.2 filters taxa with no more than a 2-count in 80% of samples into an
+# "Other" category, labeled by an arbitrary sequence variant in that "Other" category (see the print statement
+# below identifying it for reference)
 filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=FALSE) {
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
@@ -179,6 +211,98 @@ aitchison_dist <- function(x.i, x.j) {
     sq.sum <- sq.sum + (log(x.i[k]/gm.i) - log(x.j[k]/gm.j))**2
   }
   return(sqrt(sq.sum))
+}
+
+# ====================================================================================================================
+# METAGENOMICS FILE HANDLING
+# ====================================================================================================================
+
+# read in PiPhillin data from .tsv file
+# requires 16S metadata so we can pare down the samples to those in-common between data sets
+#
+# returns a matrix where rows (and rownames) are enzymes and columns (and column names) are
+# samples ordered by collection date (but not sub-ordered by anything)
+read_metagenomics <- function(metadata) {
+  piphillin_dir <- "C:/Users/Kim/Documents/rules_of_life/original_data/Piphillin_20190222"
+  piphillin_file <- "Filtered_enzymes.txt"
+  
+  # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt
+  data.piphillin <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
+                                         stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
+  enzymes <- data.piphillin[,1]
+  data.piphillin <- data.piphillin[,2:dim(data.piphillin)[2]]
+  data.piphillin <- apply(data.piphillin, c(1,2), as.numeric)
+  samples <- colnames(data.piphillin)
+  rownames(data.piphillin) <- enzymes
+  
+  # first, exclude samples not present in *both* data sets
+  samples.orig <- metadata$sample_id
+  samples.both <- intersect(samples, samples.orig)
+  
+  subset.metadata <- metadata[metadata$sample_id %in% samples.both,]
+  subset.data.piphillin <- data.piphillin[,samples.both]
+  
+  sid_collection_date <- metadata[metadata$sample_id %in% samples, c("sample_id", "collection_date")]
+  sid_ordered <- sid_collection_date[order(sid_collection_date$collection_date),c("sample_id", "collection_date")]
+  
+  ordered.data.piphillin <- subset.data.piphillin[,sid_ordered$sample_id]
+  return(ordered.data.piphillin)
+}
+
+sname_subset_idx <- function(metadata, sname) {
+  idx.subset <- metadata[metadata$sname == sname, c("sample_id","collection_date")]
+  idx.subset <- idx.subset[order(idx.subset$collection_date),] # order by collection date
+  return(idx.subset)
+}
+
+# subset by individual name (sname) and reorder
+# this requires 16S metadata to pull sample IDs associated with that host
+#
+# returns a matrix where rows (and rownames) are enzymes and columns (and column names) are
+# samples ordered by collection date and subsetted to individual sname
+subset_metagenomics_sname <- function(metagenomics_data, sname, metadata) {
+  idx.subset <- sname_subset_idx(metadata, sname)
+  sid_ordered <- idx.subset$sample_id
+  subset.metagenomics <- metagenomics_data[,colnames(metagenomics_data) %in% idx.subset$sample_id]
+  return(subset.metagenomics)
+}
+
+# converts and metagnomics matrix to a tidy array of proportions (for input into a timecourse plot)
+metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
+  idx.subset <- sname_subset_idx(metadata, sname)
+  data.prop <- prop.table(metagenomics_data, 2)
+  df.prop <- gather_array(data.prop, "proportion", "enzyme", "sample")
+  # the enzyme names are super unwieldy, so we'll omit them but we could think about including a
+  # a stub as below
+  # replace each sample ID with its collection date for readability, sanity checking!
+  for(i in 1:dim(df.prop)[1]) {
+    # df.prop$enzyme[i] <- enzymes[i]
+    sample_placeholder <- as.numeric(df.prop$sample[i])
+    sample_label <- colnames(data.prop)[sample_placeholder]
+    sample_date <- idx.subset[sample_label]$collection_date
+    df.prop$sample[i] <- idx.subset[sample_label]$collection_date
+  }
+  # fix the order of dates by converting to factors; not sure why this works but ggplot will reorder
+  # the samples field otherwise!
+  df.prop.ordered <- df.prop[order(df.prop$sample),]
+  df.prop.ordered$sample <- factor(df.prop.ordered$sample, levels=unique(df.prop.ordered$sample))
+  df.prop.ordered$enzyme <- factor(df.prop.ordered$enzyme, levels=unique(df.prop.ordered$enzyme))
+  return(df.prop.ordered)
+}
+
+# expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}}
+plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", legend=FALSE) {
+  p <- ggplot(metagenomics_prop, aes(x=sample, y=proportion, fill=enzyme)) + 
+    geom_bar(position="fill", stat="identity") +
+    scale_y_continuous(labels = percent_format()) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    theme(legend.text=element_text(size=8))
+  if(legend) {
+    p <- p + theme(legend.position="bottom")
+  } else {
+    p <- p + theme(legend.position="none")
+  }
+  ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=10, height=4, units="in")
 }
 
 # ====================================================================================================================
@@ -387,11 +511,17 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
   ggsave(save_filename, plot=p, scale=1.5, width=5, height=3, units="in")
 }
 
-plot_timecourse <- function(data, save_filename, legend=TRUE, legend_level="species") {
+# plot proportional change over time
+# note: palette size would probably have to increase to accomodate legend_level finer than family!
+plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=TRUE, legend_level="family") {
+  n <- nsamples(data)
   p <- apply_proportion(data)
   df <- psmelt(p)
   df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
 
+  # for gapped plots, this is the OTU ID placeholder we'll use for dummy data
+  na.string <- ".N/A"
+  
   # replace Sample ID's with their dates for readability
   metadata <- sample_data(data)
   for(i in 1:dim(df2)[1]) {
@@ -400,44 +530,84 @@ plot_timecourse <- function(data, save_filename, legend=TRUE, legend_level="spec
 
   # make sure the dates are in order and fix the order by converting to factors
   df3 <- df2[order(df2$Sample),]
-  df3$Sample <- factor(df3$Sample, levels=unique(df3$Sample))
+  if(gapped) {
+    # insert empty samples were gaps of 2 weeks or more exist
+    gap.days <- 13
+    dates_present <- unique(df3$Sample)
+    for(d in 1:(length(dates_present)-1)) {
+      diff <- as.Date(dates_present[d+1]) - as.Date(dates_present[d])
+      next.date <- as.Date(dates_present[d])
+      attr(diff, "units") <- "days"
+      while(diff > gap.days) {
+        next.date <- next.date + gap.days
+        df3 <- rbind(df3, list(OTU=na.string, Sample=as.character(next.date), Abundance=1))
+        diff <- as.Date(dates_present[d+1]) - next.date
+      }
+    }
+  }
+  df3 <- df3[order(df3$Sample),]
 
+  df3$Sample <- factor(df3$Sample, levels=unique(df3$Sample))
   # replace ASV sequences with their (abbrev.) taxonomy for readability
   for(i in 1:dim(df3)[1]) {
     # show labels as order/family/genus
     # species is NA for all
-    if(legend_level == "species") {
-      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
-    } else if(legend_level == "genus") {
-      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:5]),collapse="/")
-    } else {
-      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4]),collapse="/")
+    if(df3$OTU[i] != na.string) {
+      if(legend_level == "species") {
+        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
+      } else if(legend_level == "genus") {
+        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:5]),collapse="/")
+      } else {
+        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4]),collapse="/")
+      }
     }
   }
 
-  p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
-    geom_bar(position="fill", stat="identity") +
-    scale_y_continuous(labels = percent_format()) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    theme(legend.text=element_text(size=8))
+  if(gapped) {
+    categories <- unique(df3$OTU)
+    coul = brewer.pal(4, "Spectral")
+    coul = colorRampPalette(coul)(25)
+    coul[1] <- "#DDDDDD"
+    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_fill_manual(values=coul) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8))
+    img_width <- 15
+  } else {
+    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_y_continuous(labels = percent_format()) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8))
+    img_width <- 10
+  }
+  if(n < 20) {
+    # these are likely replicates
+    img_width <- 5
+  }
   if(legend) {
     p <- p + theme(legend.position="bottom")
   } else {
     p <- p + theme(legend.position="none")
   }
-  ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=10, height=4, units="in")
+  ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
 }
 
+# this is just a wrapper to call plot_timecourse on a representative sample of individuals
 # baboons is a list of snames, e.g. c("ACA", "DUI", "CAI", "COB", "DAS")
-perform_mult_timecourse <- function(data, baboons) {
+perform_mult_timecourse <- function(data, baboons, gapped=FALSE, legend=FALSE) {
   for(b in baboons) {
     b <<- b
     cat("Plotting timecourse for",b,"...\n")
     B_counts <- subset_samples(data, sname==b)
     B_log_ratios <- apply_ilr(B_counts)
-    plot_timecourse(B_counts, paste(b[1],"timecourse",sep="_"))
-    # check (visually) preservation of collection_date order
-    #check_sid_collection_order(B_counts)
+    if(gapped) {
+      save_filename <- paste("plots/",b[1],"_gapped_timecourse",sep="")
+    } else {
+      save_filename <- paste("plots/",b[1],"_timecourse",sep="")
+    }
+    plot_timecourse_phyloseq(B_counts, save_filename=save_filename, gapped=gapped, legend=legend)
   }
 }
 

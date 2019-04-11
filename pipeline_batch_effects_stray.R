@@ -1,3 +1,7 @@
+# use Stray/pibble to regression the count data from replicates on a bunch of variables
+# we're interested in seeing if batch variables (flow_cell_lane, plate, library_pool, extract_dna_conc_ng) have any
+#   discernable effects on taxonomical relative abundances
+
 library(driver)
 library(ggplot2)
 library(devtools)
@@ -6,30 +10,21 @@ library(stringr)
 
 source("include.R")
 
-# evaluate at:
-#   (1) family + 0.2
-#   (2) genus + 0.5
-#   (3) genus + 0.2
+glom_data <- load_glommed_data(level="genus", replicates=TRUE)
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 
-level <- "genus"
-filter <- 0.2
-
-load(paste("glom_data_",level,"_reps.RData",sep=""))
-replicates <- subset_samples(glom_data, sample_status==2)
-
-# filter data down to family or genus
-filtered <- filter_data(replicates, sample_threshold=filter, verbose=T)
+replicates <- subset_samples(glom_data, sample_status==2) # replicates only
 md <- sample_data(filtered)
 n <- phyloseq::nsamples(filtered)
 p <- ntaxa(filtered)
 cat("Number samples:",n,"\n")
 cat("Number taxa:",p,"\n")
 
-#devtools::load_all("C:/Users/kim/Documents/mongrel")
+# update this to use Stray::pibble
+# devtools::load_all("C:/Users/kim/Documents/mongrel")
 devtools::load_all("/data/mukherjeelab/Mongrel/mongrel")
 
-# for testing
-#subset_ids <- sample_data(filtered)$sample_id[1:35]
+# subset_ids <- sample_data(filtered)$sample_id[1:35] # testing
 subset_ids <- sample_data(filtered)$sample_id
 subsetted <- subset_samples(filtered, sample_id %in% subset_ids)
 md <- sample_data(subsetted)
@@ -114,7 +109,4 @@ ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",fi
 
 plot(fit, par="Lambda", focus.coord = focus, focus.cov = rownames(X)[74:76])
 ggsave(paste("plots/replicates/",level,"_",filter,"/lambda_",level,"_filter_",filter,"_dnaconc.png",sep=""), scale=1.5)
-
-
-
 

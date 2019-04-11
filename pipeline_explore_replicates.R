@@ -1,3 +1,5 @@
+# what does this file do?
+
 library(driver)
 library(phyloseq)
 library(ggplot2)
@@ -13,36 +15,41 @@ translate_month <- function(x) {
   if(x == 7) { return("Jul") }
 }
 
-load("glom_data_genus_reps.RData")
-md <- sample_data(glom_data)
-plot(density(md$age))
+cosine_angle <- function(vec1, vec2) {
+  y.t <- as.vector(sample_lr[,j])
+  y.tt <- sqrt(y.t%*%y.t)
+  y.h <- as.vector(sample_lr[,k])
+  y.hh <- sqrt(y.h%*%y.h)
+  cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
+}
 
-# get correlation for replicates
+glom_data <- load_glommed_data(level="genus", replicates=TRUE)
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 
-# this should be agglomerated data
-filtered <- filter_data(data=glom_data, count_threshold=3, sample_threshold=0.2)
-counts <- otu_table(filtered)@.Data
-log_ratios <- apply(counts + 0.65, 1, alr)
+# get replicates and unique instances of sname x date pairs
+replicates <- subset_samples(glom_data, sample_status==2) # replicates only
+md <- read_metadata(replicates)
+unique_replicates <- unique(md[,c("sname","collection_date")])
+
+# apply log ratio transform
+log_ratios <- apply_ilr(replicates)
 log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
 
-cat("Zero-filtered taxa to:",ntaxa(filtered),"\n")
-replicate_samples <- md[md$sample_status==2,]
-unique_replicates <- unique(replicate_samples[,c("sname","collection_date")])
+# ====================================================================================================================
+# correlation WITHIN replicate sets
+# ====================================================================================================================
+
 corr_list <- c()
 min_corr <- c(Inf, "", "")
 max_corr <- c(-Inf, "", "")
 for(i in 1:dim(unique_replicates)[1]) {
   sname <- unique_replicates[i]$sname
   date <- unique_replicates[i]$collection_date
-  idx <- as.character(get_variable(replicate_samples, "sname")) == sname
-  samples <- prune_samples(idx, replicate_samples)
+  idx <- as.character(get_variable(replicates, "sname")) == sname
+  samples <- prune_samples(idx, replicates)
   idx <- as.character(get_variable(samples, "collection_date")) == date
   samples <- prune_samples(idx, samples)
-  # mean-center
-  sample_lr <- log_ratios[,colnames(log_ratios) %in% samples$sample_id]
-  # calculate correlation
-  # the plots of log counts against each other look good
-  # why is the "correlation" so low or even negative?
+  sample_lr <- log_ratios[,colnames(log_ratios) %in% sample_data(samples)$sample_id]
   total_corr <- 0
   pairs <- 0
   for(j in 1:(dim(sample_lr)[2]-1)) {
@@ -52,17 +59,17 @@ for(i in 1:dim(unique_replicates)[1]) {
         y.tt <- sqrt(y.t%*%y.t)
         y.h <- as.vector(sample_lr[,k])
         y.hh <- sqrt(y.h%*%y.h)
-        #cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
+        cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
         total_corr <- total_corr + (y.t%*%y.h)/(y.tt*y.hh)
         pairs <- pairs + 1
       }
     }
   }
   corr_list[i] <- total_corr/pairs
-  if(corr_list[i] > max_corr[1] && dim(samples)[1] > 3) {
+  if(corr_list[i] > max_corr[1] && ntaxa(samples) > 3) {
     max_corr <- c(corr_list[i], sname, date)
   }
-  if(corr_list[i] < min_corr[1] && dim(samples)[1] > 3) {
+  if(corr_list[i] < min_corr[1] && ntaxa(samples)[1] > 3) {
     min_corr <- c(corr_list[i], sname, date)
   }
   cat("Average correlation between replicates for",sname,":",corr_list[i],"\n")
@@ -78,7 +85,9 @@ p <- ggplot(plot_data, aes(x)) +
 p
 ggsave("plots/correlation_between_replicates.png", scale=1.5, width=4, height=4, units="in")
 
-# what is up with lower-correlation replicates: VIB (0.34), DUD (0.52)
+# what is up with lower-correlation replicates?
+# check the counts-per-replicates for low-correlation sets of replicates
+# e.g. VIB (0.34), DUD (0.52)
 lc_reps <- subset_samples(filtered, sname=="VIB")
 lc_reps <- subset_samples(lc_reps, sample_status==2)
 if(length(unique(sample_data(lc_reps)$collection_date))==1) {
@@ -89,30 +98,33 @@ if(length(unique(sample_data(lc_reps)$collection_date))==1) {
   }
 }
 
+# ====================================================================================================================
+# correlation BETWEEN replicate sets
+# ====================================================================================================================
+
 measured_cross_correlation <- c()
-# what's the correlation between individuals
 for(i in 1:(dim(unique_replicates)[1]-1)) {
   for(j in 2:dim(unique_replicates)[1]) {
     if(i != j) {
       # get set of replicates i
       sname.i <- unique_replicates[i]$sname
       date.i <- unique_replicates[i]$collection_date
-      idx <- as.character(get_variable(replicate_samples, "sname")) == sname.i
-      samples <- prune_samples(idx, replicate_samples)
+      idx <- as.character(get_variable(replicates, "sname")) == sname.i
+      samples <- prune_samples(idx, replicates)
       idx <- as.character(get_variable(samples, "collection_date")) == date.i
       samples.i <- prune_samples(idx, samples)
       
       # get set of replicates j
       sname.j <- unique_replicates[j]$sname
       date.j <- unique_replicates[j]$collection_date
-      idx <- as.character(get_variable(replicate_samples, "sname")) == sname.j
-      samples <- prune_samples(idx, replicate_samples)
+      idx <- as.character(get_variable(replicates, "sname")) == sname.j
+      samples <- prune_samples(idx, replicates)
       idx <- as.character(get_variable(samples, "collection_date")) == date.j
       samples.j <- prune_samples(idx, samples)
       
       # just use the first of the pairs for now
-      sample_lr.i <- log_ratios[,colnames(log_ratios) %in% samples.i$sample_id]
-      sample_lr.j <- log_ratios[,colnames(log_ratios) %in% samples.j$sample_id]
+      sample_lr.i <- log_ratios[,colnames(log_ratios) %in% sample_data(samples.i)$sample_id]
+      sample_lr.j <- log_ratios[,colnames(log_ratios) %in% sample_data(samples.j)$sample_id]
       total_corr <- 0
       pairs <- 0
       for(k in 1:(dim(sample_lr.i)[2]-1)) {
@@ -139,35 +151,12 @@ p <- ggplot(plot_data, aes(x)) +
 p
 ggsave("plots/correlation_across_replicates.png", scale=1.5, width=4, height=4, units="in")
 
-
-# plot replicates (proportion total abundance)
-
-replicate_months <- unlist(lapply(md[md$sample_status==2,"collection_date"]@.Data, function(x) substr(x, 6, 7)))
-reps_int <- as.numeric(replicate_months)
-
-month_data <- data.frame(month=as.factor(unlist(lapply(reps_int, translate_month))))
-levels(month_data$month) <- c("Feb", "Apr", "May", "Jun", "Jul")
-p <- ggplot(month_data, aes(x=month)) + geom_bar()
-ggsave("plots/replicate_frequency.png", plot=p, scale=1.5, height=4, width=4, units="in")
-
-# see how much batch variables vary across these time points
-batch_vars <- c("plate", "extract_dna_conc_ng", "flow_cell_lane", "library_pool")
-
-replicates <- md[md$sample_status==2,]
-replicates <- replicates[order(replicates$collection_date),]
-replicates <- replicates[order(replicates$sname),]
-write.table(t(replicates[,c("sample_id","collection_date","sname","sex","age","season","plate",
-                            "extract_dna_conc_ng","library_pool","flow_cell_lane")]),
-            file="temp.txt")
-
-# reuse
-replicates <- subset_samples(glom_data, sample_status==2)
-#glommed_reps_genus <- glom_counts(replicates, level="genus", NArm=FALSE)
-#glommed_reps_family <- glom_counts(replicates, level="family", NArm=FALSE)
+# ====================================================================================================================
+# plot selected replicate sets
+# ====================================================================================================================
 
 individual <- "VIB"
-#indiv_samples <- subset_samples(glommed_reps_genus, sname==individual)
-indiv_samples <- subset_samples(glommed_reps_family, sname==individual)
+indiv_samples <- subset_samples(replicates, sname==individual)
 
 # collapse all lowly expressed guys into one lump
 taxa_sums <- colSums(otu_table(indiv_samples)@.Data)
@@ -175,11 +164,10 @@ taxa_IDs <- names(taxa_sums)
 taxa_sums <- as.vector(taxa_sums)
 merge_list <- taxa_IDs[which(taxa_sums < 25)]
 merged_samples <- merge_taxa(indiv_samples, merge_list)
-# append a rep # to each collection date, just for plotting
-fake_dates <- sample_data(merged_samples)$collection_date
+mod_dates <- sample_data(merged_samples)$collection_date
 for(i in 1:length(fake_dates)) {
-  fake_dates[i] <- paste(fake_dates[i],i,sep="_")
+  # append a rep # to each collection date, just for plotting
+  mod_dates[i] <- paste(fake_dates[i],i,sep="_rep")
 }
-sample_data(merged_samples)$collection_date <- fake_dates
-plot_timecourse(merged_samples, paste(individual,"_replicate_timecourse",sep=""), legend=T, legend_level="genus")
-#plot_timecourse(merged_samples, paste(individual,"_replicate_timecourse",sep=""), legend=T, legend_level="family")
+sample_data(merged_samples)$collection_date <- mod_dates
+plot_timecourse_phyloseq(merged_samples, paste("plots/",individual,"_replicate_timecourse",sep=""), gapped=F, legend=T, legend_level="family")
