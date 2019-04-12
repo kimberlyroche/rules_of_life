@@ -285,24 +285,59 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
   # fix the order of dates by converting to factors; not sure why this works but ggplot will reorder
   # the samples field otherwise!
   df.prop.ordered <- df.prop[order(df.prop$sample),]
-  df.prop.ordered$sample <- factor(df.prop.ordered$sample, levels=unique(df.prop.ordered$sample))
-  df.prop.ordered$enzyme <- factor(df.prop.ordered$enzyme, levels=unique(df.prop.ordered$enzyme))
+  # df.prop.ordered$sample <- factor(df.prop.ordered$sample, levels=unique(df.prop.ordered$sample))
+  # df.prop.ordered$enzyme <- factor(df.prop.ordered$enzyme, levels=unique(df.prop.ordered$enzyme))
   return(df.prop.ordered)
 }
 
 # expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}}
-plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", legend=FALSE) {
-  p <- ggplot(metagenomics_prop, aes(x=sample, y=proportion, fill=enzyme)) + 
-    geom_bar(position="fill", stat="identity") +
-    scale_y_continuous(labels = percent_format()) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    theme(legend.text=element_text(size=8))
+plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", gapped=FALSE, legend=FALSE) {
+  na.string <- ".N/A"
+  img_width <- 10
+  
+  # make sure the dates are in order and fix the order by converting to factors
+  df2 <- metagenomics_prop[order(metagenomics_prop$sample),]
+  if(gapped) {
+    # insert empty samples were gaps of 2 weeks or more exist
+    gap.days <- 13
+    dates_present <- unique(df2$sample)
+    for(d in 1:(length(dates_present)-1)) {
+      diff <- as.Date(dates_present[d+1]) - as.Date(dates_present[d])
+      next.date <- as.Date(dates_present[d])
+      attr(diff, "units") <- "days"
+      while(diff > gap.days) {
+        next.date <- next.date + gap.days
+        df2 <- rbind(df2, list(enzyme=na.string, sample=as.character(next.date), proportion=0))
+        diff <- as.Date(dates_present[d+1]) - next.date
+      }
+    }
+    img_width <- 15
+  }
+  df2 <- df2[order(df2$sample),]
+  
+  if(gapped) {
+    categories <- unique(df2$enzyme)
+    coul = brewer.pal(4, "Spectral")
+    coul = colorRampPalette(coul)(length(unique(df2$enzyme)))
+    coul[1] <- "#DDDDDD"
+    p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_fill_manual(values=coul) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8))
+  } else {
+    p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_y_continuous(labels = percent_format()) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8))
+  }
   if(legend) {
     p <- p + theme(legend.position="bottom")
   } else {
     p <- p + theme(legend.position="none")
   }
-  ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=10, height=4, units="in")
+  ggsave(paste("plots/", save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
 }
 
 # ====================================================================================================================
@@ -566,7 +601,7 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   if(gapped) {
     categories <- unique(df3$OTU)
     coul = brewer.pal(4, "Spectral")
-    coul = colorRampPalette(coul)(25)
+    coul = colorRampPalette(coul)(unique(df3$OTU))
     coul[1] <- "#DDDDDD"
     p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
       geom_bar(position="fill", stat="identity") +
