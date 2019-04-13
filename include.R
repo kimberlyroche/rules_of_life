@@ -193,10 +193,18 @@ apply_proportion <- function(data) {
   return(transform_sample_counts(data, function(x) x / sum(x) ))
 }
 
-# takes a phyloseq object, returns a data.frame!
+# returns a data.frame
 apply_ilr <- function(data, pseudocount=0.65) {
-  counts <- otu_table(data)@.Data
-  return(apply(counts+pseudocount, 1, ilr))
+  if("phyloseq" %in% class(data)) {
+    counts <- otu_table(data)@.Data # samples (rows) x taxa (columns)
+  } else {
+    counts <- data # enzymes (rows) x samples (columns)
+    counts <- t(counts)
+  }
+  counts <- counts + pseudocount
+  # driver log-ratio transforms expect samples as rows!
+  # output: samples (rows) x D-1 taxa (columns)
+  return(driver::ilr(counts))
 }
 
 geom_mean <- function(x) {
@@ -646,14 +654,20 @@ perform_mult_timecourse <- function(data, baboons, gapped=FALSE, legend=FALSE) {
   }
 }
 
-calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_units="weeks", resample_rate=0.2) {
+calc_autocorrelation <- function(data,
+                                 metadata,
+                                 resample=FALSE,
+                                 lag.max=26,
+                                 date_diff_units="weeks",
+                                 resample_rate=0.2) {
   if(date_diff_units != "weeks" && date_diff_units != "months" && date_diff_units != "seasons") {
     date_diff_units <- "weeks"
   }
 
-  individuals <- unique(read_metadata(data)$sname)
-  # individuals <- individuals[1:50] # for testing
+  individuals <- unique(metadata$sname)
+  individuals <- individuals[1:50] # for testing
 
+  # only if using 
   season_boundaries <- c(200005, 200010, 200105, 200110, 200205, 200210, 200305, 200310,
                        200405, 200410, 200505, 200510, 200605, 200610, 200705, 200710,
                        200805, 200810, 200905, 200910, 201005, 201010, 201105, 201110,
@@ -664,8 +678,9 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
     rounds <- 100
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
+  
   log_ratios <- apply_ilr(data)
-  log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
+  log_ratios <- scale(log_ratios, center=T, scale=F)
   for(r in 1:rounds) {
     if(resample) {
       cat("Resampling iteration",r,"\n")
@@ -673,68 +688,68 @@ calc_autocorrelation <- function(data, resample=FALSE, lag.max=26, date_diff_uni
     lag.sums <- numeric(lag.max)
     lag.measured <- numeric(lag.max)
     for(indiv in individuals) {
+      # pick an individual
       # this weird syntactic hack seems to be necessary for subset_samples?
       # apparently the thing you're filtering against must be globally available
       indiv <<- indiv
-      counts <- subset_samples(data, sname==indiv)
-      do_sample <- rep(1, phyloseq::nsamples(counts))
-      if(resample) {
-        # randomly blind ~50% of this individuals samples
-        do_sample <- rbinom(phyloseq::nsamples(counts), 1, resample_rate)
-      }
-      # this was misleading; the mean-centering should be taking place before subsetting
-      # this was deflating the autocorrelation estimates!
-      # log_ratios <- apply_ilr(counts)
-      # log_ratios <- t(apply(log_ratios, 1, function(x) x - mean(x)))
-      sample_lr <- log_ratios[,colnames(log_ratios) %in% sample_data(counts)$sample_id]
-      md <- read_metadata(counts)
-      indiv_sample_no <- length(md$collection_date)
-      # get distances between adjacent timepoints in {date_diff_units}
-      d1 <- as.Date(md$collection_date[1])
-      time_diff <- matrix(0, nrow=indiv_sample_no, ncol=indiv_sample_no)
-      if(indiv_sample_no > 1) {
-        for(d1_idx in 1:(indiv_sample_no-1)) {
-          for(d2_idx in (d1_idx+1):indiv_sample_no) {
-            d1 <- as.Date(md$collection_date[d1_idx])
-            d2 <- as.Date(md$collection_date[d2_idx])
-            time_diff[d1_idx,d2_idx] <- as.numeric(difftime(d2, d1, units="weeks"))
-            if(date_diff_units == "weeks") {
-              time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx])
-            } else if(date_diff_units == "months") {
-              time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx]/4)
-            } else if(date_diff_units == "seasons") {
-              d1_ym <- as.numeric(format(d1, "%Y%m"))
-              d2_ym <- as.numeric(format(d2, "%Y%m"))
-              # distance is number of season boundaries between the samples
-              time_diff[d1_idx,d2_idx] <- sum(season_boundaries < d2_ym) - sum(season_boundaries < d1_ym) + 1
+      # pull sample IDs associated with this individual
+      sample_info <- metadata[metadata$sname == indiv, c("sample_id", "collection_date")]
+      # appear already ordered but let's be paranoid
+      sample_info <- sample_info[order(sample_info$collection_date),]
+      # pull log ratios associated with this individual
+      # there may be cases where none of the identified samples are present in this dataset
+      # catch that case
+      if(length(intersect(rownames(log_ratios), sample_info$sample_id)) > 0) {
+        sample_lr <- log_ratios[rownames(log_ratios) %in% sample_info$sample_id,,drop=F]
+        #sample_lr <- log_ratios[rownames(log_ratios) %in% sample_info$sample_id,,drop=F]
+        indiv_sample_no <- dim(sample_lr)[1]
+        # randomly censor some of the samples
+        do_sample <- rep(1, indiv_sample_no)
+        if(resample) {
+          do_sample <- rbinom(indiv_sample_no, 1, resample_rate)
+        }
+        # replace these sample IDs with collection dates, that's what we really want
+        # order should be maintained here
+        rownames(sample_lr) <- sample_info[sample_info$sample_id %in% rownames(sample_lr), "collection_date"]$collection_date
+  
+        # get distances between adjacent timepoints in units of {date_diff_units}
+        d1 <- as.Date(sample_info$collection_date[1])
+        time_diff <- matrix(0, nrow=indiv_sample_no, ncol=indiv_sample_no)
+        if(indiv_sample_no > 1) {
+          for(d1_idx in 1:(indiv_sample_no-1)) {
+            for(d2_idx in (d1_idx+1):indiv_sample_no) {
+              d1 <- as.Date(sample_info$collection_date[d1_idx])
+              d2 <- as.Date(sample_info$collection_date[d2_idx])
+              time_diff[d1_idx,d2_idx] <- as.numeric(difftime(d2, d1, units="weeks"))
+              if(date_diff_units == "weeks") {
+                time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx])
+              } else if(date_diff_units == "months") {
+                time_diff[d1_idx,d2_idx] <- ceiling(time_diff[d1_idx,d2_idx]/4)
+              } else if(date_diff_units == "seasons") {
+                d1_ym <- as.numeric(format(d1, "%Y%m"))
+                d2_ym <- as.numeric(format(d2, "%Y%m"))
+                # distance is number of season boundaries between the samples, indicated in the vector above
+                time_diff[d1_idx,d2_idx] <- sum(season_boundaries < d2_ym) - sum(season_boundaries < d1_ym) + 1
+              }
             }
           }
         }
-      }
-      time_diff <- c(time_diff)
-      for(lag in 1:lag.max) {
-        idx <- which(time_diff==lag)
-        # convert these 1D indices to 2D
-        if(length(idx) >= 1) {
-          tot <- 0
-          for(t in idx) {
-            d1_idx <- floor(t/indiv_sample_no) + 1
-            d2_idx <- t %% indiv_sample_no
-            if(do_sample[d1_idx] && do_sample[d2_idx]) {
-              # removed references to the erroneous mean-centering
-              # y.t <- as.vector(log_ratios[,d1_idx])
-              y.t <- as.vector(sample_lr[,d1_idx])
-              y.tt <- sqrt(y.t%*%y.t)
-              # y.h <- as.vector(log_ratios[,d2_idx])
-              y.h <- as.vector(sample_lr[,d2_idx])
-              y.hh <- sqrt(y.h%*%y.h)
-              tot <- tot + (y.t%*%y.h)/(y.tt*y.hh)
-              lag.measured[lag] <- lag.measured[lag] + 1
+        for(lag in 1:lag.max) {
+          # find pairs with this lag
+          idx <- which(time_diff==lag, arr.ind=T)
+          if(dim(idx)[1] >= 1) {
+            for(t in 1:dim(idx)[1]) {
+              d1_idx <- idx[t,1]
+              d2_idx <- idx[t,2]
+              if(do_sample[d1_idx] && do_sample[d2_idx]) {
+                # given centering, cosine angle == Pearson's correlation
+                lag.sums[lag] <- lag.sums[lag] + cor(sample_lr[d1_idx,], sample_lr[d2_idx,])
+                lag.measured[lag] <- lag.measured[lag] + 1
+              }
             }
           }
-          lag.sums[lag] <- lag.sums[lag] + tot
+          lags[lag,r] <- lag.sums[lag]/lag.measured[lag]
         }
-        lags[lag,r] <- lag.sums[lag]/lag.measured[lag]
       }
     }
     if(rounds == 1) {
