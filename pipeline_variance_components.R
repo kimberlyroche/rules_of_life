@@ -13,6 +13,8 @@ task <- as.numeric(args[1])
 # 3 : metagenomics, no noise
 # 4 : metagenomics, noise included
 
+task <- 1
+
 glom_data <- load_glommed_data(level="species", replicates=TRUE)
 filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 metadata <- read_metadata(filtered)

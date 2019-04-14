@@ -333,7 +333,7 @@ subset_metagenomics_sname <- function(metagenomics_data, sname, metadata) {
 # converts and metagnomics matrix to a tidy array of proportions (for input into a timecourse plot)
 metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
   idx.subset <- sname_subset_idx(metadata, sname)
-  data.prop <- prop.table(metagenomics_data, 2)
+  data.prop <- prop.table(metagenomics_data, 2) # column(sample)-wise proportion
   df.prop <- gather_array(data.prop, "proportion", "enzyme", "sample")
   # the enzyme names are super unwieldy, so we'll omit them but we could think about including a
   # a stub as below
@@ -357,7 +357,7 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
 plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", gapped=FALSE, legend=FALSE) {
   na.string <- ".N/A"
 
-  # make sure the dates are in order and fix the order by converting to factors
+  # make sure the dates are in order (redundant, but)
   df2 <- metagenomics_prop[order(metagenomics_prop$sample),]
   if(gapped) {
     # insert empty samples were gaps of 2 weeks or more exist
@@ -374,8 +374,8 @@ plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metag
       }
     }
     img_width <- 15
+    df2 <- df2[order(df2$sample),]
   }
-  df2 <- df2[order(df2$sample),]
   df2$enzyme <- factor(df2$enzyme, levels=unique(df2$enzyme))
   
   categories <- unique(df2$enzyme)
@@ -1130,7 +1130,7 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
     empty_kernel <- matrix(0, ns_all, ns_all)
   }
   
-  if(length(baboons) <= 25) {
+  if(length(baboons) <= 0) {
     if("phyloseq" %in% class(data)) {
       tag <- ""
     } else {
@@ -1167,10 +1167,18 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
   }
   
   kernels <- c("weekly","seasonal","group","age","individual","plate","DNAconc","residual")
-  if(include_residual) {
-    total_var <- colSums(estimates)
+  if(optim_it > 1) {
+    if(include_residual) {
+      total_var <- colSums(estimates)
+    } else {
+      total_var <- colSums(estimates[1:7,])
+    }
   } else {
-    total_var <- colSums(estimates[1:7,])
+    if(include_residual) {
+      total_var <- c(sum(estimates))
+    } else {
+      total_var <- c(sum(estimates[1:7,]))
+    }
   }
   for(i in 1:optim_it) {
     rank <- order(estimates[,i], decreasing=TRUE)
