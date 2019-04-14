@@ -15,8 +15,18 @@ glom_data <- load_glommed_data(level="species", replicates=TRUE)
 filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 metadata <- read_metadata(filtered)
 
+# ====================================================================================================================
+# read in metagenomics
+# ====================================================================================================================
+
+# read metagenomics
+data.piphillin <- read_metagenomics(metadata)
+metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, metadata)
+
 if(FALSE) {
 
+color_metagenomics <- TRUE
+  
 cat("Earliest sample:", min(metadata$collection_date), "\n")
 cat("Latest sample:", max(metadata$collection_date), "\n")
 
@@ -24,27 +34,41 @@ min_samples <- 10 # drop individuals with fewer than this many samples
 individuals <- unique(metadata$sname)
 samples <- list()
 for(i in 1:length(individuals)) {
-  indiv_samples <- subset_samples(metadata, (sname %in% c(individuals[i])))$collection_date
-  indiv_samples <- as.vector(sapply(indiv_samples, date_to_num))
+  indiv_samples <- subset_samples(metadata, (sname %in% c(individuals[i])))
+  indiv_collection_dates <- indiv_samples$collection_date
+  indiv_sample_id <- indiv_samples$sample_id
+  indiv_samples <- as.vector(sapply(indiv_collection_dates, date_to_num))
   if(length(indiv_samples) >= min_samples) {
-    samples[[individuals[i]]] <- indiv_samples
+    samples[[individuals[i]]] <- list(indiv_samples, indiv_sample_id)
   }
 }
 
-plot.data <- data.frame(indiv=NULL, sample=NULL)
+metagenomics.sample_ids <- metadata.metagenomics[,"sample_id"]$sample_id
+
+plot.data <- data.frame(indiv=NULL, sample=NULL, metagenomics=NULL)
 for(ind in names(samples)) {
-  new.data <- data.frame(indiv=rep(ind, length(samples[[ind]])), sample=samples[[ind]])
+  if(color_metagenomics) {
+    new.data <- data.frame(indiv=rep(ind, length(samples[[ind]][[1]])),
+                           sample=samples[[ind]][[1]], metagenomics=as.factor(samples[[ind]][[2]] %in% metagenomics.sample_ids))
+  } else {
+    new.data <- data.frame(indiv=rep(ind, length(samples[[ind]][[1]])),
+                           sample=samples[[ind]][[1]])
+  }
   plot.data <- rbind(plot.data, new.data)
 }
 
-m <- ggplot(plot.data, aes(x=sample, y=indiv)) +
-  geom_point() +
-  theme_minimal() +
-  xlab("") +
-  ylab("") +
-  theme(axis.text.x=element_blank()) +
-  theme(axis.title.y=element_text(margin=margin(t=10, r=0, b=0, l=10)))
-ggsave("plots/ABRP_overview.png", scale=2, width=4, height=8, units="in")
+if(color_metagenomics) {
+  m <- ggplot(plot.data, aes(x=sample, y=indiv, color=metagenomics))
+} else {
+  m <- ggplot(plot.data, aes(x=sample, y=indiv))
+}
+  m <- m + geom_point() +
+    theme_minimal() +
+    xlab("") +
+    ylab("") +
+    theme(axis.text.x=element_blank()) +
+    theme(axis.title.y=element_text(margin=margin(t=10, r=0, b=0, l=10)))
+ggsave("plots/ABRP_overview.png", scale=1.5, width=12, height=6, units="in")
 
 }
 
@@ -57,14 +81,6 @@ if(FALSE) {
 histogram_indiv_samples(filtered)
 histogram_sample_density(filtered, "weeks")
 }
-
-# ====================================================================================================================
-# read in metagenomics
-# ====================================================================================================================
-
-# read metagenomics
-data.piphillin <- read_metagenomics(metadata)
-metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, metadata)
 
 # ====================================================================================================================
 # time courses for densely sampled individuals
