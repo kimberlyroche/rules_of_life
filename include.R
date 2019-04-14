@@ -30,6 +30,49 @@ over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI
              "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN",
              "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX",
              "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW")
+# individuals with at least 2 samples
+over_1 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS",
+            "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW",
+            "VIN", "TAL", "VEX", "VEI", "ALE", "MBE", "WHE", "WYN", "LOL", "HOL", "NOB", "VOT", "LYE",
+            "HON", "DAG", "DUN", "OTI", "LUI", "OFR", "LAZ", "ONY", "VEL", "ELV", "FAX", "ORI", "EAG",
+            "ODE", "NIK", "VAP", "WIP", "LOU", "NOO", "EVA", "EXO", "KOR", "NAR", "VOW", "HYM", "PAI",
+            "LAS", "VIO", "WEA", "DOU", "LIZ", "WAS", "ZIB", "QUA", "WEN", "WOB", "WOL", "HOK", "LAV",
+            "OBI", "POK", "SOR", "KOL", "ISR", "OMO", "SCE", "AFR", "MON", "NIN", "VEB", "ADD", "VOY",
+            "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN",
+            "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX",
+            "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW", "IAG", "MLO", "GYP", "LIT", "OPA",
+            "COT", "DIP", "LAW", "RHO", "VOR", "AMA", "AYU", "DUR", "FLA", "OAS", "VIB", "CAB", "CHE",
+            "HAV", "LUP", "MIC", "YOB", "PIT", "YAN", "LOZ", "TOG", "BEA", "DUD", "GOM", "HIB", "WAG",
+            "ETO", "KEL", "NUT", "WES", "IDI", "ISO", "PRU", "YOG", "ZAI", "AZI", "DIC", "EMI", "KAT",
+            "LAX", "LIM", "NET", "VAD", "ANE", "CAD", "ECL", "HAM", "OCT", "TAP", "GAS", "NAW", "RWA",
+            "CYC", "HES", "LOM", "NOK", "SHY", "CAR", "DJI", "KAG", "LYM", "MOR", "ORN", "RAN", "SCO",
+            "CON", "NOS", "WON", "YAR", "BLU", "DYN", "EAS", "IGU", "OOZ", "WIR", "DEA", "DEG", "GAM",
+            "KER", "KUT", "NOZ", "SER", "WIV", "APP", "BAT", "HUC", "LAH", "LAT", "LOA", "LUR", "OBL",
+            "THU", "ZIN", "DAM", "FAB", "JOB", "KIJ", "OZO", "RIF", "SAG", "WAW", "NOP", "REX", "VES",
+            "WIF", "CED", "HEK", "LUX", "NYL", "ROC", "VAN", "WOO", "AMO", "BUT", "DEP", "ELB", "FIG",
+            "KRI", "MAH", "YOK", "ZAN", "DAP", "JAG", "LUT", "SAT", "TUS", "VEH", "VIP", "LYC", "NAI",
+            "ARS", "HAD", "KRA", "LUD", "NIR", "NUN", "RIK", "UHU", "WAJ", "WEW", "WIZ", "YOI", "BAG",
+            "DHO", "FAC", "KEY", "TER", "VUG", "WUM", "GER", "HOF", "IRI", "MYS", "NES", "ROX", "WER",
+            "WEU", "ELD", "FIW", "LAA", "LAQ", "SAW", "SUJ", "ATL", "DOV", "EUR", "FAM", "FIN", "VAZ",
+            "WYL", "ZAK", "CAY", "DIB", "FUZ", "GYA", "HIV", "LEC", "LUO", "SOK", "VAU", "WAP", "WEI",
+            "WOK", "FRU", "GRA", "PEC", "PEM", "TIN", "DED", "HYD", "LYB", "NOJ", "NOM", "WOZ", "YEL",
+            "DIG", "GET", "MOZ", "POA", "RHU", "WEZ", "WYC", "APO", "BUL", "ELA", "KIP", "LUS", "SEI",
+            "WEG", "WOV", "WRA", "ZOR", "HAP", "KOM", "PLA", "WEY", "WIW", "YUG", "BOL", "DEC", "LOD",
+            "LUV", "LUZ", "NAF", "NAG", "NUM", "NYA", "RIG", "SEE", "ALV", "CAV", "ESI", "GEM", "HEL",
+            "LEY", "LID", "LOP", "NYU", "POT", "SAC", "WOC", "WOF", "YOL", "ZAM", "ALB", "BIO", "ERN",
+            "HIC", "HIZ", "LUF", "NEH", "NON", "VEG", "ASA", "BOC", "DEF", "EBA", "EQU", "ERI", "HEE",
+            "LAF", "LES", "RIS", "SEM", "WYA", "YAK", "BIK", "FIL", "GLO", "HOJ", "HOS", "LOS", "MIA",
+            "PUY", "RIV", "SAH", "SAS", "ZIM", "ZUR", "AAR", "APH", "CAC", "COP", "DOJ", "DRI", "KAF",
+            "KHA", "LEJ", "MOG", "OKO", "ROW", "TAB", "WOI", "ALM", "CHL", "CRI", "EID", "ENV", "HAG",
+            "HEA", "ICA", "KOA", "NEA", "NIO", "NUZ", "NYS", "TRU", "WAM", "WED", "WEM", "WEX", "WHO",
+            "ABD", "ACI", "BOY", "COU", "DEO", "DRU", "EDG", "ERM", "EXI", "FAK", "GUI", "ILA", "LOJ",
+            "LUM", "RAG", "ROD", "SAD", "UTE", "VAQ", "VIA", "WEK", "WOP", "WRY", "YAP", "ACM", "DHA",
+            "DIW", "FED", "FER", "GAL", "GUR", "IVY", "LEU", "LUG", "MES", "MEX", "NER", "PIX", "SAU",
+            "SQU", "TIV", "UPE", "URU", "YAY", "ZUC", "ACC", "ADR", "ARA", "BOT", "CEN", "DOT", "EDI",
+            "EUG", "GLE", "HEX", "HUD", "KNO", "LAL", "LEF", "LEH", "LIX", "NAK", "NTA", "OPU", "ORB",
+            "PSY", "RHA", "SPY", "TAY", "TOR", "TRI", "WUN", "WYO", "YAZ", "YIP", "ANC", "BRO", "EKA",
+            "GAE", "GEN", "GOV", "GWA", "HAZ", "HIA", "HIN", "HYR", "JIJ", "LAR", "LIV", "LYL", "MEG",
+            "NGA", "NOA", "RAZ", "RUB", "RUE", "SUE", "TOF", "USI", "VAT", "WID", "YAB", "YEN", "YUM", "ZAP", "ZAW")
 
 # ====================================================================================================================
 # ACCESSORS
@@ -832,11 +875,11 @@ plot_cov <- function(datamat, filename) {
     ylab("samples") +
     theme_minimal() +
     guides(fill=guide_legend(title="covariance"))
-  ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste("plots/",filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 # pass in zero-filtered data
-estimate_variance_components <- function(data, metadata, optim_it=1) {
+estimate_variance_components <- function(data, metadata, optim_it=1, use_individuals=Inf, include_residual=False) {
   ilr_data <- NULL
   week_kernel <- NULL
   season_vector <- NULL
@@ -845,11 +888,16 @@ estimate_variance_components <- function(data, metadata, optim_it=1) {
   indiv_vector <- NULL
   plate_vector <- NULL
   conc_vector <- NULL
+  
+  within_group_corr <- 0.1
+  between_group_corr <- 0
 
   # build kernels for factors of interest
 
-  baboons <- unique(metadata$sname)
-  baboons <- baboons[sample(length(baboons))[1:10]] # subsample 100
+  baboons <- over_1
+  if(use_individuals < Inf) {
+    baboons <- baboons[sample(length(baboons))[1:use_individuals]] # subsample for debugging
+  }
   for(b in 1:length(baboons)) {
     cat("Building kernel for",baboons[b],"\n")
     # get samples for this individual only
@@ -881,8 +929,6 @@ estimate_variance_components <- function(data, metadata, optim_it=1) {
       nt <- ntaxa(baboon_counts)
       ns <- phyloseq::nsamples(baboon_counts)
     } else {
-      #nt <- dim(baboon_log_ratios)[1]
-      #ns <- dim(baboon_log_ratios)[2]+1 # no. taxa = no. enzymes; this is pre-LR transform
       nt <- dim(baboon_log_ratios)[1] + 1 # no. taxa = no. enzymes; this is pre-LR transform
       ns <- dim(baboon_log_ratios)[2]
     }
@@ -988,8 +1034,7 @@ estimate_variance_components <- function(data, metadata, optim_it=1) {
       conc_vector <- c(conc_vector, subset_conc_vector)
     }
   }
-  #plot_cov(week_kernel, "date_correlation")
-
+  
   ns_all <- length(season_vector)
 
   season_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
@@ -998,96 +1043,115 @@ estimate_variance_components <- function(data, metadata, optim_it=1) {
       if(i == j) {
         season_kernel[i,j] <- 1
       } else if(season_vector[i] == "W" && season_vector[j] == "W") {
-        season_kernel[i,j] <- 0.1
+        season_kernel[i,j] <- within_group_corr
       } else if(season_vector[i] == "D" && season_vector[j] == "D") {
-        season_kernel[i,j] <- 0.2
+        season_kernel[i,j] <- within_group_corr
       } else {
-        season_kernel[i,j] <- 0.0
+        season_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(season_kernel, "season_correlation")
-
+  
   age_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
     for(j in 1:ns_all) {
       if(i == j) {
         age_kernel[i,j] <- 1
-      } else if(age_vector[i] == "J" || age_vector[j] == "J") {
-        age_kernel[i,j] <- 0
+      } else if(age_vector[i] == "J" && age_vector[j] == "J") {
+        age_kernel[i,j] <- within_group_corr
+      } else if(age_vector[i] == "A" && age_vector[j] == "A") {
+        age_kernel[i,j] <- within_group_corr
       } else if(age_vector[i] == "G" && age_vector[j] == "G") {
-        age_kernel[i,j] <- 0.2
+        age_kernel[i,j] <- within_group_corr
       } else {
-        age_kernel[i,j] <- 0.1
+        age_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(age_kernel, "age_correlation")
-
+  
   group_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
     for(j in 1:ns_all) {
       if(i == j) {
         group_kernel[i,j] <- 1
       } else if(group_vector[i] == group_vector[j]) {
-        group_kernel[i,j] <- 0.2
+        group_kernel[i,j] <- within_group_corr
       } else {
-        group_kernel[i,j] <- 0
+        group_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(group_kernel, "group_correlation")
-
+  
   indiv_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
     for(j in 1:ns_all) {
       if(i == j) {
         indiv_kernel[i,j] <- 1
       } else if(indiv_vector[i] == indiv_vector[j]) {
-        indiv_kernel[i,j] <- 0.2
+        indiv_kernel[i,j] <- within_group_corr
       } else {
-        indiv_kernel[i,j] <- 0
+        indiv_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(indiv_kernel, "indiv_correlation")
-
+  
   plate_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
     for(j in 1:ns_all) {
       if(i == j) {
         plate_kernel[i,j] <- 1
       } else if(plate_vector[i] == plate_vector[j]) {
-        plate_kernel[i,j] <- 0.2
+        plate_kernel[i,j] <- within_group_corr
       } else {
-        plate_kernel[i,j] <- 0
+        plate_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(plate_kernel, "plate_correlation")
-
+  
   conc_kernel <- matrix(0, nrow=ns_all, ncol=ns_all)
   for(i in 1:ns_all) {
     for(j in 1:ns_all) {
       if(i == j) {
         conc_kernel[i,j] <- 1
-      } else if(conc_vector[i] >= 7 && conc_vector[j] >= 7) {
-        # allow positive correlation for high concentration samples
-        conc_kernel[i,j] <- 0.2
+      } else if(conc_vector[i] == conc_vector[j]) {
+        conc_kernel[i,j] <- within_group_corr
       } else {
-        conc_kernel[i,j] <- 0
+        conc_kernel[i,j] <- between_group_corr
       }
     }
   }
-  #plot_cov(conc_kernel, "conc_correlation")
   
-  empty_kernel <- diag(ns_all)
+  # residual (white noise kernel)
+  if(include_residual) {
+    empty_kernel <- matrix(within_group_corr, ns_all, ns_all)
+    diag(empty_kernel) <- 1
+  } else {
+    empty_kernel <- matrix(0, ns_all, ns_all)
+  }
+  
+  if(length(baboons) <= 25) {
+    if("phyloseq" %in% class(data)) {
+      tag <- ""
+    } else {
+      tag <- "metagenomics"
+    }
+    plot_cov(week_kernel, paste("date_sample_correlation", tag, sep=""))
+    plot_cov(season_kernel, paste("season_sample_correlation", tag, sep=""))
+    plot_cov(age_kernel, paste("age_sample_correlation", tag, sep=""))
+    plot_cov(group_kernel, paste("group_sample_correlation", tag, sep=""))
+    plot_cov(indiv_kernel, paste("indiv_sample_correlation", tag, sep=""))
+    plot_cov(plate_kernel, paste("plate_sample_correlation", tag, sep=""))
+    plot_cov(conc_kernel, paste("DNAconc_sample_correlation", tag, sep=""))
+    if(include_residual) {
+      plot_cov(empty_kernel, paste("residual_sample_correlation", tag, sep=""))
+    }
+  }
 
   # optimize the scale of each variance component
   logd_mat_t <- function(s) {
     return(logd_matrixt(s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8],
-                        ilr_data, empty_kernel, week_kernel, season_kernel, group_kernel, age_kernel,
-                        indiv_kernel, plate_kernel, conc_kernel))
+                        ilr_data, week_kernel, season_kernel, group_kernel, age_kernel,
+                        indiv_kernel, plate_kernel, conc_kernel, empty_kernel))
   }
   
   components <- 8
@@ -1101,13 +1165,19 @@ estimate_variance_components <- function(data, metadata, optim_it=1) {
     estimates[,i] <- res$par
   }
   
-  kernels <- c("residual", "weekly","seasonal","group","age","individual","plate","DNAconc")
-  total_var <- sum(estimates)
+  kernels <- c("weekly","seasonal","group","age","individual","plate","DNAconc","residual")
+  if(include_residual) {
+    total_var <- colSums(estimates)
+  } else {
+    total_var <- colSums(estimates[1:7,])
+  }
   for(i in 1:optim_it) {
     rank <- order(estimates[,i], decreasing=TRUE)
     cat("Iteration",i,":")
     for(j in 1:components) {
-      cat(" ",kernels[rank[j]]," (",round(estimates[rank[j],i]/total_var,digits=3),")",sep="")
+      if(rank[j] != components || include_residual) {
+        cat(" ",kernels[rank[j]]," (",round(estimates[rank[j],i]/total_var[i],digits=3),")",sep="")
+      }
     }
     cat("\n")
   }
