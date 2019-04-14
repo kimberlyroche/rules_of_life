@@ -4,8 +4,7 @@ library(ggplot2)
 source("include.R")
 
 individuals <- c("ACA", "DUI")
-
-individuals <- c("VEG") # 10-sample test individual
+#individuals <- c("VEG") # 10-sample test individual
 
 for(indiv in individuals) {
   

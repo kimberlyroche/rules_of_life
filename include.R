@@ -286,7 +286,7 @@ aitchison_dist <- function(x.i, x.j) {
 # returns a matrix where rows (and rownames) are enzymes and columns (and column names) are
 # samples ordered by collection date (but not sub-ordered by anything)
 read_metagenomics <- function(metadata) {
-  piphillin_dir <- "C:/Users/Kim/Documents/rules_of_life/original_data/Piphillin_20190222"
+  piphillin_dir <- "original_data/Piphillin_20190222"
   piphillin_file <- "Filtered_enzymes.txt"
   
   # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt
@@ -731,7 +731,8 @@ calc_autocorrelation <- function(data,
 
   rounds <- 1
   if(resample) {
-    rounds <- 10
+    rounds <- 100
+    #rounds <- 10 # for testing
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
   
@@ -894,7 +895,7 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
 
   # build kernels for factors of interest
 
-  baboons <- over_1
+  baboons <- over_50
   if(use_individuals < Inf) {
     baboons <- baboons[sample(length(baboons))[1:use_individuals]] # subsample for debugging
   }

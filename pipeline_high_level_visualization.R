@@ -15,6 +15,8 @@ glom_data <- load_glommed_data(level="species", replicates=TRUE)
 filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 metadata <- read_metadata(filtered)
 
+if(FALSE) {
+
 cat("Earliest sample:", min(metadata$collection_date), "\n")
 cat("Latest sample:", max(metadata$collection_date), "\n")
 
@@ -44,13 +46,17 @@ m <- ggplot(plot.data, aes(x=sample, y=indiv)) +
   theme(axis.title.y=element_text(margin=margin(t=10, r=0, b=0, l=10)))
 ggsave("plots/ABRP_overview.png", scale=2, width=4, height=8, units="in")
 
+}
+
 # ====================================================================================================================
 # sample frequency
 # ====================================================================================================================
 
+if(FALSE) {
 # render histograms of sample frequency
 histogram_indiv_samples(filtered)
 histogram_sample_density(filtered, "weeks")
+}
 
 # ====================================================================================================================
 # read in metagenomics
@@ -64,9 +70,11 @@ metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, me
 # time courses for densely sampled individuals
 # ====================================================================================================================
 
+if(FALSE) {
 short_list <- c("ACA", "DUI", "CAI", "COB", "DAS")
 perform_mult_timecourse(filtered, short_list)
 perform_mult_timecourse(data.piphillin, short_list)
+}
 
 # ====================================================================================================================
 # covariance matrixies ordered on covariates
@@ -104,6 +112,7 @@ visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "age", sam
 # ordination
 # ====================================================================================================================
 
+if(FALSE) {
 # subset to a manageable sample size
 md <- read_metadata(filtered)
 sample_ids <- md$sample_id[sample(nsamples(filtered))[1:5000]]
@@ -148,3 +157,4 @@ ord <- ordinate(baboon_counts, "PCoA", "bray")
 cat("Plotting individual labeling on ordination...\n")
 p <- plot_ordination(baboon_counts, ord, type="sample", color="sname")
 ggsave("plots/sname_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+}
