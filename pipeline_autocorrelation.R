@@ -23,65 +23,92 @@ metadata <- read_metadata(filtered)
 
 # read in metagenomics/PiPhillin
 data.piphillin <- read_metagenomics(metadata)
+metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, metadata)
 
 if(task == 1) {
+  # 16S
   lags <- calc_autocorrelation(filtered, metadata, lag.max=26, resample=F, resample_rate=0.2)
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=26, resample=T, resample_rate=0.2)
-  #plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk",sep=""))
   
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=26, resample=T, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_bounnded",sep=""))
+  
+  # metagenomics
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=26, resample=F, resample_rate=0.2)
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_metagenomics",sep=""))
+  
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=26, resample=T, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_26wk_metagenomics_bounded",sep=""))
 }
 
 if(task == 2) {
   lags <- calc_autocorrelation(filtered, metadata, lag.max=52, resample=F, resample_rate=0.2)
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_52wk",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=52, resample=T, resample_rate=0.2)
-  #plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_52wk")
+
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=52, resample=T, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_52wk_bounded")
   
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=52, resample=F, resample_rate=0.2)
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_52wk_metagenomics",sep=""))
+
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=52, resample=T, resample_rate=0.2)
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_52wk_metagenomics_bounded",sep=""))
 }
 
 if(task == 3) {
   lags <- calc_autocorrelation(filtered, metadata, lag.max=12, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_12mo",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=12, resample=T, resample_rate=0.2, date_diff_units="months")
-  #plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_12mo")
+
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=12, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_12mo_bounded")
 
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=12, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_12mo_metagenomics",sep=""))
+
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=12, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_12mo_metagenomics_bounded",sep=""))
 }
 
 if(task == 4) {
   lags <- calc_autocorrelation(filtered, metadata, lag.max=24, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_24mo",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=24, resample=T, resample_rate=0.2, date_diff_units="months")
-  #plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_24mo")
+  
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=24, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_24mo_bounded")
   
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=24, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_24mo_metagenomics",sep=""))
+  
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=24, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_24mo_metagenomics_bounded",sep=""))
 }
 
 if(task == 5) {
   lags <- calc_autocorrelation(filtered, metadata, lag.max=36, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_36mo",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=36, resample=T, resample_rate=0.2, date_diff_units="months")
-  #plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_36mo")
+  
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=36, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_36mo_bounded")
   
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=36, resample=F, resample_rate=0.2, date_diff_units="months")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_36mo_metagenomics",sep=""))
+  
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=36, resample=T, resample_rate=0.2, date_diff_units="months")
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_36mo_metagenomics_bounded",sep=""))
 }
 
 if(task == 6) {
   lags <- calc_autocorrelation(filtered, metadata, lag.max=11, resample=F, resample_rate=0.2, date_diff_units="seasons")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_11season",sep=""))
-  #lags <- calc_autocorrelation(filtered, metadata, lag.max=11, resample=T, resample_rate=0.2, date_diff_units="seasons")
-  #plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_11season")
+  
+  lags <- calc_autocorrelation(filtered, metadata, lag.max=11, resample=T, resample_rate=0.2, date_diff_units="seasons")
+  plot_bounded_autocorrelation(lags, filename="plots/autocorrelation_11season_bounded")
 
   lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=11, resample=F, resample_rate=0.2, date_diff_units="seasons")
   plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_11season_metagenomics",sep=""))
+  
+  lags <- calc_autocorrelation(data.piphillin, metadata, lag.max=11, resample=T, resample_rate=0.2, date_diff_units="seasons")
+  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_11season_metagenomics_bounded",sep=""))
 }
 
 

@@ -1,7 +1,9 @@
 source("include.R")
 
+# NOTE: refactored a lot of code; have yet to re-test everything in this file!
+
 # ====================================================================================================================
-# plot all samples (time on x-axis, individual on y-axis)
+# plot sample overview: all samples with time on x-axis x individual on y-axis
 # ====================================================================================================================
 
 # recode date as numeric: number of days since earliest sample date
@@ -9,9 +11,9 @@ date_to_num <- function(date) {
   as.numeric(difftime(date, as.Date("2000-04-21"), units="days"))
 }
 
-# read raw data
-data <- read_data()
-read_metadata(data)
+glom_data <- load_glommed_data(level="species", replicates=TRUE)
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
+metadata <- read_metadata(filtered)
 
 cat("Earliest sample:", min(metadata$collection_date), "\n")
 cat("Latest sample:", max(metadata$collection_date), "\n")
@@ -46,18 +48,25 @@ ggsave("plots/ABRP_overview.png", scale=2, width=4, height=8, units="in")
 # sample frequency
 # ====================================================================================================================
 
-glom_data <- load_glommed_data(level="species", replicates=TRUE)
-filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-
 # render histograms of sample frequency
 histogram_indiv_samples(filtered)
 histogram_sample_density(filtered, "weeks")
 
 # ====================================================================================================================
+# read in metagenomics
+# ====================================================================================================================
+
+# read metagenomics
+data.piphillin <- read_metagenomics(metadata)
+metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, metadata)
+
+# ====================================================================================================================
 # time courses for densely sampled individuals
 # ====================================================================================================================
 
-perform_mult_timecourse(filtered, c("ACA", "DUI", "CAI", "COB", "DAS"))
+short_list <- c("ACA", "DUI", "CAI", "COB", "DAS")
+perform_mult_timecourse(filtered, short_list)
+perform_mult_timecourse(data.piphillin, short_list)
 
 # ====================================================================================================================
 # covariance matrixies ordered on covariates
@@ -66,17 +75,30 @@ perform_mult_timecourse(filtered, c("ACA", "DUI", "CAI", "COB", "DAS"))
 # plot (subsampled) scrambled correlation matrices for a very coarse look into correlation on 
 # the basis of various covariates
 # batch stuff
-visualize_groupwise_covariance(filtered, "plate", sample=50)
-visualize_groupwise_covariance(filtered, "flow_cell_lane", sample=1000)
-visualize_groupwise_covariance(filtered, "library_pool", sample=200)
-visualize_groupwise_covariance(filtered, "extract_dna_conc_ng", sample=100)
+visualize_groupwise_covariance(filtered, metadata, "plate", sample=50)                    # need to test these
+visualize_groupwise_covariance(filtered, metadata, "flow_cell_lane", sample=1000)
+visualize_groupwise_covariance(filtered, metadata, "library_pool", sample=200)
+visualize_groupwise_covariance(filtered, metadata, "extract_dna_conc_ng", sample=100)
 # biological stuff
-visualize_groupwise_covariance(filtered, "sex", sample=1000)
-visualize_groupwise_covariance(filtered, "season", sample=1000)
-visualize_groupwise_covariance(filtered, "grp", sample=100)
-visualize_groupwise_covariance(filtered, "matgrp", sample=100)
-visualize_groupwise_covariance(filtered, "sname", sample=100)
-visualize_groupwise_covariance(filtered, "age", sample=500)
+visualize_groupwise_covariance(filtered, metadata, "sex", sample=1000)
+visualize_groupwise_covariance(filtered, metadata, "season", sample=1000)
+visualize_groupwise_covariance(filtered, metadata, "grp", sample=100)
+visualize_groupwise_covariance(filtered, metadata, "matgrp", sample=100)
+visualize_groupwise_covariance(filtered, metadata, "sname", sample=100)
+visualize_groupwise_covariance(filtered, metadata, "age", sample=500)
+
+# batch stuff
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "plate", sample=50)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "flow_cell_lane", sample=1000)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "library_pool", sample=200)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "extract_dna_conc_ng", sample=100)
+# biological stuff
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "sex", sample=1000)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "season", sample=1000)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "grp", sample=100)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "matgrp", sample=100)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "sname", sample=100)
+visualize_groupwise_covariance(data.piphillin, metadata.metagenomics, "age", sample=500)
 
 # ====================================================================================================================
 # ordination

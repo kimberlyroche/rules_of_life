@@ -154,6 +154,16 @@ grp_by_sname <- function(data) {
   return(unlist(lapply(snames, function(x) length(unlist(unique(md[md$sname %in% x,"grp"]))))))
 }
 
+# there are samples in the 16S ASV data not present in the metagenomics
+# remove these from the metadata paired with the metagenomics data set
+read_metadata_metagenomics <- function(metagenomics, full_data, full_metadata) {
+  sample_ids <- colnames(metagenomics)
+  md.sample_ids <- full_metadata$sample_id
+  intersection_ids <- intersect(sample_ids, md.sample_ids)
+  subset_metadata <- full_metadata[full_metadata$sample_id %in% intersection_ids,]
+  return(subset_metadata)
+}
+
 # ====================================================================================================================
 # DATA TRANSFORMATION, ETC.
 # ====================================================================================================================
@@ -194,6 +204,8 @@ apply_proportion <- function(data) {
 }
 
 # returns a data.frame
+# if passing in a phyloseq object, expects taxa as columns
+# if passing in metaganomics data, expects enzymes as rows
 apply_ilr <- function(data, pseudocount=0.65) {
   if("phyloseq" %in% class(data)) {
     counts <- otu_table(data)@.Data # samples (rows) x taxa (columns)
@@ -301,8 +313,7 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
 # expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}}
 plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", gapped=FALSE, legend=FALSE) {
   na.string <- ".N/A"
-  img_width <- 10
-  
+
   # make sure the dates are in order and fix the order by converting to factors
   df2 <- metagenomics_prop[order(metagenomics_prop$sample),]
   if(gapped) {
@@ -322,24 +333,21 @@ plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metag
     img_width <- 15
   }
   df2 <- df2[order(df2$sample),]
+  df2$enzyme <- factor(df2$enzyme, levels=unique(df2$enzyme))
   
+  categories <- unique(df2$enzyme)
+  coul = brewer.pal(4, "Spectral")
+  coul = colorRampPalette(coul)(length(unique(df2$enzyme)))
   if(gapped) {
-    categories <- unique(df2$enzyme)
-    coul = brewer.pal(4, "Spectral")
-    coul = colorRampPalette(coul)(length(unique(df2$enzyme)))
-    coul[1] <- "#DDDDDD"
-    p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
-      geom_bar(position="fill", stat="identity") +
-      scale_fill_manual(values=coul) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      theme(legend.text=element_text(size=8))
+    img_width <- 15
   } else {
-    p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
-      geom_bar(position="fill", stat="identity") +
-      scale_y_continuous(labels = percent_format()) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      theme(legend.text=element_text(size=8))
+    img_width <- 10
   }
+  p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
+    geom_bar(position="fill", stat="identity") +
+    scale_fill_manual(values=coul) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    theme(legend.text=element_text(size=8))
   if(legend) {
     p <- p + theme(legend.position="bottom")
   } else {
@@ -458,9 +466,7 @@ plot_corr_matrix <- function(data, filename, cov=FALSE) {
   ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
-visualize_groupwise_covariance <- function(data, group, sample=1000000) {
-
-  md <- read_metadata(data)
+visualize_groupwise_covariance <- function(data, md, group, sample=1000000) {
 
   if(group == "grp") {
     groups <- unique(md$grp); partition_obj <- md$grp; use_no <- sample
@@ -486,7 +492,8 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
   } else if(group == "extract_dna_conc_ng") {
     groups <- c(2.5, 5, 7.5, 10, 15, 20, 25, 100); partition_obj <- md$extract_dna_conc_ng; use_no <- sample
   }
-
+  
+  # list corresponding to elements of groups with sample IDs in each group's bucket
   partition_idx <- list()
   if(group == "age" || group == "extract_dna_conc_ng") {
     for(g in 1:length(groups)) {
@@ -504,18 +511,22 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
     }
   }
 
-  lr <- apply_ilr(data)
-  lr <- t(apply(lr, 1, function(x) x - mean(x)))
+  lr <- apply_ilr(data) # after this data is samples x taxa or enzymes
+  lr <- scale(lr, center=T, scale=F)
   partition_samples <- list()
   for(i in 1:length(groups)) {
-    partition_samples[[i]] <- lr[,partition_idx[[i]],drop=FALSE]
+    if("phyloseq" %in% class(data)) {
+      partition_samples[[i]] <- lr[partition_idx[[i]],,drop=FALSE]
+    } else {
+      partition_samples[[i]] <- lr[rownames(lr) %in% partition_idx[[i]],,drop=FALSE]
+    }
   }
-  # test via unique(md[md$sample_id %in% partition_idx[[1]], "grp"]) etc.
-
+  # test clean partition via unique(md[md$sample_id %in% partition_idx[[1]], "grp"]) etc.
+  
   stacked_lr <- NULL
   samples <- list()
   for(i in 1:length(groups)) {
-    total_samples <- dim(partition_samples[[i]])[2]
+    total_samples <- dim(partition_samples[[i]])[1]
     use_ids <- sample(total_samples)
     use_upper <- use_no
     #if(total_samples < use_upper) {
@@ -524,16 +535,23 @@ visualize_groupwise_covariance <- function(data, group, sample=1000000) {
     # omit groups with fewer than the requested number of samples
     if(total_samples >= use_upper) {
       cat(groups[i],"has",total_samples,"samples; using",use_upper,"\n")
-      samples[[i]] <- partition_samples[[i]][,use_ids[1:use_upper]]
+      samples[[i]] <- partition_samples[[i]][use_ids[1:use_upper],]
       if(is.null(stacked_lr)) {
         stacked_lr <- samples[[i]]
       } else {
-        stacked_lr <- cbind(stacked_lr, samples[[i]])
+        #stacked_lr <- cbind(stacked_lr, samples[[i]])
+        stacked_lr <- rbind(stacked_lr, samples[[i]])
       }
     }
   }
   cat("Sample matrix is",dim(stacked_lr)[1],"by",dim(stacked_lr)[2],"\n")
-  plot_corr_matrix(t(stacked_lr), paste(group, "_cov_matrix", sep=""))
+  if("phyloseq" %in% class(data)) {
+    save_filename <- paste("plots/", group, "_cov_matrix", sep="")
+  } else {
+    save_filename <- paste("plots/", group, "_cov_matrix_metagenomics", sep="")
+  }
+  save_filename <- 
+  plot_corr_matrix(stacked_lr, save_filename)
 }
 
 # ====================================================================================================================
@@ -606,25 +624,20 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
     }
   }
 
+  categories <- unique(df3$OTU)
+  coul = brewer.pal(4, "Spectral")
+  coul = colorRampPalette(coul)(length(unique(df3$OTU)))
   if(gapped) {
-    categories <- unique(df3$OTU)
-    coul = brewer.pal(4, "Spectral")
-    coul = colorRampPalette(coul)(unique(df3$OTU))
     coul[1] <- "#DDDDDD"
-    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
-      geom_bar(position="fill", stat="identity") +
-      scale_fill_manual(values=coul) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      theme(legend.text=element_text(size=8))
     img_width <- 15
   } else {
-    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
-      geom_bar(position="fill", stat="identity") +
-      scale_y_continuous(labels = percent_format()) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      theme(legend.text=element_text(size=8))
     img_width <- 10
   }
+  p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
+    geom_bar(position="fill", stat="identity") +
+    scale_fill_manual(values=coul) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    theme(legend.text=element_text(size=8))
   if(n < 20) {
     # these are likely replicates
     img_width <- 5
@@ -634,10 +647,10 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   } else {
     p <- p + theme(legend.position="none")
   }
-  ggsave(paste(save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
+  ggsave(paste("plots/",save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
 }
 
-# this is just a wrapper to call plot_timecourse on a representative sample of individuals
+# this is just a wrapper to call plot_timecourse_phyloseq on a representative sample of individuals
 # baboons is a list of snames, e.g. c("ACA", "DUI", "CAI", "COB", "DAS")
 perform_mult_timecourse <- function(data, baboons, gapped=FALSE, legend=FALSE) {
   for(b in baboons) {
@@ -665,7 +678,7 @@ calc_autocorrelation <- function(data,
   }
 
   individuals <- unique(metadata$sname)
-  individuals <- individuals[1:50] # for testing
+  individuals <- individuals[1:20] # for testing
 
   # only if using 
   season_boundaries <- c(200005, 200010, 200105, 200110, 200205, 200210, 200305, 200310,
@@ -675,7 +688,7 @@ calc_autocorrelation <- function(data,
 
   rounds <- 1
   if(resample) {
-    rounds <- 100
+    rounds <- 10
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
   
@@ -701,7 +714,6 @@ calc_autocorrelation <- function(data,
       # catch that case
       if(length(intersect(rownames(log_ratios), sample_info$sample_id)) > 0) {
         sample_lr <- log_ratios[rownames(log_ratios) %in% sample_info$sample_id,,drop=F]
-        #sample_lr <- log_ratios[rownames(log_ratios) %in% sample_info$sample_id,,drop=F]
         indiv_sample_no <- dim(sample_lr)[1]
         # randomly censor some of the samples
         do_sample <- rep(1, indiv_sample_no)
@@ -824,12 +836,7 @@ plot_cov <- function(datamat, filename) {
 }
 
 # pass in zero-filtered data
-estimate_variance_components <- function(filtered=NULL, optim_it=1) {
-  if(is.null(filtered)) {
-    load("glom_data_species.RData")
-    filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-  }
-
+estimate_variance_components <- function(data, metadata, optim_it=1) {
   ilr_data <- NULL
   week_kernel <- NULL
   season_vector <- NULL
@@ -841,25 +848,44 @@ estimate_variance_components <- function(filtered=NULL, optim_it=1) {
 
   # build kernels for factors of interest
 
-  baboons <- unique(read_metadata(filtered)$sname)
-  baboons <- baboons[sample(length(baboons))[1:100]] # subsample 100
+  baboons <- unique(metadata$sname)
+  baboons <- baboons[sample(length(baboons))[1:10]] # subsample 100
   for(b in 1:length(baboons)) {
     cat("Building kernel for",baboons[b],"\n")
-    # phyloseq::subset_samples is causing all kinds of issues, so let's subset on sname manually!
-    # basically you can't use subset_samples inside functions or loops
-    # see: https://github.com/joey711/phyloseq/issues/752
-    remove_idx <- as.character(get_variable(filtered, "sname")) == baboons[b]
-    baboon_counts <- prune_samples(remove_idx, filtered)
-    baboon_metadata <- read_metadata(baboon_counts)
-    baboon_log_ratios <- apply(otu_table(baboon_counts)@.Data+0.65, 1, ilr)
+    # get samples for this individual only
+    if("phyloseq" %in% class(data)) {
+      # phyloseq::subset_samples is causing all kinds of issues, so let's subset on sname manually!
+      # basically you can't use subset_samples inside functions or loops
+      # see: https://github.com/joey711/phyloseq/issues/752
+      remove_idx <- as.character(get_variable(filtered, "sname")) == baboons[b]
+      baboon_counts <- prune_samples(remove_idx, filtered)
+      # subset metadata
+      baboon_metadata <- read_metadata(baboon_counts)
+    } else {
+      baboon_counts <- subset_metagenomics_sname(data, baboons[b], metadata)
+      # column names are sample IDs
+      sample_ids <- colnames(baboon_counts)
+      baboon_metadata <- metadata[metadata$sample_id %in% sample_ids,]
+    }
+    baboon_log_ratios <- t(apply_ilr(baboon_counts))
+    # we'll ultimately pass ilr_data to optim ax taxa or enzymes (rows) x samples (columns)
+    # so build it up in that orientation
     if(is.null(ilr_data)) {
       ilr_data <- baboon_log_ratios
     } else {
+      # ilr_data is samples as rows, taxa or enzymes as columns
       ilr_data <- cbind(ilr_data, baboon_log_ratios)
     }
 
-    nt <- ntaxa(baboon_counts)
-    ns <- phyloseq::nsamples(baboon_counts)
+    if("phyloseq" %in% class(data)) {
+      nt <- ntaxa(baboon_counts)
+      ns <- phyloseq::nsamples(baboon_counts)
+    } else {
+      #nt <- dim(baboon_log_ratios)[1]
+      #ns <- dim(baboon_log_ratios)[2]+1 # no. taxa = no. enzymes; this is pre-LR transform
+      nt <- dim(baboon_log_ratios)[1] + 1 # no. taxa = no. enzymes; this is pre-LR transform
+      ns <- dim(baboon_log_ratios)[2]
+    }
 
     rho <- 1/2
     subset_week_kernel <- matrix(0, nrow=ns, ncol=ns)
@@ -1054,34 +1080,35 @@ estimate_variance_components <- function(filtered=NULL, optim_it=1) {
     }
   }
   #plot_cov(conc_kernel, "conc_correlation")
+  
+  empty_kernel <- diag(ns_all)
 
- diag_kernel <- diag(ns_all)
-
- # optimize the scale of each variance component
- logd_mat_t <- function(s) {
-   return(logd_matrixt(s[1], s[2], s[3], s[4], s[5], s[6], s[7],
-          ilr_data, week_kernel, season_kernel, group_kernel, age_kernel, indiv_kernel, plate_kernel, conc_kernel))
- }
-
- components <- 7
- estimates <- matrix(0, components, optim_it)
- for(i in 1:optim_it) {
-   cat("Optimization iteration",i,"\n")
-   # about 3x faster if we have R optim call a compiled C++ function
-   # could probably speed up further using DEoptim instead of optim here
-   res <- optim(par=runif(components), fn=logd_mat_t, method="L-BFGS-B",
-                lower=rep(0.00001,components), upper=rep(10,components))
-   estimates[,i] <- res$par
- }
-
- kernels <- c("weekly","seasonal","group","age","individual","plate","DNAconc")
- for(i in 1:optim_it) {
-   rank <- order(estimates[,i], decreasing=TRUE)
-   cat("Iteration",i,":")
-   for(j in 1:components) {
-     cat(" ",kernels[rank[j]]," (",round(estimates[rank[j],i],digits=3),")",sep="")
-   }
-   cat("\n")
- }
-
+  # optimize the scale of each variance component
+  logd_mat_t <- function(s) {
+    return(logd_matrixt(s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8],
+                        ilr_data, empty_kernel, week_kernel, season_kernel, group_kernel, age_kernel,
+                        indiv_kernel, plate_kernel, conc_kernel))
+  }
+  
+  components <- 8
+  estimates <- matrix(0, components, optim_it)
+  for(i in 1:optim_it) {
+    cat("Optimization iteration",i,"\n")
+    # about 3x faster if we have R optim call a compiled C++ function
+    # could probably speed up further using DEoptim instead of optim here
+    res <- optim(par=runif(components), fn=logd_mat_t, method="L-BFGS-B",
+                 lower=rep(0.00001,components), upper=rep(10,components))
+    estimates[,i] <- res$par
+  }
+  
+  kernels <- c("residual", "weekly","seasonal","group","age","individual","plate","DNAconc")
+  total_var <- sum(estimates)
+  for(i in 1:optim_it) {
+    rank <- order(estimates[,i], decreasing=TRUE)
+    cat("Iteration",i,":")
+    for(j in 1:components) {
+      cat(" ",kernels[rank[j]]," (",round(estimates[rank[j],i]/total_var,digits=3),")",sep="")
+    }
+    cat("\n")
+  }
 }
