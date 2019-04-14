@@ -721,7 +721,7 @@ calc_autocorrelation <- function(data,
   }
 
   individuals <- unique(metadata$sname)
-  individuals <- individuals[1:20] # for testing
+  #individuals <- individuals[1:20] # for testing
 
   # only if using 
   season_boundaries <- c(200005, 200010, 200105, 200110, 200205, 200210, 200305, 200310,
