@@ -211,6 +211,12 @@ read_metadata_metagenomics <- function(metagenomics, full_data, full_metadata) {
 # DATA TRANSFORMATION, ETC.
 # ====================================================================================================================
 
+# recode date as numeric: number of days since earliest sample date
+# these are frequently *fractional* because of leap years!!!
+date_to_num <- function(date) {
+  as.numeric(difftime(date, as.Date("2000-04-21"), units="days"))
+}
+
 filter_data_omit <- function(count_threshold=3, sample_threshold=0.9, data=NULL) {
   if(is.null(data)) {
     load("glom_data_genus.RData")
@@ -260,6 +266,31 @@ apply_ilr <- function(data, pseudocount=0.65) {
   # driver log-ratio transforms expect samples as rows!
   # output: samples (rows) x D-1 taxa (columns)
   return(driver::ilr(counts))
+}
+
+# as above; returns D instead of D-1
+apply_clr <- function(data, pseudocount=0.65) {
+  if("phyloseq" %in% class(data)) {
+    counts <- otu_table(data)@.Data
+  } else {
+    counts <- data
+    counts <- t(counts)
+  }
+  counts <- counts + pseudocount
+  return(driver::clr(counts))
+}
+
+# as above
+# d is the index of the reference taxon
+apply_alr <- function(data, pseudocount=0.65, d=NULL) {
+  if("phyloseq" %in% class(data)) {
+    counts <- otu_table(data)@.Data
+  } else {
+    counts <- data
+    counts <- t(counts)
+  }
+  counts <- counts + pseudocount
+  return(driver::alr(counts))
 }
 
 geom_mean <- function(x) {

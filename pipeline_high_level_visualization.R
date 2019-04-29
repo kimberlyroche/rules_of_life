@@ -6,11 +6,6 @@ source("include.R")
 # plot sample overview: all samples with time on x-axis x individual on y-axis
 # ====================================================================================================================
 
-# recode date as numeric: number of days since earliest sample date
-date_to_num <- function(date) {
-  as.numeric(difftime(date, as.Date("2000-04-21"), units="days"))
-}
-
 glom_data <- load_glommed_data(level="species", replicates=TRUE)
 filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 metadata <- read_metadata(filtered)
