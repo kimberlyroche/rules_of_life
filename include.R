@@ -112,14 +112,14 @@ read_metadata <- function(data, write_sample=FALSE) {
 load_glommed_data <- function(level="species", replicates=TRUE) {
   if(level == "species") {
     if(replicates) {
-      if(file.exists("glom_data_species_reps.RData")) {
-        load("glom_data_species_reps.RData")
+      if(file.exists("original_data/glom_data_species_reps.RData")) {
+        load("original_data/glom_data_species_reps.RData")
       } else {
         stop("Agglomerated data file foe species (+replicates) does not exist.")
       }
     } else {
-      if(file.exists("glom_data_species.RData")) {
-        load("glom_data_species.RData")
+      if(file.exists("original_data/glom_data_species.RData")) {
+        load("original_data/glom_data_species.RData")
       } else {
         stop("Agglomerated data file foe species (-replicates) does not exist.")
       }
@@ -127,14 +127,14 @@ load_glommed_data <- function(level="species", replicates=TRUE) {
   }
   if(level == "genus") {
     if(replicates) {
-      if(file.exists("glom_data_genus_reps.RData")) {
-        load("glom_data_genus_reps.RData")
+      if(file.exists("original_data/glom_data_genus_reps.RData")) {
+        load("original_data/glom_data_genus_reps.RData")
       } else {
         stop("Agglomerated data file foe genus (+replicates) does not exist.")
       }
     } else {
-      if(file.exists("glom_data_genus.RData")) {
-        load("glom_data_genus.RData")
+      if(file.exists("original_data/glom_data_genus.RData")) {
+        load("original_data/glom_data_genus.RData")
       } else {
         stop("Agglomerated data file foe genus (-replicates) does not exist.")
       }
@@ -311,35 +311,55 @@ aitchison_dist <- function(x.i, x.j) {
 # METAGENOMICS FILE HANDLING
 # ====================================================================================================================
 
-# read in PiPhillin data from .tsv file
-# requires 16S metadata so we can pare down the samples to those in-common between data sets
+# read in PiPhillin data from tab-delimited txt file
 #
-# returns a matrix where rows (and rownames) are enzymes and columns (and column names) are
-# samples ordered by collection date (but not sub-ordered by anything)
-read_metagenomics <- function(metadata) {
+# returns a matrix where rows (and rownames) are enzymes and columns (and column names) are unordered samples
+read_metagenomics <- function(metadata, subset=TRUE) {
+  # subset=TRUE -- just read in the "Filtered_enzymes.txt" shortlist
   piphillin_dir <- "original_data/Piphillin_20190222"
-  piphillin_file <- "Filtered_enzymes.txt"
-  
-  # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt
-  data.piphillin <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
-                                         stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
-  enzymes <- data.piphillin[,1]
-  data.piphillin <- data.piphillin[,2:dim(data.piphillin)[2]]
-  data.piphillin <- apply(data.piphillin, c(1,2), as.numeric)
-  samples <- colnames(data.piphillin)
-  rownames(data.piphillin) <- enzymes
-  
+  if(subset) {
+    piphillin_file <- "Filtered_enzymes.txt"
+    # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt
+    whole_dataset <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
+                                           stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
+    samples <- colnames(whole_dataset)
+  } else {
+    # I chopped this up into 12 files for testing; loop through the 12
+    for(i in 1:12) {
+      cat("Reading part",i,"\n")
+      piphillin_file <- paste("enzymes_pt",i,".txt",sep="")
+      data.piphillin <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
+                                             stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
+      enzymes <- data.piphillin[,1]
+      data.piphillin <- data.piphillin[,2:dim(data.piphillin)[2]]
+      data.piphillin <- apply(data.piphillin, c(1,2), as.numeric)
+      rownames(data.piphillin) <- enzymes
+      if(is.null(whole_dataset)) {
+        whole_dataset <- data.piphillin
+      } else {
+        whole_dataset <- rbind(whole_dataset, data.piphillin)
+      }
+    }
+    # replace underscores in samples with dashes as in phyloseq object sample IDs
+    samples <- colnames(whole_dataset)
+    samples <- gsub("_", "-", samples)
+    colnames(whole_dataset) <- samples
+  }
   # first, exclude samples not present in *both* data sets
   samples.orig <- metadata$sample_id
   samples.both <- intersect(samples, samples.orig)
   
-  subset.metadata <- metadata[metadata$sample_id %in% samples.both,]
-  subset.data.piphillin <- data.piphillin[,samples.both]
-  
+  subset.metadata <- metadata[metadata$sample_id %in% samples.both,]$sample_id
+  subset.dataset <- whole_dataset[,samples.both]
+  return(subset.dataset)
+}
+
+# returns a matrix where rows (and rownames) are enzymes and columns (and column names) are
+# samples ordered by collection date (but not sub-ordered by anything)
+intersect_order_metagenomics_samples <- function(data.piphillin) {
   sid_collection_date <- metadata[metadata$sample_id %in% samples, c("sample_id", "collection_date")]
   sid_ordered <- sid_collection_date[order(sid_collection_date$collection_date),c("sample_id", "collection_date")]
-  
-  ordered.data.piphillin <- subset.data.piphillin[,sid_ordered$sample_id]
+  ordered.data.piphillin <- data.piphillin[,sid_ordered$sample_id]
   return(ordered.data.piphillin)
 }
 
@@ -363,6 +383,7 @@ subset_metagenomics_sname <- function(metagenomics_data, sname, metadata) {
 
 # converts and metagnomics matrix to a tidy array of proportions (for input into a timecourse plot)
 metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
+  enzymes <- rownames(metagenomics_data)
   idx.subset <- sname_subset_idx(metadata, sname)
   data.prop <- prop.table(metagenomics_data, 2) # column(sample)-wise proportion
   df.prop <- gather_array(data.prop, "proportion", "enzyme", "sample")
@@ -370,7 +391,10 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
   # a stub as below
   # replace each sample ID with its collection date for readability, sanity checking!
   for(i in 1:dim(df.prop)[1]) {
-    # df.prop$enzyme[i] <- enzymes[i]
+    # these are uninterpretable if there are a ton of them, so add an average proportion so
+    # we can identify the highly expressed guys!
+    enz_id <- as.numeric(df.prop$enzyme[i])
+    df.prop$enzyme[i] <- enzymes[enz_id]
     sample_placeholder <- as.numeric(df.prop$sample[i])
     sample_label <- colnames(data.prop)[sample_placeholder]
     sample_date <- idx.subset[sample_label]$collection_date
@@ -387,6 +411,7 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
 # expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}}
 plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", gapped=FALSE, legend=FALSE) {
   na.string <- ".N/A"
+  # basically no way to make this legend legible, so haven't tested that
 
   # make sure the dates are in order (redundant, but)
   df2 <- metagenomics_prop[order(metagenomics_prop$sample),]
@@ -417,6 +442,7 @@ plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metag
   } else {
     img_width <- 10
   }
+  img_height <- 4
   p <- ggplot(df2, aes(x=sample, y=proportion, fill=enzyme)) + 
     geom_bar(position="fill", stat="identity") +
     scale_fill_manual(values=coul) +
@@ -427,7 +453,7 @@ plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metag
   } else {
     p <- p + theme(legend.position="none")
   }
-  ggsave(paste("plots/", save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
+  ggsave(paste("plots/", save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=img_height, units="in")
 }
 
 # ====================================================================================================================
