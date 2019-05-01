@@ -45,8 +45,10 @@ period <- 10
 omega <- 2*pi*1/period
 
 F <- matrix(c(1, 0), 1, 2)
-G <- build_G(omega)
 W.t <- diag(2)*state_noise_scale
+G <- build_G(omega)
+#G <- diag(2)*0.95
+#G <- diag(2)
 upsilon <- 100
 
 # two taxa - very simple example
@@ -98,7 +100,6 @@ if(TRUE) {
   omega <- 2*pi*1/period
   
   F <- matrix(c(1, 0), 1, 2)
-  G <- matrix(c(cos(omega), -sin(omega), sin(omega), cos(omega)), 2, 2)
   W.t <- diag(2)*state_noise_scale
   upsilon <- 100
   
@@ -117,7 +118,7 @@ if(TRUE) {
   
   theta.t <- rmatrixnormal(1, M.0, C.0, Sigma)[,,1]
 
-  T <- 30
+  T <- 100
   ys <- matrix(0, T, D)
   for(t in 1:T) {
     # state equation
@@ -135,40 +136,6 @@ if(TRUE) {
   plot_lr(ys, filename="big_1.png")
   
   plot_prop(ys, filename="big_2.png")
-}
-
-stack_G_old <- function(G, it_begin, it_end, descending=TRUE, transpose=FALSE) {
-  obj <- G
-  if(transpose) {
-    obj <- t(G)
-  }
-  if(it_begin != it_end) {
-    if(descending) {
-      if(it_begin > it_end) {
-        ret_val <- obj
-        for(i in 1:(it_begin-it_end)) {
-          ret_val <- ret_val%*%obj
-        }
-      } else {
-        # invalid case
-        ret_val <- matrix(0, 2, 2)
-      }
-    } else {
-      if(it_begin < it_end) {
-        ret_val <- obj
-        for(i in 1:(it_end-it_begin)) {
-          ret_val <- ret_val%*%obj
-        }
-      } else {
-        # invalid case
-        ret_val <- matrix(0, 2, 2)
-      }
-    }
-  } else {
-    ret_val <- obj
-  }
-  #ret_val <- Re(e_vec%*%e_val%*%t(e_vec))
-  return(ret_val)
 }
 
 stack_G <- function(G, it_begin, it_end, descending=TRUE, transpose=FALSE) {
@@ -213,6 +180,7 @@ k_per <- function(x, xp) {
 
 # calculate A (covariance matrix over states) for this simulation
 # this is the expression exactly as in the manuscript, calculated from Cov(eta_t, eta_{t-k})
+sum_on_diag <- c()
 A <- matrix(0, T, T)
 for(i in 1:T) {
   for(j in 1:T) {
@@ -222,11 +190,15 @@ for(i in 1:T) {
       first_sum <- matrix(0, 2, 2)
       if(t >= 2) {
         for(ell in t:2) {
-          G_left <- stack_G(G, t, 2)
+          G_left <- stack_G(G, t, ell)
           G_right <- stack_G(G, ell, t, descending=FALSE, transpose=TRUE)
-          first_sum <- first_sum + G_left%*%W.t%*%G_right
+          addend <- G_left%*%W.t%*%G_right
+          cat("Addend for diag (",i,"): ",(F%*%addend%*%t(F)),"\n",sep="")
+          first_sum <- first_sum + addend
         }
       }
+      cat("Sum for DIAG (",i,"): ",(F%*%first_sum%*%t(F)),"\n",sep="")
+      sum_on_diag <- c(sum_on_diag, (F%*%first_sum%*%t(F)))
       # second sum
       G_left <- stack_G(G, t, 1)
       G_right <- stack_G(G, 1, t, descending=FALSE, transpose=TRUE)
@@ -246,6 +218,7 @@ for(i in 1:T) {
         G_right <- stack_G(G, ell, tk, descending=FALSE, transpose=TRUE)
         first_sum <- first_sum + G_left%*%W.t%*%G_right
       }
+      #cat("Sum for OFF-DIAG (",i,",",j,"): ",(F%*%first_sum%*%t(F)),"\n",sep="")
       G_left <- stack_G(G, t, 1)
       G_right <- stack_G(G, 1, tk, descending=FALSE, transpose=TRUE)
       second_sum <- G_left%*%C.0%*%G_right
@@ -254,23 +227,28 @@ for(i in 1:T) {
     }
   }
 }
+plot(sum_on_diag, type="l")
 
 df <- data.frame(x=seq(1,T), y=A[1,], time="t1")
-df <- rbind(df, data.frame(x=seq(1,T), y=A[3,], time="t3"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[5,], time="t5"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[7,], time="t7"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[10,], time="t10"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[12,], time="t12"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[15,], time="t15"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[17,], time="t17"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[20,], time="t20"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[25,], time="t25"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[30,], time="t30")) # what's going on with this time point
+df <- rbind(df, data.frame(x=seq(1,T), y=A[10,], time="t3"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[20,], time="t5"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[30,], time="t7"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[40,], time="t10"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[50,], time="t12"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[60,], time="t15"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[70,], time="t17"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[80,], time="t20"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[90,], time="t25"))
+df <- rbind(df, data.frame(x=seq(1,T), y=A[100,], time="t30")) # what's going on with this time point
 p <- ggplot(df, aes(x=x, y=y, color=time)) +
   geom_line() + 
   theme_minimal()
 p
-ggsave(paste("covariance_entries_DLM.png", sep=""), width=6, height=4, units="in", scale=1.5)
+ggsave(paste("plots/covariance_entries_DLM.png", sep=""), width=6, height=4, units="in", scale=1.5)
+png("plots/A_t100.png")
+image(A)
+dev.off()
+
 eigen(A)$values
 
 # check for diagnonal dominance - HELL NO!
