@@ -37,10 +37,20 @@ for(indiv in individuals) {
   # plot gapped metagenomics timecourse
   cat("Subsetting metagenomics data for",indiv,"\n")
   subset.piphillin <- subset_metagenomics_sname(data.piphillin, indiv, metadata.metagenomics)
-  # this step takes a while (~1-2 min.) with the full enzyme list
-  cat("Getting proportions from metagenomics data for",indiv,"\n")
-  prop.piphillin <- metagenomics_proportions_tidy(subset.piphillin, indiv, metadata.metagenomics)
-  cat("Plotting metagenomics data for",indiv,"\n")
-  plot_timecourse_metagenomics(prop.piphillin, save_filename=paste(indiv, "_metagenomics_timecourse", sep=""), gapped=F, legend=F)
-  plot_timecourse_metagenomics(prop.piphillin, save_filename=paste(indiv, "_metagenomics_timecourse_gapped", sep=""), gapped=T, legend=F)
+  
+  # find the large-proportion enzymes
+  subset.prop <- prop.table(subset.piphillin, 2)
+  subset.mean <- rowMeans(subset.prop)
+  temp <- subset.mean[order(subset.mean)]
+  cat("Top 10 (proportional) ",indiv,":\n",sep="")
+  cat(names(temp[(length(temp)-10):length(temp)]),sep="\n")
+  
+  if(FALSE) {
+    # this step takes a while (~5 min.) with the full enzyme list
+    cat("Getting proportions from metagenomics data for",indiv,"\n")
+    prop.piphillin <- metagenomics_proportions_tidy(subset.piphillin, indiv, metadata.metagenomics)
+    cat("Plotting metagenomics timecourse data for",indiv,"\n")
+    plot_timecourse_metagenomics(prop.piphillin, save_filename=paste(indiv, "_metagenomics_timecourse", sep=""), gapped=F, legend=F)
+    plot_timecourse_metagenomics(prop.piphillin, save_filename=paste(indiv, "_metagenomics_timecourse_gapped", sep=""), gapped=T, legend=F)
+  }
 }

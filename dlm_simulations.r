@@ -37,22 +37,20 @@ plot_prop <- function(ys, filename) {
   ggsave(filename, scale=1.5, height=2, width=4)
 }
 
-state_noise_scale <- 0.1
-gamma.t <- 1
-observational_noise_scale <- state_noise_scale*gamma.t
-
-period <- 10
-omega <- 2*pi*1/period
-
-F <- matrix(c(1, 0), 1, 2)
-W.t <- diag(2)*state_noise_scale
-G <- build_G(omega)
-#G <- diag(2)*0.95
-#G <- diag(2)
-upsilon <- 100
-
 # two taxa - very simple example
 if(FALSE) {
+  state_noise_scale <- 0.1
+  gamma.t <- 1
+  observational_noise_scale <- state_noise_scale*gamma.t
+  
+  period <- 10
+  omega <- 2*pi*1/period
+  
+  F <- matrix(c(1, 0), 1, 2)
+  W.t <- diag(2)*state_noise_scale
+  G <- build_G(omega)
+  upsilon <- 100
+  
   noise_flags <- matrix(FALSE, 4, 2)
   noise_flags[2,1] <- TRUE # use state transition noise
   noise_flags[3,2] <- TRUE # use observational noise
@@ -87,8 +85,11 @@ if(FALSE) {
   }
 }
 
-# five taxa, longer simulation
+# five taxa, long simulation
 if(TRUE) {
+  indep_taxa <- TRUE
+  uniform_start <- FALSE
+  
   state_noise <- TRUE
   observational_noise <- TRUE
   
@@ -101,24 +102,41 @@ if(TRUE) {
   
   F <- matrix(c(1, 0), 1, 2)
   W.t <- diag(2)*state_noise_scale
+  G <- build_G(omega)
   upsilon <- 100
   
   D <- 5
   
-  Xi <- diag(D)*observational_noise_scale*(upsilon-D-1)
+  if(indep_taxa) {
+    # fully independent taxa
+    Xi <- diag(D)*observational_noise_scale*(upsilon-D-1)
+    tag <- "indeptax_"
+  } else {
+    # correlated/anti-correlated taxa
+    Xi <- diag(D)
+    Xi[1,2] <- 0.5
+    Xi[2,1] <- Xi[1,2]
+    Xi[3,4] <- -0.5
+    Xi[4,3] <- Xi[3,4]
+    Xi <- Xi*observational_noise_scale*(upsilon-D-1)
+    tag <- "nonindeptax_"
+  }
   Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
   Sigma.true <- Sigma
   
   # very similar initial states; everybody is pretty much in phase here
-  M.0 <- matrix(1, 2, D)
+  if(uniform_start) {
+    M.0 <- matrix(1, 2, D)
+    tag <- paste0(tag, "unifinit")
+  } else {
+    M.0 <- matrix(rnorm(10, 1, 1), 2, D)
+    tag <- paste0(tag, "nonunifinit")
+  }
   C.0 <- W.t
-  
-  # different initial states (random)
-  #C.0 <- W.t*100
   
   theta.t <- rmatrixnormal(1, M.0, C.0, Sigma)[,,1]
 
-  T <- 100
+  T <- 40
   ys <- matrix(0, T, D)
   for(t in 1:T) {
     # state equation
@@ -133,11 +151,12 @@ if(TRUE) {
     }
   }
   
-  plot_lr(ys, filename="big_1.png")
+  plot_lr(ys, filename=paste0("plots/DLMsim_logratios_",tag,".png"))
   
-  plot_prop(ys, filename="big_2.png")
+  plot_prop(ys, filename=paste0("plots/DLM_simulated_proportions_",tag,".png"))
 }
 
+# powers G through eigenvalue decomposition
 stack_G <- function(G, it_begin, it_end, descending=TRUE, transpose=FALSE) {
   obj <- G
   if(transpose) {
@@ -166,21 +185,14 @@ stack_G <- function(G, it_begin, it_end, descending=TRUE, transpose=FALSE) {
       }
     }
   }
+  # explicitly only returning the real part of A
+  # some tiny complex eigenvalues can be produced -- cool to truncate in this way?
   ret_val <- Re(e_vec%*%e_val%*%solve(e_vec))
   return(ret_val)
 }
 
-k_per <- function(x, xp) {
-  sigma.sq <- 1
-  ell.sq <- 1
-  period <- 10
-  euclid_dist <- dist(rbind(x, xp))
-  return(sigma.sq * exp(-(2*sin(pi * euclid_dist / period)**2)/ell.sq))
-}
-
 # calculate A (covariance matrix over states) for this simulation
 # this is the expression exactly as in the manuscript, calculated from Cov(eta_t, eta_{t-k})
-sum_on_diag <- c()
 A <- matrix(0, T, T)
 for(i in 1:T) {
   for(j in 1:T) {
@@ -193,12 +205,9 @@ for(i in 1:T) {
           G_left <- stack_G(G, t, ell)
           G_right <- stack_G(G, ell, t, descending=FALSE, transpose=TRUE)
           addend <- G_left%*%W.t%*%G_right
-          cat("Addend for diag (",i,"): ",(F%*%addend%*%t(F)),"\n",sep="")
           first_sum <- first_sum + addend
         }
       }
-      cat("Sum for DIAG (",i,"): ",(F%*%first_sum%*%t(F)),"\n",sep="")
-      sum_on_diag <- c(sum_on_diag, (F%*%first_sum%*%t(F)))
       # second sum
       G_left <- stack_G(G, t, 1)
       G_right <- stack_G(G, 1, t, descending=FALSE, transpose=TRUE)
@@ -218,7 +227,6 @@ for(i in 1:T) {
         G_right <- stack_G(G, ell, tk, descending=FALSE, transpose=TRUE)
         first_sum <- first_sum + G_left%*%W.t%*%G_right
       }
-      #cat("Sum for OFF-DIAG (",i,",",j,"): ",(F%*%first_sum%*%t(F)),"\n",sep="")
       G_left <- stack_G(G, t, 1)
       G_right <- stack_G(G, 1, tk, descending=FALSE, transpose=TRUE)
       second_sum <- G_left%*%C.0%*%G_right
@@ -227,78 +235,39 @@ for(i in 1:T) {
     }
   }
 }
-plot(sum_on_diag, type="l")
 
-df <- data.frame(x=seq(1,T), y=A[1,], time="t1")
-df <- rbind(df, data.frame(x=seq(1,T), y=A[10,], time="t3"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[20,], time="t5"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[30,], time="t7"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[40,], time="t10"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[50,], time="t12"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[60,], time="t15"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[70,], time="t17"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[80,], time="t20"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[90,], time="t25"))
-df <- rbind(df, data.frame(x=seq(1,T), y=A[100,], time="t30")) # what's going on with this time point
-p <- ggplot(df, aes(x=x, y=y, color=time)) +
-  geom_line() + 
-  theme_minimal()
-p
-ggsave(paste("plots/covariance_entries_DLM.png", sep=""), width=6, height=4, units="in", scale=1.5)
-png("plots/A_t100.png")
+png("plots/DLM_simulated_A.png")
 image(A)
 dev.off()
 
 eigen(A)$values
 
-# check for diagnonal dominance - HELL NO!
-for(i in 1:T) {
-  diag <- abs(A[i,i])
-  off_diag <- 0
-  for(j in 1:T) {
-    if(j != i) {
-      off_diag <- off_diag + abs(A[i,j])
-    }
-  }
-  cat("Diag:",diag,", off-diag:",off_diag,"\n")
+use_perfect_priors <- TRUE
+if(use_perfect_priors){
+  upsilon.t <- upsilon
+  Xi.t <- Xi
+  M.t <- M.0
+  C.t <- W.t
+} else {
+  # need a good way of setting these priors
+  upsilon.t <- D+2
+  empirical_cov <- t(ys)%*%ys/T
+  Xi.t <- empirical_cov*(upsilon.t-D-1) # center loosely at empirical covariance
+  M.t <- M.0
+  C.t <- diag(2)*mean(diag(empirical_cov))
 }
-
-dd_fail <- 0
-# check diagonal dominance
-for(i in 1:T) {
-  off_diag <- sum(A[i,]) - A[i,i]
-  if(off_diag > A[i,i]) {
-    dd_fail <- dd_fail + 1
-  }
-}
-cat("Diagonal fails to dominate for:",dd_fail,"\n")
-
-# periodic kernel
-A2 <- matrix(0, T, T)
-for(i in 1:T) {
-  for(j in 1:T) {
-    A2[i,j] <- k_per(ys[i,], ys[j,])
-  }
-}
-image(A2)
-eigen(A2)$values
-is.positive.semidefinite(A2)
-
-# Kalman filter for Sigma
-# empirical covariance
-Xi.t <- t(ys)%*%ys/T
-upsilon.t <- D + 2
-
-# THIS APPEARS TO BE WRONG, CHECK IT!
-M.tm1 <- M.0
-C.tm1 <- C.0
+Thetas.t <- array(0, dim=c(2, D, T)) # sample at each t
+Cs.t <- array(0, dim=c(2, 2, T))
+Ms.t <- array(0, dim=c(2, D, T))
+Rs.t <- array(0, dim=c(2, 2, T))
 for(t in 1:T) {
+  cat(sum(diag(C.t)),"\n")
   # note: F.t.T is F for us here and G.t is G
   # prior at t
-  A.t <- G%*%M.tm1
-  R.t <- G%*%C.tm1%*%t(G) + W.t
-  Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
-  theta.t <- rmatrixnormal(1, A.t, R.t, Sigma)[,,1]
+  A.t <- G%*%M.t
+  As.t[,,t] <- A.t
+  R.t <- G%*%C.t%*%t(G) + W.t
+  Rs.t[,,t] <- R.t
   # one-step ahead forecast at t
   f.t.T <- F%*%A.t
   q.t <- gamma.t + (F%*%R.t%*%t(F))[1,1]
@@ -306,16 +275,65 @@ for(t in 1:T) {
   e.t.T <- ys[t,] - f.t.T
   S.t <- R.t%*%t(F)/q.t
   M.t <- A.t + S.t%*%e.t.T
+  Ms.t[,,t] <- M.t
   C.t <- R.t - q.t*S.t%*%t(S.t)
+  Cs.t[,,t] <- C.t
   upsilon.t <- upsilon.t + 1
   Xi.t <- Xi.t + t(e.t.T)%*%e.t.T/q.t
+  Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
+  Thetas.t[,,t] <- rmatrixnormal(1, M.t, C.t, Sigma.t)[,,1]
 }
-Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
+
+cat("Trace true Sigma:",sum(diag(Sigma.true)),"\n")
+png(paste0("plots/DLMsim_true_Sigma_",tag,".png"), width=500, height=500)
 image(Sigma.true)
-image(Sigma.t)
+dev.off()
 
+mean.Sigma.t <- Xi.t/(upsilon.t - D - 1)
+cat("Trace inferred Sigma:",sum(diag(mean.Sigma.t)),"\n")
+png(paste0("plots/DLMsim_mean_Sigma_",tag,".png"), width=500, height=500)
+image(mean.Sigma.t)
+dev.off()
 
+# in the simulation smoothing, there is a systematic squashing of M.t -- WHY?
 
+# simulation smoother
+Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
+Thetas.t.smoothed <- array(0, dim=c(2, D, T))
+Thetas.t.smoothed[,,T] <- rmatrixnormal(1, Ms.t[,,T], Cs.t[,,T], Sigma)[,,1]
+for(t in (T-1):1) {
+  Z.t <- Cs.t[,,t]%*%t(G)%*%solve(Rs.t[,,(t+1)])
+  M.t.star <- Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - G%*%Ms.t[,,t])
+  #M.t.star <- Ms.t[,,(t+1)] # this pretty much perfectly rescues, why?
+  C.t.star <- round(Cs.t[,,t] - Z.t%*%Rs.t[,,(t+1)]%*%t(Z.t), 10)
+  Thetas.t.smoothed[,,(t+1)] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
+}
+
+# evaluate the fitted thetas as a sanity check
+df.true <- gather_array(ys, "logratio", "timepoint", "taxon")
+df.true <- cbind(df.true, which="true")
+
+filtered.observations <- matrix(0, T, D)
+smoothed.observations <- matrix(0, T, D)
+for(t in 1:T) {
+  filtered.observations[t,] <- F%*%Thetas.t[,,t]
+  smoothed.observations[t,] <- F%*%Thetas.t.smoothed[,,t]
+}
+df.filtered <- gather_array(filtered.observations, "logratio", "timepoint", "taxon")
+df.filtered <- cbind(df.filtered, which="filtered")
+df.smoothed <- gather_array(smoothed.observations, "logratio", "timepoint", "taxon")
+df.smoothed <- cbind(df.smoothed, which="smoothed")
+
+df.all <- rbind(df.true, df.filtered, df.smoothed)
+
+p <- ggplot(data=df.all, aes(x=timepoint, y=logratio, color=which, group=which)) + 
+  geom_line() +
+  facet_wrap(~taxon) +
+  theme_minimal()
+p
+#ggsave(paste0("plots/DLMsim_theta_fits_",tag,".png"), plot=p, scale=1.5, width=8, height=5)
+
+# simulation smoother
 
 
 
