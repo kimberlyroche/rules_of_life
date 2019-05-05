@@ -110,34 +110,19 @@ read_metadata <- function(data, write_sample=FALSE) {
 }
 
 load_glommed_data <- function(level="species", replicates=TRUE) {
-  if(level == "species") {
-    if(replicates) {
-      if(file.exists("original_data/glom_data_species_reps.RData")) {
-        load("original_data/glom_data_species_reps.RData")
-      } else {
-        stop("Agglomerated data file foe species (+replicates) does not exist.")
-      }
+  if(replicates) {
+    filename <- paste0("original_data/glom_data_",level,"_reps.RData")
+    if(file.exists(filename)) {
+      load(filename)
     } else {
-      if(file.exists("original_data/glom_data_species.RData")) {
-        load("original_data/glom_data_species.RData")
-      } else {
-        stop("Agglomerated data file foe species (-replicates) does not exist.")
-      }
+      stop(paste0("Agglomerated data file for ",level," (+replicates) does not exist."))
     }
-  }
-  if(level == "genus") {
-    if(replicates) {
-      if(file.exists("original_data/glom_data_genus_reps.RData")) {
-        load("original_data/glom_data_genus_reps.RData")
-      } else {
-        stop("Agglomerated data file foe genus (+replicates) does not exist.")
-      }
+  } else {
+    filename <- paste0("original_data/glom_data_",level,".RData")
+    if(file.exists(filename)) {
+      load(filename)
     } else {
-      if(file.exists("original_data/glom_data_genus.RData")) {
-        load("original_data/glom_data_genus.RData")
-      } else {
-        stop("Agglomerated data file foe genus (-replicates) does not exist.")
-      }
+      stop(paste0("Agglomerated data file for ",level," (-replicates) does not exist."))
     }
   }
   return(glom_data)
@@ -179,13 +164,14 @@ filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=F
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
   retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=T))@.Data)
-  collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
-  collapse_indices <- which(collapse_indices)
-  merged_data <- merge_taxa(data, collapse_indices, 1)
+  #collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
+  counts <- otu_table(data)@.Data
+  collapse_indices <- apply(counts, 2, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) < sample_threshold)
+  collapse_taxnames <- names(collapse_indices[which(collapse_indices == TRUE)])
+  merged_data <- merge_taxa(data, collapse_taxnames, 1)
   if(verbose) {
-    cat("Collapsing",length(collapse_indices),"taxa of",ntaxa(data),"\n")
-    cat("\tOther category collapsed into:",as.vector(tax_table(data)[collapse_indices[1]]),sep=" ","\n")
-    cat("\tOther sequence variant:",rownames(tax_table(data))[collapse_indices[1]],sep=" ","\n")
+    cat("Collapsing",length(collapse_taxnames),"taxa of",ntaxa(data),"\n")
+    cat("\tOther category collapsed into:",collapse_taxnames[1],sep=" ","\n")
     cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
     cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
   }

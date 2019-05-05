@@ -153,7 +153,7 @@ if(TRUE) {
   
   plot_lr(ys, filename=paste0("plots/DLMsim_logratios_",tag,".png"))
   
-  plot_prop(ys, filename=paste0("plots/DLM_simulated_proportions_",tag,".png"))
+  plot_prop(ys, filename=paste0("plots/DLMsim_proportions_",tag,".png"))
 }
 
 # powers G through eigenvalue decomposition
@@ -236,13 +236,13 @@ for(i in 1:T) {
   }
 }
 
-png("plots/DLM_simulated_A.png")
+png("plots/DLMsim_Amat.png")
 image(A)
 dev.off()
 
 eigen(A)$values
 
-use_perfect_priors <- TRUE
+use_perfect_priors <- FALSE
 if(use_perfect_priors){
   upsilon.t <- upsilon
   Xi.t <- Xi
@@ -261,11 +261,9 @@ Cs.t <- array(0, dim=c(2, 2, T))
 Ms.t <- array(0, dim=c(2, D, T))
 Rs.t <- array(0, dim=c(2, 2, T))
 for(t in 1:T) {
-  cat(sum(diag(C.t)),"\n")
   # note: F.t.T is F for us here and G.t is G
   # prior at t
   A.t <- G%*%M.t
-  As.t[,,t] <- A.t
   R.t <- G%*%C.t%*%t(G) + W.t
   Rs.t[,,t] <- R.t
   # one-step ahead forecast at t
@@ -295,8 +293,6 @@ png(paste0("plots/DLMsim_mean_Sigma_",tag,".png"), width=500, height=500)
 image(mean.Sigma.t)
 dev.off()
 
-# in the simulation smoothing, there is a systematic squashing of M.t -- WHY?
-
 # simulation smoother
 Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
 Thetas.t.smoothed <- array(0, dim=c(2, D, T))
@@ -304,9 +300,8 @@ Thetas.t.smoothed[,,T] <- rmatrixnormal(1, Ms.t[,,T], Cs.t[,,T], Sigma)[,,1]
 for(t in (T-1):1) {
   Z.t <- Cs.t[,,t]%*%t(G)%*%solve(Rs.t[,,(t+1)])
   M.t.star <- Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - G%*%Ms.t[,,t])
-  #M.t.star <- Ms.t[,,(t+1)] # this pretty much perfectly rescues, why?
   C.t.star <- round(Cs.t[,,t] - Z.t%*%Rs.t[,,(t+1)]%*%t(Z.t), 10)
-  Thetas.t.smoothed[,,(t+1)] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
+  Thetas.t.smoothed[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
 }
 
 # evaluate the fitted thetas as a sanity check
@@ -331,9 +326,7 @@ p <- ggplot(data=df.all, aes(x=timepoint, y=logratio, color=which, group=which))
   facet_wrap(~taxon) +
   theme_minimal()
 p
-#ggsave(paste0("plots/DLMsim_theta_fits_",tag,".png"), plot=p, scale=1.5, width=8, height=5)
-
-# simulation smoother
+ggsave(paste0("plots/DLMsim_theta_fits_",tag,".png"), plot=p, scale=1.5, width=8, height=5)
 
 
 
