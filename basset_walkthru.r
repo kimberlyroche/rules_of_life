@@ -157,7 +157,7 @@ if(FALSE) {
 #Gamma <- function(X) PER(X, period=365) # periodic only
 Gamma <- function(X) SE(X) # squared exponential only
 for(indiv in c("DUI", "LEB")) {
-  fit.obj <- fit_to_baboon(Gamma, "DUI", "2001-10-01", "2002-11-30") # wet season through a dry season
+  fit.obj <- fit_to_baboon(Gamma, indiv, "2001-10-01", "2002-11-30") # wet season through a dry season
   predict.obj <- get_predictions(fit.obj$X, fit.obj$fit)
   plot_fit(fit.obj$Y, fit.obj$X, fit.obj$labels, predict.obj$Y, predict.obj$X, paste0("basset_SE_",indiv))
 }

@@ -1234,3 +1234,414 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
     cat("\n")
   }
 }
+
+# ====================================================================================================================
+# DYNAMIC LINEAR MODELS
+# ====================================================================================================================
+
+# quick plot function for log ratios (x=time)
+plot_lr <- function(ys, filename=NULL) {
+  df <- gather_array(ys, "value", "time", "component")
+  df$component <- as.factor(df$component)
+  
+  p <- ggplot(df, aes(x=time, y=value, group=component)) +
+    geom_line(aes(color=component)) +
+    theme_minimal() +
+    theme(legend.position="none")
+  if(!is.null(filename)) {
+    ggsave(filename, scale=1.5, height=2, width=4)
+  } else {
+    show(p)
+  }
+}
+
+# quick plot function for proportions (x=time)
+plot_prop <- function(ys, filename=NULL) {
+  # visualize as proportions
+  proportions <- clrInv(ys)
+  df <- gather_array(proportions, "value", "time", "component")
+  df$component <- factor(df$component)
+  
+  categories <- unique(df$component)
+  coul = brewer.pal(4, "Spectral")
+  coul = colorRampPalette(coul)(length(unique(df$component)))
+  p <- ggplot(df, aes(x=time, y=value, fill=component)) + 
+    geom_bar(position="fill", stat="identity") +
+    scale_fill_manual(values=coul) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    theme(legend.position="none")
+  if(!is.null(filename)) {
+    ggsave(filename, scale=1.5, height=2, width=4)
+  } else {
+    show(p)
+  }
+}
+
+# quick plot function for true thetas, filtered thetas, and smoothed thetas - sanity check
+# data_obj is the output of five_taxa_simuation()
+# fit_obj.f is the output of fit_filter()
+# fit_obj.s is the output of fit_smoother()
+plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, filename=NULL) {
+  T <- nrow(data_obj$ys)
+  D <- ncol(data_obj$ys)
+  
+  df.true <- gather_array(data_obj$ys, "logratio", "timepoint", "taxon")
+  df.true <- cbind(df.true, which="true")
+  
+  filtered.observations <- matrix(0, T, D)
+  smoothed.observations <- matrix(0, T, D)
+  for(t in 1:T) {
+    filtered.observations[t,] <- data_obj$F%*%fit_obj.f$Thetas.t[,,t]
+    if(!is.null(fit_obj.s)) {
+      smoothed.observations[t,] <- data_obj$F%*%fit_obj.s$Thetas.t[,,t]
+    }
+  }
+  df.filtered <- gather_array(filtered.observations, "logratio", "timepoint", "taxon")
+  df.filtered <- cbind(df.filtered, which="filtered")
+  if(!is.null(fit_obj.s)) {
+    df.smoothed <- gather_array(smoothed.observations, "logratio", "timepoint", "taxon")
+    df.smoothed <- cbind(df.smoothed, which="smoothed")
+    df.all <- rbind(df.true, df.filtered, df.smoothed)
+  } else {
+    df.all <- rbind(df.true, df.filtered)
+  }
+  
+  p <- ggplot(data=df.all, aes(x=timepoint, y=logratio, color=which, group=which)) + 
+    geom_line() + 
+    facet_wrap(~taxon) +
+    theme_minimal()
+  if(!is.null(filename)) {
+    ggsave(filename, plot=p, scale=1.5, width=8, height=5)
+  } else {
+    show(p)
+  }
+}
+
+# generate Fourier form rotation matrix for a given omega (a function of period)
+build_G <- function(period) {
+  omega <- 2*pi/period
+  return(matrix(c(cos(omega), -sin(omega), sin(omega), cos(omega)), 2, 2))
+}
+
+# 2-taxa simulation just for illustrative purposes
+two_taxa_simulation <- function(T=30) {
+  state_noise_scale <- 0.1
+  gamma.t <- 1
+  observational_noise_scale <- state_noise_scale*gamma.t
+  
+  period <- 10
+
+  F <- matrix(c(1, 0), 1, 2)
+  W.t <- diag(2)*state_noise_scale
+  G <- build_G(period)
+  upsilon <- 100
+  
+  # we'll do all combinations of noise and generate plots to see how the resultant log ratios
+  # and proportions look
+  noise_flags <- matrix(FALSE, 4, 2)
+  noise_flags[2,1] <- TRUE # use state transition noise
+  noise_flags[3,2] <- TRUE # use observational noise
+  noise_flags[4,] <- TRUE # use both types of noise
+  
+  D <- 2
+  
+  for(i in 1:dim(noise_flags)[1]) {
+    Xi <- diag(D)*observational_noise_scale*(upsilon-D-1)
+    Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
+    
+    theta.t <- rmatrixnormal(1, matrix(1, 2, D), W.t, Sigma)[,,1]
+
+    ys <- matrix(0, T, D)
+    for(t in 1:T) {
+      # state equation
+      theta.t <- G%*%theta.t
+      if(noise_flags[i,1]) {
+        theta.t = theta.t + rmatrixnormal(1, matrix(0, 2, D), W.t, Sigma)[,,1]
+      }
+      # observation equation
+      ys[t,] <- F%*%theta.t
+      if(noise_flags[i,2]) {
+        ys[t,] <- ys[t,] + rmvnorm(1, rep(0, D), gamma.t*Sigma)
+      }
+    }
+    
+    plot_lr(ys, filename=paste(i,"_1.png",sep=""))
+    plot_prop(ys, filename=paste(i,"_2.png",sep=""))
+  }
+}
+
+five_taxa_simulation <- function(T=40, indep_taxa=TRUE, uniform_start=TRUE, save_images=TRUE) {
+  state_noise_scale <- 0.05
+  gamma <- 1
+  observational_noise_scale <- state_noise_scale*gamma
+  
+  period <- 10
+
+  F <- matrix(c(1, 0), 1, 2)
+  W <- diag(2)*state_noise_scale
+  G <- build_G(period)
+  upsilon <- 100
+  
+  D <- 5
+  
+  if(indep_taxa) {
+    # fully independent taxa
+    Xi <- diag(D)*observational_noise_scale*(upsilon-D-1)
+    tag <- "indeptax_"
+  } else {
+    # correlated/anti-correlated taxa
+    Xi <- diag(D)
+    Xi[1,2] <- 0.5
+    Xi[2,1] <- Xi[1,2]
+    Xi[3,4] <- -0.5
+    Xi[4,3] <- Xi[3,4]
+    Xi <- Xi*observational_noise_scale*(upsilon-D-1)
+    tag <- "nonindeptax_"
+  }
+  Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
+  
+  # very similar initial states; everybody is pretty much in phase here
+  if(uniform_start) {
+    M.0 <- matrix(1, 2, D)
+    tag <- paste0(tag, "unifinit")
+  } else {
+    M.0 <- matrix(rnorm(10, 1, 1), 2, D)
+    tag <- paste0(tag, "nonunifinit")
+  }
+  C.0 <- W
+  
+  theta.t <- rmatrixnormal(1, M.0, C.0, Sigma)[,,1]
+  
+  ys <- matrix(0, T, D)
+  for(t in 1:T) {
+    # state equation
+    theta.t <- G%*%theta.t + rmatrixnormal(1, matrix(0, 2, D), W, Sigma)[,,1]
+    # observation equation
+    ys[t,] <- F%*%theta.t + rmvnorm(1, rep(0, D), gamma*Sigma)
+  }
+  
+  if(save_images) {
+    plot_lr(ys, filename=paste0("plots/DLMsim_logratios_",tag,".png"))
+    plot_prop(ys, filename=paste0("plots/DLMsim_proportions_",tag,".png"))
+  }
+  
+  return(list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=Sigma, M.0=M.0, C.0=C.0))
+}
+
+# powers G through eigenvalue decomposition
+stack_G <- function(G, it_begin, it_end, descending=TRUE, transpose=FALSE) {
+  obj <- G
+  if(transpose) {
+    obj <- t(G)
+  }
+  obj <- eigen(obj)
+  e_vec <- obj$vectors
+  e_val <- diag(2)
+  diag(e_val) <- obj$values
+  if(it_begin != it_end) {
+    if(descending) {
+      if(it_begin > it_end) {
+        power_it <- length(1:(it_begin-it_end+1))
+        e_val <- e_val**power_it
+      } else {
+        # invalid case
+        e_val <- matrix(0, 2, 2)
+      }
+    } else {
+      if(it_begin < it_end) {
+        power_it <- length(1:(it_end-it_begin+1))
+        e_val <- e_val**power_it
+      } else {
+        # invalid case
+        e_val <- matrix(0, 2, 2)
+      }
+    }
+  }
+  # explicitly only returning the real part of A
+  # some tiny complex eigenvalues can be produced -- cool to truncate in this way?
+  ret_val <- Re(e_vec%*%e_val%*%solve(e_vec))
+  return(ret_val)
+}
+
+build_A <- function(T, G, C.0, W, gamma, save_images=T) {
+  # calculate A (covariance matrix over states) for this simulation
+  # this is the expression exactly as in the manuscript, calculated from Cov(eta_t, eta_{t-k})
+  A <- matrix(0, T, T)
+  for(i in 1:T) {
+    for(j in 1:T) {
+      if(i == j) {
+        # diagonal
+        t <- j
+        first_sum <- matrix(0, 2, 2)
+        if(t >= 2) {
+          for(ell in t:2) {
+            G_left <- stack_G(G, t, ell)
+            G_right <- stack_G(G, ell, t, descending=FALSE, transpose=TRUE)
+            addend <- G_left%*%W%*%G_right
+            first_sum <- first_sum + addend
+          }
+        }
+        # second sum
+        G_left <- stack_G(G, t, 1)
+        G_right <- stack_G(G, 1, t, descending=FALSE, transpose=TRUE)
+        second_sum <- G_left%*%C.0%*%G_right
+        A[t,t] <- gamma + F%*%(W + first_sum + second_sum)%*%t(F)
+      } else {
+        tk <- i
+        t <- j
+        if(j < i) {
+          tk <- j
+          t <- i
+        }
+        # off-diagonal
+        first_sum <- matrix(0, 2, 2)
+        for(ell in tk:2) {
+          G_left <- stack_G(G, t, ell)
+          G_right <- stack_G(G, ell, tk, descending=FALSE, transpose=TRUE)
+          first_sum <- first_sum + G_left%*%W%*%G_right
+        }
+        G_left <- stack_G(G, t, 1)
+        G_right <- stack_G(G, 1, tk, descending=FALSE, transpose=TRUE)
+        second_sum <- G_left%*%C.0%*%G_right
+        G_left <- stack_G(G, t, tk+1)
+        A[i,j] <- F%*%(G_left%*%W + first_sum + second_sum)%*%t(F)
+      }
+    }
+  }
+  
+  if(save_images) {
+    png("plots/DLMsim_Amat.png")
+    image(A)
+    dev.off()
+  }
+  
+  if(min(eigen(A)$values) < 0) {
+    cat("Matrix A has negative eigenvalue(s)!\n")
+  }
+}
+
+# Kalman filter
+# data_obj is a list containing ys, F, W, G, upsilon, Xi, gamma, Sigma, M.0, C.0
+# observation_vec (if present) indicates the spacing of observations, e.g. c(1, 3, 4, 7)
+#   indicates observations 2, 5, & 6 are missing and should be imputed in the usual way
+fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL) {
+  D <- ncol(data_obj$ys)
+  Theta.dim <- ncol(data_obj$G)
+  if(!is.null(observation_vec)) {
+    T <- max(observation_vec)
+  } else {
+    T <- nrow(data_obj$ys)
+  }
+  if(is.null(censor_vec)) {
+    censor_vec <- rep(0, T)
+  }
+  upsilon.t <- data_obj$upsilon
+  Xi.t <- data_obj$Xi
+  M.t <- data_obj$M.0
+  C.t <- data_obj$C.0
+  Thetas.t <- array(0, dim=c(Theta.dim, D, T)) # sample at each t
+  Cs.t <- array(0, dim=c(Theta.dim, Theta.dim, T))
+  Ms.t <- array(0, dim=c(Theta.dim, D, T))
+  Rs.t <- array(0, dim=c(Theta.dim, Theta.dim, T))
+  for(t in 1:T) {
+    if(censor_vec[t] == 1 || (!is.null(observation_vec) && !(t %in% observation_vec))) {
+      # NEED TO THINK ABOUT CENSORING AND GAPPING AT THE SAME TIME (NO?)
+      #cat("Imputing t =",t,"\n")
+      R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      Rs.t[,,t] <- R.t
+      M.t <- data_obj$G%*%M.t
+      Ms.t[,,t] <- M.t
+      C.t <- R.t
+      C.t <- round(C.t, 10) # not symmetric (precision) warnings; JFC
+      Cs.t[,,t] <- C.t
+      # no change to Sigma.t -- correct?
+      Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
+      Thetas.t[,,t] <- rmatrixnormal(1, M.t, C.t, Sigma.t)[,,1]
+    } else {
+      # note: F.t.T is F for us here and G.t is G
+      # prior at t
+      A.t <- data_obj$G%*%M.t
+      R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      Rs.t[,,t] <- R.t
+      # one-step ahead forecast at t
+      f.t.T <- data_obj$F%*%A.t
+      q.t <- data_obj$gamma + (data_obj$F%*%R.t%*%t(data_obj$F))[1,1]
+      # posterior at t
+      if(is.null(observation_vec)) {
+        e.t.T <- data_obj$ys[t,] - f.t.T
+      } else {
+        e.t.T <- data_obj$ys[as(which(observation_vec == t), "numeric"),] - f.t.T
+      }
+      S.t <- R.t%*%t(data_obj$F)/q.t
+      M.t <- A.t + S.t%*%e.t.T
+      Ms.t[,,t] <- M.t
+      C.t <- R.t - q.t*S.t%*%t(S.t)
+      C.t <- round(C.t, 10)
+      Cs.t[,,t] <- C.t
+      upsilon.t <- upsilon.t + 1
+      Xi.t <- Xi.t + t(e.t.T)%*%e.t.T/q.t
+      Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
+      Thetas.t[,,t] <- rmatrixnormal(1, M.t, C.t, Sigma.t)[,,1]
+    }
+  }
+  return(list(Thetas.t=Thetas.t, upsilon=upsilon.t, Xi=Xi.t, Ms.t=Ms.t, Cs.t=Cs.t, Rs.t=Rs.t))
+}
+
+# simulation smoother
+# fit_obj is the output of fit_filter()
+fit_smoother <- function(data_obj, fit_obj, censor_vec=NULL, observation_vec=NULL) {
+  T <- nrow(data_obj$ys)
+  D <- ncol(data_obj$ys)
+  Theta.dim <- ncol(data_obj$G)
+  if(!is.null(observation_vec)) {
+    T <- max(observation_vec)
+  } else {
+    T <- nrow(data_obj$ys)
+  }
+  if(is.null(censor_vec)) {
+    censor_vec <- rep(0, T)
+  }
+  Sigma.t <- rinvwishart(1, fit_obj$upsilon, fit_obj$Xi)[,,1]
+  Thetas.t.smoothed <- array(0, dim=c(Theta.dim, D, T))
+  rmatnorm_mean <- fit_obj$Ms.t[,,T]
+  dim(rmatnorm_mean) <- c(Theta.dim, D) # this is needed if the state has one dimension only
+                                        # we want drop=T but only for the last dimension, ugh!
+  Thetas.t.smoothed[,,T] <- rmatrixnormal(1, rmatnorm_mean, fit_obj$Cs.t[,,T], Sigma.t)[,,1]
+  for(t in (T-1):1) {
+    Z.t <- fit_obj$Cs.t[,,t]%*%t(data_obj$G)%*%solve(fit_obj$Rs.t[,,(t+1)])
+    if(censor_vec[t] == 1 || (!is.null(observation_vec) && !(t %in% observation_vec))) {
+      M.t.star <- fit_obj$Ms.t[,,t]
+    } else {
+      if(is.null(observation_vec)) {
+        M.t.star <- fit_obj$Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
+      } else {
+        M.t.star <- fit_obj$Ms.t[,,as(which(observation_vec == t), "numeric")] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
+      }
+    }
+    C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 10)
+    Thetas.t.smoothed[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
+  }
+  return(list(Thetas.t=Thetas.t.smoothed))
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
