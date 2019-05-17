@@ -13,16 +13,17 @@ save_all <- FALSE
 # (1) simulate some DLM data and fit it
 # ----------------------------------------------------------------------------------------
 
-sim <- five_taxa_simulation(T=40, indep_taxa=TRUE, uniform_start=FALSE, save_images=FALSE)
+sim <- five_taxa_simulation(T=40, indep_taxa=TRUE, uniform_start=FALSE, noise_scale=1, save_images=FALSE)
 
 cat("Trace true Sigma:",sum(diag(sim$Sigma)),"\n")
+cat("Trace true W:",sum(diag(sim$W)),"\n")
 if(save_all) {
   png(paste0("plots/DLMsim_true_Sigma_",tag,".png"), width=500, height=500)
   image(sim$Sigma)
   dev.off()
 }
 
-censor_vec <- rbinom(nrow(sim$ys), 1, 0.5) # randomly censor half to test imputation
+censor_vec <- rbinom(nrow(sim$ys), 1, 0.5) # randomly censor to test imputation
 
 fit.f <- fit_filter(sim, censor_vec=censor_vec)
 
@@ -33,11 +34,21 @@ if(save_all) {
   image(mean.Sigma)
   dev.off()
 }
+plot_theta_fits(sim, fit_obj.f=fit.f, fit_obj.s=NULL, filename=NULL)
 
 fit.s <- fit_smoother(sim, fit.f, censor_vec=censor_vec)
 
-filename <- paste0("plots/DLMsim_theta_fits_",tag,".png")
-plot_theta_fits(sim, fit_obj.f=fit.f, fit_obj.s=fit.s, filename=NULL)
+if(save_all) {
+  filename <- paste0("plots/DLMsim_theta_fits_",tag,".png")
+} else {
+  filename <- NULL
+}
+plot_theta_fits(sim, fit_obj.f=fit.f, fit_obj.s=fit.s, filename=filename)
+
+# takeaway: can fit a periodic DLM with very few observations if parameters are
+# initialized close to true values and true signal has a very periodic structure
+# the highly structured nature of the signal seems to make it really robust to crappy
+# initial parameter choices; the random walk doesn't have the benefit of that structure!
 
 # ----------------------------------------------------------------------------------------
 # use the "DUI" (2001) baboon data
@@ -72,9 +83,15 @@ C.0 <- W
 
 data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
 fit.f <- fit_filter(data_obj, observation_vec=NULL)
-fit.s <- fit_smoother(data_obj, fit.f, censor_vec=NULL)
+#fit.s <- fit_smoother(data_obj, fit.f, censor_vec=NULL)
+fit.s <- NULL
 
-plot_theta_fits(data_obj, fit.f, fit_obj.s=fit.s, filename="plots/DLMsim_DUI_1Drandomwalk.png") # sanity check
+if(save_all) {
+  filename <- "plots/DLMsim_DUI_1Drandomwalk.png"
+} else {
+  filename <- NULL
+}
+plot_theta_fits(data_obj, fit.f, fit_obj.s=fit.s, filename=filename) # sanity check
 
 # plot mean Sigma
 mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)
@@ -88,6 +105,10 @@ if(save_all) {
 # (2b) fit a 1D random walk with a big gap in the middle
 # ----------------------------------------------------------------------------------------
 
+saved_ys <- driver::clr(counts)
+ys <- saved_ys
+ys <- ys[,1:10]
+
 D <- ncol(ys)
 
 F <- matrix(1, 1, 1)
@@ -99,20 +120,45 @@ gamma <- 1
 M.0 <- matrix(rnorm(D, 1, 1), 1, D)
 C.0 <- W
 
-observation_vec <- c(1:15, 26:40) # 10-observation gap in the middle
+observation_vec <- c(1:10, 21:30) # 10-observation gap in the middle
 
 data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
 fit.f <- fit_filter(data_obj, observation_vec=observation_vec)
 fit.s <- fit_smoother(data_obj, fit.f, censor_vec=NULL)
 
-plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, filename="plots/DLMsim_DUI_1Drandomwalk_middlegap.png")
+if(save_all) {
+  filename <- "plots/DLMsim_DUI_1Drandomwalk_middlegap.png"
+} else {
+  filename <- NULL
+}
+plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, filename=filename)
+
 # check the means, not the Theta.t draws
-#fit_obj$Thetas.t <- fit_obj$Ms.t
-#plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=NULL, filename=NULL)
+fit.f$Thetas.t <- fit.f$Ms.t
+fit.s$Thetas.t <- fit.s$Ms.t
+plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, filename=NULL)
+
+mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)
+cat("Trace inferred Sigma:",sum(diag(mean.Sigma)),"\n")
+image(mean.Sigma)
+
+# takeaway: the means track pretty well where they have feedback and more or less
+# flatline where they don't; with a gap in available observations in the middle, 
+# smoothing definitely improves on the filtered estimate, which is SHOULD; small values
+# for W give lesser/slower adaptation and smaller Sigma but really don't change structure
+# of Sigma
+
+# there's a tradeoff -- no missing: large W make for very tight fits, small W make for
+# very smooth fits; gaps: small W keep the thetas from wandering too much in the gaps
+# (in either case the mean looks good)
 
 # ----------------------------------------------------------------------------------------
 # (2c) fit a 1D random walk with true between-sample gaps
 # ----------------------------------------------------------------------------------------
+
+saved_ys <- driver::clr(counts)
+ys <- saved_ys
+ys <- ys[,1:4]
 
 D <- ncol(ys)
 
@@ -128,15 +174,26 @@ C.0 <- W
 dates <- sample_data(pruned)$collection_date
 min_d <- dates[1]
 observation_vec <- sapply(dates, function(x) { round(difftime(x, min_d, units="days"))+1 } )
+#observation_vec <- NULL
 
 data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
 fit.f <- fit_filter(data_obj, observation_vec=observation_vec)
-fit.s <- fit_smoother(data_obj, fit.f, censor_vec=NULL)
+fit.f$upsilon <- 100
+fit.s <- fit_smoother(data_obj, fit.f)
 
-plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, filename="plots/DLMsim_DUI_1Drandomwalk_truegaps.png")
+if(save_all) {
+  filename <- "plots/DLMsim_DUI_1Drandomwalk_truegaps.png"
+} else {
+  filename <- NULL
+}
+#plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, observation_vec=observation_vec, filename=filename)
+
 # check the means, not the Theta.t draws
-#fit_obj$Thetas.t <- fit_obj$Ms.t
-#plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=NULL, filename="plots/DLMsim_DUI_1Drandomwalk_truegaps_mean.png")
+alt_fit.f <- fit.f
+alt_fit.s <- fit.s
+#alt_fit.f$Thetas.t <- alt_fit.f$Ms.t
+#alt_fit.s$Thetas.t <- alt_fit.s$Ms.t
+plot_theta_fits(data_obj, fit_obj.f=alt_fit.f, fit_obj.s=alt_fit.s, observation_vec=observation_vec, filename=NULL)
 
 # plot mean Sigma
 mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)

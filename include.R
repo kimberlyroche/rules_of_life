@@ -1281,16 +1281,27 @@ plot_prop <- function(ys, filename=NULL) {
 # data_obj is the output of five_taxa_simuation()
 # fit_obj.f is the output of fit_filter()
 # fit_obj.s is the output of fit_smoother()
-plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, filename=NULL) {
+plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, observation_vec=NULL, filename=NULL) {
   T <- nrow(data_obj$ys)
+  T_actual <- T
+  if(!is.null(observation_vec)) {
+    T_actual <- max(observation_vec)
+  }
+  xs <- 1:T_actual
   D <- ncol(data_obj$ys)
   
   df.true <- gather_array(data_obj$ys, "logratio", "timepoint", "taxon")
+  # replace timepoint with the actual day offset
+  if(!is.null(observation_vec)) {
+    for(i in 1:nrow(df.true)) {
+      df.true$timepoint[i] <- observation_vec[df.true$timepoint[i]]
+    }
+  }
   df.true <- cbind(df.true, which="true")
   
-  filtered.observations <- matrix(0, T, D)
-  smoothed.observations <- matrix(0, T, D)
-  for(t in 1:T) {
+  filtered.observations <- matrix(0, T_actual, D)
+  smoothed.observations <- matrix(0, T_actual, D)
+  for(t in 1:T_actual) {
     filtered.observations[t,] <- data_obj$F%*%fit_obj.f$Thetas.t[,,t]
     if(!is.null(fit_obj.s)) {
       smoothed.observations[t,] <- data_obj$F%*%fit_obj.s$Thetas.t[,,t]
@@ -1370,8 +1381,8 @@ two_taxa_simulation <- function(T=30) {
   }
 }
 
-five_taxa_simulation <- function(T=40, indep_taxa=TRUE, uniform_start=TRUE, save_images=TRUE) {
-  state_noise_scale <- 0.05
+five_taxa_simulation <- function(T=40, indep_taxa=TRUE, uniform_start=TRUE, noise_scale=0.05, save_images=TRUE) {
+  state_noise_scale <- noise_scale
   gamma <- 1
   observational_noise_scale <- state_noise_scale*gamma
   
@@ -1589,41 +1600,27 @@ fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL) {
 
 # simulation smoother
 # fit_obj is the output of fit_filter()
-fit_smoother <- function(data_obj, fit_obj, censor_vec=NULL, observation_vec=NULL) {
-  T <- nrow(data_obj$ys)
+fit_smoother <- function(data_obj, fit_obj) {
   D <- ncol(data_obj$ys)
   Theta.dim <- ncol(data_obj$G)
-  if(!is.null(observation_vec)) {
-    T <- max(observation_vec)
-  } else {
-    T <- nrow(data_obj$ys)
-  }
-  if(is.null(censor_vec)) {
-    censor_vec <- rep(0, T)
-  }
+  T <- dim(fit_obj$Thetas.t)[3]
   Sigma.t <- rinvwishart(1, fit_obj$upsilon, fit_obj$Xi)[,,1]
   Thetas.t.smoothed <- array(0, dim=c(Theta.dim, D, T))
+  Ms.t <- array(0, dim=c(Theta.dim, D, T))
   rmatnorm_mean <- fit_obj$Ms.t[,,T]
-  dim(rmatnorm_mean) <- c(Theta.dim, D) # this is needed if the state has one dimension only
-                                        # we want drop=T but only for the last dimension, ugh!
+  dim(rmatnorm_mean) <- c(Theta.dim, D) # fix if the state has one dimension only
+                                        # can't do drop=FALSE here
   Thetas.t.smoothed[,,T] <- rmatrixnormal(1, rmatnorm_mean, fit_obj$Cs.t[,,T], Sigma.t)[,,1]
+  Ms.t[,,T] <- rmatnorm_mean
   for(t in (T-1):1) {
     Z.t <- fit_obj$Cs.t[,,t]%*%t(data_obj$G)%*%solve(fit_obj$Rs.t[,,(t+1)])
-    if(censor_vec[t] == 1 || (!is.null(observation_vec) && !(t %in% observation_vec))) {
-      M.t.star <- fit_obj$Ms.t[,,t]
-    } else {
-      if(is.null(observation_vec)) {
-        M.t.star <- fit_obj$Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
-      } else {
-        M.t.star <- fit_obj$Ms.t[,,as(which(observation_vec == t), "numeric")] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
-      }
-    }
+    M.t.star <- fit_obj$Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
+    Ms.t[,,t] <- M.t.star
     C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 10)
     Thetas.t.smoothed[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
   }
-  return(list(Thetas.t=Thetas.t.smoothed))
+  return(list(Thetas.t=Thetas.t.smoothed, Ms.t=Ms.t))
 }
-
 
 
 
