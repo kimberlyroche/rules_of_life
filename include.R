@@ -1281,7 +1281,10 @@ plot_prop <- function(ys, filename=NULL) {
 # data_obj is the output of five_taxa_simuation()
 # fit_obj.f is the output of fit_filter()
 # fit_obj.s is the output of fit_smoother()
-plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, observation_vec=NULL, filename=NULL) {
+plot_theta_fits <- function(data_obj, fit_obj.f=NULL, fit_obj.s=NULL, observation_vec=NULL, filename=NULL) {
+  if(is.null(fit_obj.f) && is.null(fit_obj.s)) {
+    return()
+  }
   T <- nrow(data_obj$ys)
   T_actual <- T
   if(!is.null(observation_vec)) {
@@ -1302,19 +1305,23 @@ plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, observation_vec
   filtered.observations <- matrix(0, T_actual, D)
   smoothed.observations <- matrix(0, T_actual, D)
   for(t in 1:T_actual) {
-    filtered.observations[t,] <- data_obj$F%*%fit_obj.f$Thetas.t[,,t]
+    if(!is.null(fit_obj.f)) {
+      filtered.observations[t,] <- data_obj$F%*%fit_obj.f$Thetas.t[,,t]
+    }
     if(!is.null(fit_obj.s)) {
       smoothed.observations[t,] <- data_obj$F%*%fit_obj.s$Thetas.t[,,t]
     }
   }
-  df.filtered <- gather_array(filtered.observations, "logratio", "timepoint", "taxon")
-  df.filtered <- cbind(df.filtered, which="filtered")
+  df.all <- df.true
+  if(!is.null(fit_obj.f)) {
+    df.filtered <- gather_array(filtered.observations, "logratio", "timepoint", "taxon")
+    df.filtered <- cbind(df.filtered, which="filtered")
+    df.all <- rbind(df.all, df.filtered)
+  }
   if(!is.null(fit_obj.s)) {
     df.smoothed <- gather_array(smoothed.observations, "logratio", "timepoint", "taxon")
     df.smoothed <- cbind(df.smoothed, which="smoothed")
-    df.all <- rbind(df.true, df.filtered, df.smoothed)
-  } else {
-    df.all <- rbind(df.true, df.filtered)
+    df.all <- rbind(df.all, df.smoothed)
   }
   
   p <- ggplot(data=df.all, aes(x=timepoint, y=logratio, color=which, group=which)) + 
@@ -1327,6 +1334,51 @@ plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, observation_vec
     show(p)
   }
 }
+
+# unfinished; busted
+# fit_and_plot_intervals <- function(data_obj, observation_vec=observation_vec) {
+#   S <- 10
+#   T <- nrow(data_obj$ys)
+#   if(!is.null(observation_vec)) {
+#     T <- max(observation_vec)
+#   }
+#   draws <- array(dim=c(T, ncol(data_obj$ys), S)) # time (rows) x taxa (columns) x samples
+#   for(s in 1:S) {
+#     cat("Generating sample",s,"\n")
+#     fit.f <- fit_filter(data_obj, observation_vec=observation_vec)
+#     fit.s <- fit_smoother(data_obj, fit.f)
+#     draws[,,s] <- t(fit.s$Thetas.t[1,,])
+#   }
+#   labeled_ys <- data_obj$ys
+#   if(!is.null(observation_vec)) {
+#     rownames(labeled_ys) <- observation_vec
+#   }
+#   samples <- gather_array(data_obj$ys, "coord", "timepoint", "taxon")
+#   # crazy inefficient; fix this
+#   samples <- cbind(samples, lower=NA)
+#   samples <- cbind(samples, upper=NA)
+#   for(i in 1:nrow(samples)) {
+#     samples[i,"lower"] <- min(draws[samples[i,"timepoint"],samples[i,"taxon"],])
+#     samples[i,"upper"] <- max(draws[samples[i,"timepoint"],samples[i,"taxon"],])
+#   }
+#   taxon <- 2
+#   p <- ggplot(samples[samples$taxon==taxon,], aes(timepoint)) +
+#     geom_ribbon(aes(ymin=lower, ymax=upper), fill="grey80") +
+#     geom_line(aes(y=coord))
+#   p
+# }
+
+plot_mean_Sigma <- function(fit_obj, filename=NULL) {
+  mean.Sigma <- fit_obj$Xi/(fit_obj$upsilon - nrow(fit_obj$Xi) - 1)
+  if(!is.null(filename)) {
+    png(filename)
+    image(mean.Sigma)
+    dev.off()
+  } else {
+    image(mean.Sigma)
+  }
+}
+
 
 # generate Fourier form rotation matrix for a given omega (a function of period)
 build_G <- function(period, harmonics=1) {
@@ -1567,43 +1619,53 @@ fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL, discount
   Cs.t <- array(0, dim=c(Theta.dim, Theta.dim, T))
   Ms.t <- array(0, dim=c(Theta.dim, D, T))
   Rs.t <- array(0, dim=c(Theta.dim, Theta.dim, T))
+  W.t <- NULL # last observed W.t (when using discount)
   for(t in 1:T) {
     if(censor_vec[t] == 1 || (!is.null(observation_vec) && !(t %in% observation_vec))) {
-      #cat("Imputing t =",t,"\n")
+      # case 1: no observations at this time point for any individuals
+      # impute all by passing prior on as posterior
+      P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
       if(is.null(discount)) {
-        R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+        R.t <- P.t + data_obj$W
       } else {
-        P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
-        R.t <- P.t + ((1-discount)/discount)*P.t
+        # note: West & Harrison (p. 352) suggest not applying discount for missing observations
+        if(is.null(W.t)) {
+          W.t <- ((1-discount)/discount)*P.t
+        }
+        R.t <- P.t + W.t
       }
+      R.t <- round(R.t, 10)
       Rs.t[,,t] <- R.t
-      M.t <- data_obj$G%*%M.t
+      A.t <- data_obj$G%*%M.t
+      # carry forward without update
+      M.t <- A.t
       Ms.t[,,t] <- M.t
       C.t <- R.t
-      C.t <- round(C.t, 10) # not symmetric (precision) warnings; JFC
       Cs.t[,,t] <- C.t
-      # no change to Sigma.t -- correct?
+      # no change to Sigma.t parameters
       Sigma.t <- rinvwishart(1, upsilon.t, Xi.t)[,,1]
       Thetas.t[,,t] <- rmatrixnormal(1, M.t, C.t, Sigma.t)[,,1]
     } else {
-      # note: F.t.T is F for us here and G.t is G
-      # prior at t
-      A.t <- data_obj$G%*%M.t
-      if(is.null(discount)) {
-        R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
-      } else {
-        P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
-        R.t <- P.t + ((1-discount)/discount)*P.t
-      }
-      Rs.t[,,t] <- R.t
+      # case 2: apply update where possible, note: F.t.T is F for us here and G.t is G
       # one-step ahead forecast at t
+      P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
+      if(is.null(discount)) {
+        R.t <- P.t + data_obj$W
+      } else {
+        W.t <- ((1-discount)/discount)*P.t
+        R.t <- P.t + W.t
+      }
+      R.t <- round(R.t, 10)
+      Rs.t[,,t] <- R.t
+      A.t <- data_obj$G%*%M.t
       f.t.T <- data_obj$F%*%A.t
       q.t <- data_obj$gamma + (data_obj$F%*%R.t%*%t(data_obj$F))[1,1]
-      # posterior at t
       if(is.null(observation_vec)) {
+        # we're assuming 1 individual if observation_mat is missing
         e.t.T <- data_obj$ys[t,] - f.t.T
       } else {
-        e.t.T <- data_obj$ys[as(which(observation_vec == t), "numeric"),] - f.t.T
+        # if more than one sample on the same day (mislabeled?) take the first for now
+        e.t.T <- data_obj$ys[as(which(observation_vec == t)[1], "numeric"),] - f.t.T
       }
       S.t <- R.t%*%t(data_obj$F)/q.t
       M.t <- A.t + S.t%*%e.t.T
@@ -1629,22 +1691,43 @@ fit_smoother <- function(data_obj, fit_obj) {
   Sigma.t <- rinvwishart(1, fit_obj$upsilon, fit_obj$Xi)[,,1]
   Thetas.t.smoothed <- array(0, dim=c(Theta.dim, D, T))
   Ms.t <- array(0, dim=c(Theta.dim, D, T))
+  etas.t <- matrix(0, D, T)
   rmatnorm_mean <- fit_obj$Ms.t[,,T]
   dim(rmatnorm_mean) <- c(Theta.dim, D) # fix if the state has one dimension only
                                         # can't do drop=FALSE here
   Thetas.t.smoothed[,,T] <- rmatrixnormal(1, rmatnorm_mean, fit_obj$Cs.t[,,T], Sigma.t)[,,1]
+  etas.t[,T] <- rmatrixnormal(1, data_obj$F%*%Thetas.t.smoothed[,,T], 1, Sigma.t)[,,1]
   Ms.t[,,T] <- rmatnorm_mean
   for(t in (T-1):1) {
     Z.t <- fit_obj$Cs.t[,,t]%*%t(data_obj$G)%*%solve(fit_obj$Rs.t[,,(t+1)])
     M.t.star <- fit_obj$Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
     Ms.t[,,t] <- M.t.star
-    C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 8)
+    C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 10)
     Thetas.t.smoothed[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
+    # draw an eta, this is how we'll estimate modeled covariance
+    etas.t[,t] <- rmatrixnormal(1, data_obj$F%*%Thetas.t.smoothed[,,t], 1, Sigma.t)[,,1]
   }
-  return(list(Thetas.t=Thetas.t.smoothed, Ms.t=Ms.t))
+  return(list(Thetas.t=Thetas.t.smoothed, etas.t=etas.t, Ms.t=Ms.t))
 }
 
-
+pull_indiv_data <- function(sname, asv_data, pseudocount=0.5, date_begin="2001-10-01", date_end="2002-11-30",
+                               subset_dim=0) {
+  pruned <- prune_samples(sample_data(non_reps)$sname==sname, non_reps)
+  pruned <- prune_samples((sample_data(pruned)$collection_date > date_begin) &
+                            (sample_data(pruned)$collection_date < date_end), pruned)
+  cat(paste0("Real data set (",sname,") has ",nsamples(pruned)," samples and ",ntaxa(pruned)," taxa\n"))
+  counts <- otu_table(pruned)@.Data + pseudocount # samples (rows) x taxa (columns)
+  ys <- driver::clr(counts)
+  # the baseline date common to individuals
+  min_date <- min(sample_data(pruned)$collection_date)
+  dates_observed <- sample_data(pruned)$collection_date
+  observation_vec <- sapply(dates_observed, function(x) { round(difftime(x, min_date, units="days"))+1 } )
+  # subset taxa
+  if(subset_dim > 0) {
+    ys <- ys[,1:subset_dim]
+  }
+  return(list(ys=ys, observation_vec=observation_vec, sname=sname))
+}
 
 
 
