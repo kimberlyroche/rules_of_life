@@ -1329,9 +1329,22 @@ plot_theta_fits <- function(data_obj, fit_obj.f, fit_obj.s=NULL, observation_vec
 }
 
 # generate Fourier form rotation matrix for a given omega (a function of period)
-build_G <- function(period) {
-  omega <- 2*pi/period
-  return(matrix(c(cos(omega), -sin(omega), sin(omega), cos(omega)), 2, 2))
+build_G <- function(period, harmonics=1) {
+  if(harmonics == 1) {
+    omega <- 2*pi/period
+    return(matrix(c(cos(omega), -sin(omega), sin(omega), cos(omega)), 2, 2))
+  } else {
+    G <- matrix(0, 2*harmonics, 2*harmonics)
+    for(h in 1:harmonics) {
+      omega <- 2*pi*h/period
+      common_offset <- (h-1)*2
+      G[(common_offset+1),(common_offset+1)] <- cos(omega)
+      G[(common_offset+1),(common_offset+2)] <- sin(omega)
+      G[(common_offset+2),(common_offset+1)] <- -sin(omega)
+      G[(common_offset+2),(common_offset+2)] <- cos(omega)
+    }
+    return(G)
+  }
 }
 
 # 2-taxa simulation just for illustrative purposes
@@ -1535,7 +1548,7 @@ build_A <- function(T, G, C.0, W, gamma, save_images=T) {
 # data_obj is a list containing ys, F, W, G, upsilon, Xi, gamma, Sigma, M.0, C.0
 # observation_vec (if present) indicates the spacing of observations, e.g. c(1, 3, 4, 7)
 #   indicates observations 2, 5, & 6 are missing and should be imputed in the usual way
-fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL) {
+fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL, discount=NULL) {
   D <- ncol(data_obj$ys)
   Theta.dim <- ncol(data_obj$G)
   if(!is.null(observation_vec)) {
@@ -1556,9 +1569,13 @@ fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL) {
   Rs.t <- array(0, dim=c(Theta.dim, Theta.dim, T))
   for(t in 1:T) {
     if(censor_vec[t] == 1 || (!is.null(observation_vec) && !(t %in% observation_vec))) {
-      # NEED TO THINK ABOUT CENSORING AND GAPPING AT THE SAME TIME (NO?)
       #cat("Imputing t =",t,"\n")
-      R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      if(is.null(discount)) {
+        R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      } else {
+        P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
+        R.t <- P.t + ((1-discount)/discount)*P.t
+      }
       Rs.t[,,t] <- R.t
       M.t <- data_obj$G%*%M.t
       Ms.t[,,t] <- M.t
@@ -1572,7 +1589,12 @@ fit_filter <- function(data_obj, censor_vec=NULL, observation_vec=NULL) {
       # note: F.t.T is F for us here and G.t is G
       # prior at t
       A.t <- data_obj$G%*%M.t
-      R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      if(is.null(discount)) {
+        R.t <- data_obj$G%*%C.t%*%t(data_obj$G) + data_obj$W
+      } else {
+        P.t <- data_obj$G%*%C.t%*%t(data_obj$G)
+        R.t <- P.t + ((1-discount)/discount)*P.t
+      }
       Rs.t[,,t] <- R.t
       # one-step ahead forecast at t
       f.t.T <- data_obj$F%*%A.t
@@ -1616,7 +1638,7 @@ fit_smoother <- function(data_obj, fit_obj) {
     Z.t <- fit_obj$Cs.t[,,t]%*%t(data_obj$G)%*%solve(fit_obj$Rs.t[,,(t+1)])
     M.t.star <- fit_obj$Ms.t[,,t] + Z.t%*%(Thetas.t.smoothed[,,(t+1)] - data_obj$G%*%fit_obj$Ms.t[,,t])
     Ms.t[,,t] <- M.t.star
-    C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 10)
+    C.t.star <- round(fit_obj$Cs.t[,,t] - Z.t%*%fit_obj$Rs.t[,,(t+1)]%*%t(Z.t), 8)
     Thetas.t.smoothed[,,t] <- rmatrixnormal(1, M.t.star, C.t.star, Sigma.t)[,,1]
   }
   return(list(Thetas.t=Thetas.t.smoothed, Ms.t=Ms.t))

@@ -70,6 +70,10 @@ ys <- driver::clr(counts)
 # (2a) fit a 1D random walk without gaps
 # ----------------------------------------------------------------------------------------
 
+saved_ys <- driver::clr(counts)
+ys <- saved_ys
+ys <- ys[,1:10]
+
 D <- ncol(ys)
 
 F <- matrix(1, 1, 1)
@@ -83,8 +87,7 @@ C.0 <- W
 
 data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
 fit.f <- fit_filter(data_obj, observation_vec=NULL)
-#fit.s <- fit_smoother(data_obj, fit.f, censor_vec=NULL)
-fit.s <- NULL
+fit.s <- fit_smoother(data_obj, fit.f)
 
 if(save_all) {
   filename <- "plots/DLMsim_DUI_1Drandomwalk.png"
@@ -163,22 +166,28 @@ ys <- ys[,1:4]
 D <- ncol(ys)
 
 F <- matrix(1, 1, 1)
-W <- diag(1)
+W <- diag(1)*0.1
 G <- diag(1)
-upsilon <- D + 2
-Xi <- diag(D)*(upsilon-D-1)
+upsilon <- D + 10
+Xi <- diag(D)*0.025*(upsilon-D-1) # setting these parameters in such a way that the taxa
+                                # damn near totally independent and the system and
+                                # observation noise are very small seems to work well
+
+cat("Relative scale of W, Sigma:\n")
+cat("Tr W:",sum(diag(W)),"\n")
+Sigma_prior <- Xi/(upsilon - D - 1)
+cat("Tr Sigma:",sum(diag(Sigma_prior)),"\n")
+
 gamma <- 1
 M.0 <- matrix(rnorm(D, 1, 1), 1, D)
-C.0 <- W
+C.0 <- W*10
 
 dates <- sample_data(pruned)$collection_date
 min_d <- dates[1]
 observation_vec <- sapply(dates, function(x) { round(difftime(x, min_d, units="days"))+1 } )
-#observation_vec <- NULL
 
 data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
 fit.f <- fit_filter(data_obj, observation_vec=observation_vec)
-fit.f$upsilon <- 100
 fit.s <- fit_smoother(data_obj, fit.f)
 
 if(save_all) {
@@ -186,14 +195,14 @@ if(save_all) {
 } else {
   filename <- NULL
 }
-#plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, observation_vec=observation_vec, filename=filename)
+plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, observation_vec=observation_vec, filename=filename)
 
 # check the means, not the Theta.t draws
-alt_fit.f <- fit.f
-alt_fit.s <- fit.s
+#alt_fit.f <- fit.f
+#alt_fit.s <- fit.s
 #alt_fit.f$Thetas.t <- alt_fit.f$Ms.t
 #alt_fit.s$Thetas.t <- alt_fit.s$Ms.t
-plot_theta_fits(data_obj, fit_obj.f=alt_fit.f, fit_obj.s=alt_fit.s, observation_vec=observation_vec, filename=NULL)
+#plot_theta_fits(data_obj, fit_obj.f=alt_fit.f, fit_obj.s=alt_fit.s, observation_vec=observation_vec, filename=NULL)
 
 # plot mean Sigma
 mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)
@@ -203,37 +212,120 @@ if(save_all) {
   dev.off()
 }
 
-# ----------------------------------------------------------------------------------------
-# (...) fit a random walk model with a 2-component state
-# ----------------------------------------------------------------------------------------
-
-# TO-DO
+cat("Total variation (empirical):",sum(diag(cov(ys))),"\n")
+cat("Total variation (modeled, filtered):  ",(sum(diag(cov(t(fit.f$Thetas.t[1,,])))) + gamma*sum(diag(mean.Sigma))),"\n")
+cat("Total variation (modeled, smoothed):  ",(sum(diag(cov(t(fit.s$Thetas.t[1,,])))) + gamma*sum(diag(mean.Sigma))),"\n")
 
 # ----------------------------------------------------------------------------------------
-# (...) fit a FF seasonal model with gapped observations
+# (3a) fit a FF seasonal model with gapped observations
+# use a single harmonic, center Sigma very loosely on HALF the empirical covariance over
+# taxa (with the justification that the other half the variance should be learned as)
+# system evolution variance and use a discount factor to set W.t; assume gamma = 1
 # ----------------------------------------------------------------------------------------
+
+saved_ys <- driver::clr(counts)
+ys <- saved_ys
+ys <- ys[,1:6]
 
 D <- ncol(ys)
 
-F <- matrix(1, 1, 1)
-W <- diag(1)*0.1
-G <- build_G(period=365)
-upsilon <- D + 2
-Xi <- diag(D)*(upsilon-D-1)*0.1
+F <- matrix(c(1, 0), 1, 2)
+G <- build_G(period=365, harmonics=1)
+upsilon <- D + 2 # very weak centering
+Xi <- cov(ys)*0.5 # center on empirical covariance
+
+cat("Relative scale of Sigma (trace):",sum(diag(Xi)),"\n")
+
 gamma <- 1
-M.0 <- matrix(rnorm(D, 1, 1), 1, D)
-C.0 <- W
+M.0 <- matrix(rnorm(D, 1, 1), 2, D)
+C.0 <- diag(2)
 
 dates <- sample_data(pruned)$collection_date
 min_d <- dates[1]
 observation_vec <- sapply(dates, function(x) { round(difftime(x, min_d, units="days"))+1 } )
 
-data_obj <- list(ys=ys, F=F, W=W, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
-fit.f <- fit_filter(data_obj, observation_vec=observation_vec)
+data_obj <- list(ys=ys, F=F, W=NULL, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
+fit.f <- fit_filter(data_obj, observation_vec=observation_vec, discount=0.98)
+fit.s <- fit_smoother(data_obj, fit.f)
 
-plot_theta_fits(data_obj, fit.f, fit_obj.s=NULL, filename=NULL) # sanity check
+if(save_all) {
+  filename <- "plots/DLMsim_DUI_1Dperiodic_gaps_h1_Theta.png"
+} else {
+  filename <- NULL
+}
+plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, observation_vec=observation_vec, filename=filename)
 
+# plot mean Sigma
+mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)
+if(save_all) {
+  png("plots/DLMsim_DUI_1Dperiodic_gaps_h1_Sigma.png")
+  image(mean.Sigma)
+  dev.off()
+}
 
+cat("Total variation (empirical):",sum(diag(cov(ys))),"\n")
+T <- dim(fit.s$Thetas.t)[3]
+etas.f <- matrix(0, D, T)
+etas.s <- matrix(0, D, T)
+for(i in 1:T) {
+  etas.f[,t] <- F%*%fit.f$Thetas.t[,,t]
+  etas.s[,t] <- F%*%fit.s$Thetas.t[,,t]
+}
+cat("Total variation (modeled, filtered):  ",(sum(diag(cov(etas.f))) + gamma*sum(diag(mean.Sigma))),"\n")
+cat("Total variation (modeled, smoothed):  ",(sum(diag(cov(etas.s))) + gamma*sum(diag(mean.Sigma))),"\n")
 
+# ----------------------------------------------------------------------------------------
+# (3b) periodic + half harmonic
+# ----------------------------------------------------------------------------------------
 
+saved_ys <- driver::clr(counts)
+ys <- saved_ys
+ys <- ys[,1:6]
+
+D <- ncol(ys)
+
+F <- matrix(c(1, 0, 1, 0), 1, 4)
+G <- build_G(period=365, harmonics=2)
+upsilon <- D + 2 # very weak centering
+Xi <- cov(ys)*0.5 # center on empirical covariance
+
+cat("Relative scale of Sigma (trace):",sum(diag(Xi)),"\n")
+
+gamma <- 1
+M.0 <- matrix(rnorm(D, 1, 1), 4, D)
+C.0 <- diag(4)
+
+dates <- sample_data(pruned)$collection_date
+min_d <- dates[1]
+observation_vec <- sapply(dates, function(x) { round(difftime(x, min_d, units="days"))+1 } )
+
+data_obj <- list(ys=ys, F=F, W=NULL, G=G, upsilon=upsilon, Xi=Xi, gamma=gamma, Sigma=NULL, M.0=M.0, C.0=C.0)
+fit.f <- fit_filter(data_obj, observation_vec=observation_vec, discount=0.98)
+fit.s <- fit_smoother(data_obj, fit.f)
+
+if(save_all) {
+  filename <- "plots/DLMsim_DUI_1Dperiodic_gaps_h2_Theta.png"
+} else {
+  filename <- NULL
+}
+plot_theta_fits(data_obj, fit_obj.f=fit.f, fit_obj.s=fit.s, observation_vec=observation_vec, filename=filename)
+
+# plot mean Sigma
+mean.Sigma <- fit.f$Xi/(fit.f$upsilon - D - 1)
+if(save_all) {
+  png("plots/DLMsim_DUI_1Dperiodic_gaps_h2_Sigma.png")
+  image(mean.Sigma)
+  dev.off()
+}
+
+cat("Total variation (empirical):",sum(diag(cov(ys))),"\n")
+T <- dim(fit.s$Thetas.t)[3]
+etas.f <- matrix(0, D, T)
+etas.s <- matrix(0, D, T)
+for(i in 1:T) {
+  etas.f[,t] <- F%*%fit.f$Thetas.t[,,t]
+  etas.s[,t] <- F%*%fit.s$Thetas.t[,,t]
+}
+cat("Total variation (modeled, filtered):  ",(sum(diag(cov(etas.f))) + gamma*sum(diag(mean.Sigma))),"\n")
+cat("Total variation (modeled, smoothed):  ",(sum(diag(cov(etas.s))) + gamma*sum(diag(mean.Sigma))),"\n")
 
