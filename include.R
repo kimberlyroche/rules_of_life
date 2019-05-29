@@ -172,6 +172,10 @@ filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=F
   if(verbose) {
     cat("Collapsing",length(collapse_taxnames),"taxa of",ntaxa(data),"\n")
     cat("\tOther category collapsed into:",collapse_taxnames[1],sep=" ","\n")
+    collapse_tidx <- which(rownames(tax_table(merged_data)) == collapse_taxnames[1])
+    cat("\tIndex of other in tax table:",collapse_tidx,"\n")
+    cat("\tTaxonomy of collapsed:",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
+    tax_table(merged_data)@.Data[collapse_tidx,] <- rep("Collapsed",7)
     cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
     cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
   }
@@ -1710,14 +1714,18 @@ fit_smoother <- function(data_obj, fit_obj) {
   return(list(Thetas.t=Thetas.t.smoothed, etas.t=etas.t, Ms.t=Ms.t))
 }
 
-pull_indiv_data <- function(sname, asv_data, pseudocount=0.5, date_begin="2001-10-01", date_end="2002-11-30",
-                               subset_dim=0) {
+pull_indiv_data <- function(sname, asv_data, pseudocount=0.5, date_begin="1900-01-01", date_end="2100-01-01",
+                               subset_dim=0, lr_transform=TRUE) {
   pruned <- prune_samples(sample_data(non_reps)$sname==sname, non_reps)
   pruned <- prune_samples((sample_data(pruned)$collection_date > date_begin) &
                             (sample_data(pruned)$collection_date < date_end), pruned)
   cat(paste0("Real data set (",sname,") has ",nsamples(pruned)," samples and ",ntaxa(pruned)," taxa\n"))
-  counts <- otu_table(pruned)@.Data + pseudocount # samples (rows) x taxa (columns)
-  ys <- driver::clr(counts)
+  counts <- otu_table(pruned)@.Data # samples (rows) x taxa (columns)
+  if(lr_transform) {
+    ys <- driver::clr(counts + pseudocount)
+  } else {
+    ys <- counts
+  }
   # the baseline date common to individuals
   min_date <- min(sample_data(pruned)$collection_date)
   dates_observed <- sample_data(pruned)$collection_date

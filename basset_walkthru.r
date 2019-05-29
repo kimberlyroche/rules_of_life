@@ -12,7 +12,7 @@ PER <- function(X, sigma=1, rho=1, period = 24, jitter = 1e-10){
   return(G)
 }
 
-# returns fit (CLR)
+# returns fit (*LR)
 fit_to_reference <- function(Gamma){
   data(mallard) # loads "ps" phyloseq obj
   
@@ -107,22 +107,27 @@ fit_to_baboon <- function(Gamma, sname, start_date_str, end_date_str) {
   dim(X) <- c(1, length(X))
   
   fit <- stray::basset(Y, X, upsilon, Theta, Gamma, Xi)
-  fit.clr <- to_clr(fit)
-  return(list(Y=Y, X=X, fit=fit.clr, labels=readable_rownames))
+  #fit.clr <- to_clr(fit)
+  fit.alr <- to_alr(fit, D)
+  return(list(Y=Y, X=X, fit=fit.alr, labels=readable_rownames))
 }
 
-get_predictions <- function(X, fit.clr){
+get_predictions <- function(X, fit){
   cat("Predicting from 1 to",max(X),"\n")
   X_predict <- t(1:(max(X))) # time point range, fill in any missing
-  predicted <- predict(fit.clr, X_predict, jitter=1) # predicts samples from the posterior (default = 2000)
+  predicted <- predict(fit, X_predict, jitter=1) # predicts samples from the posterior (default = 2000)
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
 plot_fit <- function(Y, X, labels, Y_predict, X_predict, save_filename){
-  Y_clr_tidy <- clr_array(Y+0.65, parts = 1) %>% 
+  #Y_clr_tidy <- clr_array(Y+0.65, parts = 1) %>% 
+  #  gather_array(mean, coord, sample) %>% 
+  #  mutate(time = X[1,sample], 
+  #         coord = paste0("CLR(", labels[coord],")"))
+  Y_alr_tidy <- alr_array(Y+0.65, parts = 1) %>% 
     gather_array(mean, coord, sample) %>% 
     mutate(time = X[1,sample], 
-           coord = paste0("CLR(", labels[coord],")"))
+           coord = paste0("ALR_D(", labels[coord],")"))
   
   predicted_tidy <- gather_array(Y_predict, val, coord, sample, iter) %>% 
     mutate(time = X_predict[1,sample]) %>% # just adds time point ID
@@ -130,13 +135,13 @@ plot_fit <- function(Y, X, labels, Y_predict, X_predict, save_filename){
     group_by(time, coord) %>% # there are D x N combos of time and coordinate (log ratio)
     summarise_posterior(val, na.rm=TRUE) %>% # gets standard quantiles for each coord x timepoint combo
     ungroup() %>% # just undoes this group x coord binding
-    mutate(coord = paste0("CLR(", labels[coord],")")) # replace coord with readable family name
+    mutate(coord = paste0("ALR_D(", labels[coord],")")) # replace coord with readable family name
   
   p <- ggplot(predicted_tidy, aes(x = time, y=mean)) +
     geom_ribbon(aes(ymin=p2.5, ymax=p97.5), fill="darkgrey", alpha=0.5) +
     geom_ribbon(aes(ymin=p25, ymax=p75), fill="darkgrey", alpha=0.9) +
     geom_line(color="blue") +
-    geom_point(data = Y_clr_tidy, alpha=0.5) +
+    geom_point(data = Y_alr_tidy, alpha=0.5) +
     facet_wrap(~coord, scales="free_y") +
     theme_minimal() +
     theme(axis.title.y = element_blank(), 
@@ -157,7 +162,7 @@ if(FALSE) {
 #Gamma <- function(X) PER(X, period=365) # periodic only
 Gamma <- function(X) SE(X) # squared exponential only
 for(indiv in c("DUI", "LEB")) {
-  fit.obj <- fit_to_baboon(Gamma, indiv, "2001-10-01", "2002-11-30") # wet season through a dry season
+  fit.obj <- fit_to_baboon(Gamma, indiv, start_date_str="2001-10-01", end_date_str="2002-11-30") # wet season through a dry season
   predict.obj <- get_predictions(fit.obj$X, fit.obj$fit)
   plot_fit(fit.obj$Y, fit.obj$X, fit.obj$labels, predict.obj$Y, predict.obj$X, paste0("basset_SE_",indiv))
 }

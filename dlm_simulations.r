@@ -58,7 +58,14 @@ if(FALSE) {
 sname <- "DUI"
 
 glom_data <- load_glommed_data(level="family", replicates=TRUE)
+tax_names <- tax_table(glom_data)@.Data
+
 filtered <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+# view taxonomy
+temp <- tax_table(filtered)@.Data
+rownames(temp) <- NULL
+# write.csv(temp, file="C:/Users/kim/Desktop/rules_of_life_stray_run1/tax_table.csv")
+
 # family-agglomerated has replicates; remove these
 non_reps <- prune_samples(sample_data(filtered)$sample_status==0, filtered)
 
@@ -181,10 +188,25 @@ cat("Total variation (modeled, smoothed):",sum(diag(cov(t(fit.s$etas.t)))),"\n")
 # (4) do top 10 best sampled
 # ----------------------------------------------------------------------------------------
 
+# save all individuals to files
+
+for(sname in best_sampled) {
+  cat("Individual",sname,"\n")
+  indiv_data <- pull_indiv_data(sname, non_reps, lr_transform=FALSE)
+  save(indiv_data, file=paste0("C:/Users/kim/Desktop/temp/",sname,"_data.RData"))
+}
+
+D <- 5
+for(sname in best_sampled) {
+  cat("Individual",sname,"\n")
+  indiv_data <- pull_indiv_data(sname, non_reps, subset_dim=D, lr_transform=FALSE)
+  save(indiv_data, file=paste0("C:/Users/kim/Desktop/temp/",sname,"_subset_data.RData"))
+}
+
 D <- 6
 for(sname in best_sampled) {
   cat("Individual",sname,"\n")
-  indiv_data <- pull_indiv_data(sname, non_reps, subset_dim=D)
+  indiv_data <- pull_indiv_data(sname, non_reps, subset_dim=D, date_begin="2001-10-01", date_end="2002-11-30")
   data_obj <- list(ys=indiv_data$ys,
                    F=matrix(c(1, 0), 1, 2),
                    W=NULL,
