@@ -6,7 +6,7 @@ library(tidyverse)
 
 # X is Q x N as in other kernels
 # bandwidth: rho as chosen gives antiphase observations a correlation of ~0.1
-PER <- function(X, sigma=1, rho=1, period = 24, jitter = 1e-10){
+PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
   dist <- as.matrix(dist(t(X)))
   G <- sigma^2 * exp(-2*(sin(pi*dist/period)^2)/(rho^2)) + jitter*diag(ncol(dist))
   return(G)
@@ -15,7 +15,7 @@ PER <- function(X, sigma=1, rho=1, period = 24, jitter = 1e-10){
 get_predictions <- function(X, fit){
   cat("Predicting from 1 to",max(X),"\n")
   X_predict <- t(1:(max(X))) # time point range, fill in any missing
-  predicted <- predict(fit, X_predict, jitter=1) # predicts samples from the posterior (default = 2000)
+  predicted <- predict(fit, X_predict) # predicts samples from the posterior (default = 2000)
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
@@ -102,7 +102,9 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1) {
 
 # baboon
 #Gamma <- function(X) PER(X, period=365) # periodic only
-Gamma <- function(X) SE(X) # squared exponential only
+#Gamma <- function(X) SE(X) # squared exponential only
+
+Gamma <- function(X) 0.2*PER(X, rho=10, period=365) + 0.8*SE(X) # arbitrary
 
 baboon <- "ACA"
 load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
@@ -112,8 +114,9 @@ predict_obj <- get_predictions(fit_obj$X, fit_obj$fit) # interpolates
 plot_predictions(fit_obj, predict_obj, LR_coord=1)
 plot_predictions(fit_obj, predict_obj, LR_coord=2)
 
+# when is a convolution of kernels PSD???
 
-
+# get something ok-ish and try (HARDAC) on full time series data for top-10 sampled baboon
 
 
 
