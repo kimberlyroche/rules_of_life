@@ -1,4 +1,6 @@
-library(stray)
+#library(stray)
+devtools::load_all("/data/mukherjeelab/labraduck")
+
 library(phyloseq)
 library(dplyr)
 library(driver)
@@ -19,7 +21,7 @@ get_predictions <- function(X, fit){
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
-fit_to_baboon <- function(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2002-11-30") {
+fit_to_baboon <- function(baboon, indiv_data, Gamma, date_lower_limit=NULL, date_upper_limit=NULL) {
   Y_full <- indiv_data$ys
   observations_full <- indiv_data$observation_vec
   
@@ -60,7 +62,7 @@ fit_to_baboon <- function(baboon, indiv_data, Gamma, date_lower_limit="2001-10-0
   return(list(Y=Y, X=observations, fit=fit.alr))
 }
 
-plot_predictions <- function(fit_obj, predict_obj, LR_coord=1) {
+plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") {
   Y.alr <- driver::alr(t(fit_obj$Y) + 0.5)
   observations <- fit_obj$X
   alr_tidy <- gather_array(Y.alr, "LR_value", "timepoint", "LR_coord")
@@ -94,10 +96,20 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1) {
     geom_line(color="blue") + 
     geom_point(data=alr_tidy[alr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
     theme_minimal() + 
-    theme(axis.title.y = element_blank(), 
-          axis.title.x = element_blank(), 
+    theme(axis.title.x = element_blank(), 
           axis.text.x = element_text(angle=45))
-  p
+  if(LR_coord == 1) {
+    p <- p + ylab("ALR(Bifidobacteriaceae/Helicobacteraceae)")
+  } else if(LR_coord == 2) {
+    p <- p + ylab("ALR(Prevotellaceae/Helicobacteraceae)")
+  } else if(LR_coord == 21) {
+    p <- p + ylab("ALR(Christensenellaceae/Helicobacteraceae)")
+  } else if(LR_coord == 25) {
+    p <- p + ylab("ALR(Lactobacillaceae/Helicobacteraceae)")
+  } else {
+    p <- p + ylab("ALR coord")
+  }
+  ggsave(paste0(save_name,".png"), scale=2, width=8, height=3, units="in", dpi=100)
 }
 
 # baboon
@@ -109,10 +121,15 @@ Gamma <- function(X) 0.2*PER(X, rho=10, period=365) + 0.8*SE(X) # arbitrary
 baboon <- "ACA"
 load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 
-fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2003-11-30")
+#fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2003-11-30")
+fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit) # interpolates
-plot_predictions(fit_obj, predict_obj, LR_coord=1)
-plot_predictions(fit_obj, predict_obj, LR_coord=2)
+plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name="ACA_LR1")
+plot_predictions(fit_obj, predict_obj, LR_coord=2, save_name="ACA_LR2")
+plot_predictions(fit_obj, predict_obj, LR_coord=21, save_name="ACA_LR21")
+plot_predictions(fit_obj, predict_obj, LR_coord=25, save_name="ACA_LR25")
+
+save(fit_obj, file="basset_ACA.RData")
 
 # when is a convolution of kernels PSD???
 
