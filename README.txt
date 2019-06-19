@@ -1,3 +1,15 @@
+# 50
+[ker48@x2-01-1 slurm]$ sbatch VC1.slurm
+Submitted batch job 8382155
+[ker48@x2-01-1 slurm]$ nano VC3.slurm
+[ker48@x2-01-1 slurm]$ sbatch VC3.slurm
+Submitted batch job 8382156
+# 25
+[ker48@x2-01-1 slurm]$ sbatch VC1.slurm
+Submitted batch job 8382157
+[ker48@x2-01-1 slurm]$ sbatch VC3.slurm
+Submitted batch job 8382158
+
 
 
 Note: the line CXXFLAGS = -O3 -march=native added to ~/.R/Makevars for Mongrel compilation breaks

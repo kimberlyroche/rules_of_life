@@ -20,7 +20,7 @@ filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 metadata <- read_metadata(filtered)
 
 if(task == 1) {
-  estimate_variance_components(filtered, metadata, optim_it=1, use_individuals=50, include_residual=F)
+  estimate_variance_components(filtered, metadata, optim_it=1, use_individuals=25, include_residual=F)
 }
 if(task == 2) {
   estimate_variance_components(filtered, metadata, optim_it=1, use_individuals=50, include_residual=T)
@@ -32,7 +32,7 @@ if(task == 3 || task == 4) {
   metadata.metagenomics <- read_metadata_metagenomics(data.piphillin, filtered, metadata)
 
   if(task == 3) {
-    estimate_variance_components(data.piphillin, metadata.metagenomics, optim_it=1, use_individuals=50, include_residual=F)
+    estimate_variance_components(data.piphillin, metadata.metagenomics, optim_it=1, use_individuals=25, include_residual=F)
   }
   if(task == 4) {
     estimate_variance_components(data.piphillin, metadata.metagenomics, optim_it=1, use_individuals=50, include_residual=T)
