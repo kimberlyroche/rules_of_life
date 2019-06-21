@@ -14,10 +14,10 @@ PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
   return(G)
 }
 
-get_predictions <- function(X, fit){
+get_predictions <- function(X, fit, n_samples=2000){
   cat("Predicting from 1 to",max(X),"\n")
   X_predict <- t(1:(max(X))) # time point range, fill in any missing
-  predicted <- predict(fit, X_predict) # predicts samples from the posterior (default = 2000)
+  predicted <- predict(fit, X_predict, iter=n_samples) # predicts samples from the posterior (default = 2000)
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
@@ -102,40 +102,43 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") 
     p <- p + ylab("ALR(Bifidobacteriaceae/Helicobacteraceae)")
   } else if(LR_coord == 2) {
     p <- p + ylab("ALR(Prevotellaceae/Helicobacteraceae)")
-  } else if(LR_coord == 21) {
-    p <- p + ylab("ALR(Christensenellaceae/Helicobacteraceae)")
-  } else if(LR_coord == 25) {
-    p <- p + ylab("ALR(Lactobacillaceae/Helicobacteraceae)")
+  } else if(LR_coord == 7) {
+    p <- p + ylab("ALR(Muribaculaceae/Helicobacteraceae)")
+  } else if(LR_coord == 19) {
+    p <- p + ylab("ALR(order Mollicutes RF39/Helicobacteraceae)")
   } else {
     p <- p + ylab("ALR coord")
   }
-  ggsave(paste0(save_name,".png"), scale=2, width=8, height=3, units="in", dpi=100)
+  ggsave(paste0("plots/basset/",save_name,".png"), scale=2, width=12, height=3, units="in", dpi=100)
 }
 
-# baboon
+# for reference, individuals passable as arguments are:
+# "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
+
+args <- commandArgs(trailingOnly=TRUE)
+
+if(length(args) < 1) {
+  stop("Usage: Rscript basset_walkthrough.r ACA", call.=FALSE)
+}
+
+baboon <- args[1]
+
+load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
+
 #Gamma <- function(X) PER(X, period=365) # periodic only
 #Gamma <- function(X) SE(X) # squared exponential only
-
-Gamma <- function(X) 0.2*PER(X, rho=10, period=365) + 0.8*SE(X) # arbitrary
-
-baboon <- "ACA"
-load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
+Gamma <- function(X) 0.15*PER(X, sigma=1, rho=20, period=365, jitter=0) + 0.85*SE(X, sigma=1, rho=100, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
+# will additive combinations like this always be PSD?
 
 #fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2003-11-30")
 fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma)
-predict_obj <- get_predictions(fit_obj$X, fit_obj$fit) # interpolates
-plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name="ACA_LR1")
-plot_predictions(fit_obj, predict_obj, LR_coord=2, save_name="ACA_LR2")
-plot_predictions(fit_obj, predict_obj, LR_coord=21, save_name="ACA_LR21")
-plot_predictions(fit_obj, predict_obj, LR_coord=25, save_name="ACA_LR25")
+predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=1000) # interpolates
+plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name=paste0(baboon,"_LR1"))
+plot_predictions(fit_obj, predict_obj, LR_coord=2, save_name=paste0(baboon,"_LR2"))
+plot_predictions(fit_obj, predict_obj, LR_coord=7, save_name=paste0(baboon,"_LR7"))
+plot_predictions(fit_obj, predict_obj, LR_coord=19, save_name=paste0(baboon,"_LR19"))
 
-save(fit_obj, file="basset_ACA.RData")
-
-# when is a convolution of kernels PSD???
-
-# get something ok-ish and try (HARDAC) on full time series data for top-10 sampled baboon
-
-
+save(fit_obj, file=paste0("bassetfit_",baboon,".RData"))
 
 
 
