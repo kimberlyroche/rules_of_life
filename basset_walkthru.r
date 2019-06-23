@@ -54,11 +54,9 @@ fit_to_baboon <- function(baboon, indiv_data, Gamma, date_lower_limit=NULL, date
   # mean-center
   Xi <- Xi*(upsilon-D-1)
   
-#  alr_ys <- driver::alr(t(Y) + 0.5)
-#  alr_means <- colMeans(alr_ys)
-#  Theta <- function(X) matrix(alr_means, D-1, ncol(X))
-
-  Theta <- function(X) matrix(10, D-1, ncol(X))
+  alr_ys <- driver::alr(t(Y) + 0.5)
+  alr_means <- colMeans(alr_ys)
+  Theta <- function(X) matrix(alr_means, D-1, ncol(X))
 
   fit <- stray::basset(Y, observations, upsilon, Theta, Gamma, Xi)
   #fit.clr <- to_clr(fit)
@@ -101,18 +99,8 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") 
     geom_point(data=alr_tidy[alr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
     theme_minimal() + 
     theme(axis.title.x = element_blank(), 
-          axis.text.x = element_text(angle=45))
-  if(LR_coord == 1) {
-    p <- p + ylab("ALR(Bifidobacteriaceae/Helicobacteraceae)")
-  } else if(LR_coord == 2) {
-    p <- p + ylab("ALR(class Kiritimatiellae/Helicobacteraceae)")
-  } else if(LR_coord == 7) {
-    p <- p + ylab("ALR(Muribaculaceae/Helicobacteraceae)")
-  } else if(LR_coord == 19) {
-    p <- p + ylab("ALR(order Mollicutes RF39/Helicobacteraceae)")
-  } else {
-    p <- p + ylab("ALR coord")
-  }
+          axis.text.x = element_text(angle=45)) +
+    ylab("ALR coord")
   ggsave(paste0("plots/basset/",save_name,".png"), scale=2, width=12, height=3, units="in", dpi=100)
 }
 
@@ -130,19 +118,35 @@ baboon <- args[1]
 load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 
 #Gamma <- function(X) PER(X, period=365) # periodic only
-Gamma <- function(X) SE(X, sigma=1, rho=100, jitter=1e-8) # squared exponential only
-#Gamma <- function(X) 0.15*PER(X, sigma=1, rho=20, period=365, jitter=0) + 0.85*SE(X, sigma=1, rho=100, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
+#Gamma <- function(X) SE(X, sigma=1, rho=100, jitter=1e-8) # squared exponential only
+Gamma <- function(X) 0.15*PER(X, sigma=1, rho=20, period=365, jitter=0) + 0.85*SE(X, sigma=1, rho=100, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
 # will additive combinations like this always be PSD?
 
 #fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2003-11-30")
 fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=1000) # interpolates
-plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name=paste0(baboon,"_LR1_2"))
-plot_predictions(fit_obj, predict_obj, LR_coord=2, save_name=paste0(baboon,"_LR2_2"))
-plot_predictions(fit_obj, predict_obj, LR_coord=7, save_name=paste0(baboon,"_LR7_2"))
-plot_predictions(fit_obj, predict_obj, LR_coord=19, save_name=paste0(baboon,"_LR19_2"))
 
-#save(fit_obj, file=paste0("bassetfit_",baboon,".RData"))
+LR_coords <- NULL
+# chosen because they give (1) a reference (2) an apparent positive covary-er (3) zero covary-er
+if(baboon == "ACA") {
+  LR_coords <- c(19, 21, 20)
+} else if(baboon == "DUX") {
+  LR_coords <- c(19, 21, 20)
+} else if(baboon == "LOG") {
+  LR_coords <- c(1, 15, 7)
+} else if(baboon == "THR") {
+  LR_coords <- c(1, 15, 3)
+} else if(baboon == "VAI") {
+  LR_coords <- c(1, 25, 21)
+}
+
+if(!is.null(LR_coords)) {
+  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[1], save_name=paste0(baboon,"_ref"))
+  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[2], save_name=paste0(baboon,"_pos"))
+  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[3], save_name=paste0(baboon,"_neu"))
+}
+
+save(fit_obj, file=paste0("subsetted_indiv_data/",baboon,"_bassetfit.RData"))
 
 
 

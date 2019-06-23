@@ -21,7 +21,7 @@ n_indiv <- length(best_sampled)
 all_samples <- matrix(NA, D-1, (D-1)*n_samples_subset*n_indiv)
 labels <- c()
 for(i in 1:n_indiv) {
-  load(paste0("bassetfit_",best_sampled[i],".RData"))
+  load(paste0("subsetted_indiv_data/",best_sampled[i],"_bassetfit.RData"))
   Sigma_samples <- fit_obj$fit$Sigma
   rm(fit_obj)
   Sigma_samples <- Sigma_samples[,,1:n_samples_subset]
