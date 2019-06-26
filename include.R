@@ -762,6 +762,8 @@ calc_autocorrelation <- function(data,
                                  resample=FALSE,
                                  lag.max=26,
                                  date_diff_units="weeks",
+                                 use_alr=FALSE,
+                                 alr_ref=NULL,
                                  resample_rate=0.2) {
   if(date_diff_units != "weeks" && date_diff_units != "months" && date_diff_units != "seasons") {
     date_diff_units <- "weeks"
@@ -783,8 +785,12 @@ calc_autocorrelation <- function(data,
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
   
-  log_ratios <- apply_ilr(data)
-  log_ratios <- scale(log_ratios, center=T, scale=F)
+  if(use_alr) {
+    log_ratios <- apply_alr(data, d=alr_ref)
+  } else {
+    log_ratios <- apply_ilr(data)
+  }
+  log_ratios <- scale(log_ratios, center=TRUE, scale=FALSE)
   for(r in 1:rounds) {
     if(resample) {
       cat("Resampling iteration",r,"\n")
@@ -800,10 +806,8 @@ calc_autocorrelation <- function(data,
       sample_info <- metadata[metadata$sname == indiv, c("sample_id", "collection_date")]
       # appear already ordered but let's be paranoid
       sample_info <- sample_info[order(sample_info$collection_date),]
-      # pull log ratios associated with this individual
-      # there may be cases where none of the identified samples are present in this dataset
-      # catch that case
-      if(length(intersect(rownames(log_ratios), sample_info$sample_id)) > 0) {
+      # we need individuals with at least 2 samples
+      if(length(intersect(rownames(log_ratios), sample_info$sample_id)) > 1) {
         sample_lr <- log_ratios[rownames(log_ratios) %in% sample_info$sample_id,,drop=F]
         indiv_sample_no <- dim(sample_lr)[1]
         # randomly censor some of the samples
@@ -851,7 +855,9 @@ calc_autocorrelation <- function(data,
               }
             }
           }
-          lags[lag,r] <- lag.sums[lag]/lag.measured[lag]
+          if(lag.sums[lag] > 0 & lag.measured[lag] > 0) {
+            lags[lag,r] <- lag.sums[lag]/lag.measured[lag]
+          }
         }
       }
     }
@@ -881,7 +887,7 @@ calc_autocorrelation <- function(data,
   }
 }
 
-plot_mean_autocorrelation <- function(lags, filename="autocorrelation") {
+plot_mean_autocorrelation <- function(lags, filename="autocorrelation", width=6, height=3) {
   lag.max <- max(lags$lag)
   p <- ggplot(lags, aes(x=lag, y=ac)) +
     geom_line(linetype = "dashed") +
@@ -892,10 +898,10 @@ plot_mean_autocorrelation <- function(lags, filename="autocorrelation") {
     theme_minimal() +
     theme(axis.line.x=element_line(), axis.line.y=element_line()) +
     geom_hline(yintercept = 0)
-  ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
+  ggsave(paste(filename,".png",sep=""), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
 }
 
-plot_bounded_autocorrelation <- function(lags, filename="autocorrelation") {
+plot_bounded_autocorrelation <- function(lags, filename="autocorrelation", width=6, height=3) {
   p <- ggplot(lags, aes(x=lag, y=ac)) +
     geom_line(linetype="solid") +
     geom_ribbon(aes(ymin=lower, ymax=upper), alpha=0.2) +
@@ -906,7 +912,7 @@ plot_bounded_autocorrelation <- function(lags, filename="autocorrelation") {
     theme_minimal() +
     theme(axis.line.x=element_line(), axis.line.y=element_line()) +
     geom_hline(yintercept = 0)
-  ggsave(paste(filename,".png",sep=""), plot=p, scale=2, width=4, height=3, units="in")
+  ggsave(paste(filename,".png",sep=""), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
 }
 
 

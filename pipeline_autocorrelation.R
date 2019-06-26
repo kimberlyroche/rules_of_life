@@ -1,24 +1,31 @@
 # plot 16S autocorrelation
-# usage: pipeline_autocorrelation_16S.R 1
+# usage: pipeline_autocorrelation.R 16S family 156 weeks FALSE
 
 source("include.R")
 
 args = commandArgs(trailingOnly=TRUE)
-if(length(args) < 4) {
-  stop("Argument for data type (16S | metagenomics) (lag) (lag units) (resample) missing!\n")
+if(length(args) < 5) {
+  stop("Argument for data type (16S | metagenomics) (level) (lag) (lag units) (resample) missing!\n")
 }
 
 data_type <- args[1] # 16S, metagenomics
-lag.max <- as.numeric(args[2]) # e.g. 26
-lag.units <- args[3] # weeks, months, seasons
-resample <- as.logical(args[4])
+level <- args[2] # species, genus, family
+lag.max <- as.numeric(args[3]) # e.g. 26
+lag.units <- args[4] # weeks, months, seasons
+resample <- as.logical(args[5])
+
+data_type <- "16S"
+level <- "family"
+lag.max <- 36
+lag.units <- "months"
+resample <- FALSE
 
 # read in 16S
-glom_data <- load_glommed_data(level="species", replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
+glom_data <- load_glommed_data(level=level, replicates=TRUE)
+#data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
+data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE) # 9 is low-count cohort
+alr_ref <- 9
 metadata <- read_metadata(data)
-
-resample_rate = 0.2
 
 if(data_type == "metagenomics") {
   # read in metagenomics/PiPhillin
@@ -28,10 +35,21 @@ if(data_type == "metagenomics") {
   metadata <- metadata.metagenomics
 }
 
+lags <- calc_autocorrelation(data,
+                             metadata,
+                             lag.max=lag.max,
+                             date_diff_units=lag.units,
+                             resample=resample,
+                             use_alr=TRUE,
+                             alr_ref=alr_ref)
 if(resample) {
-  lags <- calc_autocorrelation(data, metadata, lag.max=lag.max, date_diff_units=lag.units, resample=resample, resample_rate=0.2)
-  plot_bounded_autocorrelation(lags, filename=paste("plots/autocorrelation_",lag.max,lag.units,"_",data_type,"_bounded",sep=""))
+  plot_bounded_autocorrelation(lags,
+                               filename=paste("plots/autocorrelation_",lag.max,lag.units,"_",data_type,"_bounded",sep=""),
+                               width=10,
+                               height=4)
 } else {
-  lags <- calc_autocorrelation(data, metadata, lag.max=lag.max, date_diff_units=lag.units, resample=resample, resample_rate=0.2)
-  plot_mean_autocorrelation(lags, filename=paste("plots/autocorrelation_",lag.max,lag.units,"_",data_type,sep=""))
+  plot_mean_autocorrelation(lags,
+                            filename=paste("plots/autocorrelation_",lag.max,lag.units,"_",data_type,sep=""),
+                            width=10,
+                            height=4)
 }
