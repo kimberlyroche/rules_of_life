@@ -28,7 +28,7 @@ get_predictions <- function(X, fit, n_samples=2000){
 
 fit_to_baboon <- function(baboon, indiv_data, Gamma, date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL) {
   Y_full <- indiv_data$ys
-  observations_full <- indiv_data$observation_vec
+  observations_full <- indiv_data$observations
   
   if(!is.null(date_lower_limit) & !is.null(date_upper_limit)) {
     # require both be present for now
@@ -120,19 +120,17 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") 
 # for reference, individuals passable as arguments are:
 # "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
 
-if(FALSE) {
 args <- commandArgs(trailingOnly=TRUE)
-
-if(length(args) < 1) {
-  stop("Usage: Rscript basset_walkthrough.r ACA", call.=FALSE)
+if(length(args) < 2) {
+  stop("Usage: Rscript basset_walkthrough.r ACA phylum NULL", call.=FALSE)
 }
-
 baboon <- args[1]
+level <- args[2]
+if(length(args) > 2) {
+  alr_ref <- as.numeric(args[3])
+} else {
+  alr_ref <- NULL
 }
-
-baboon <- "ACA"
-
-load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 
 # parameter settings for GP kernels
 
@@ -140,7 +138,29 @@ load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 # in practice sigma of one looks about right, can we motivate this?
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
 data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
-alr_ref <- 9 # low-count cohort
+
+# cut this down to the desired individual
+indiv_data <- subset_samples(data, sname==baboon)
+
+# visualize the data at this level
+plot_timecourse_phyloseq(indiv_data, save_filename=paste0(baboon,"_phylum_timecourse"), gapped=FALSE, legend=TRUE, legend_level="phylum")
+plot_timecourse_phyloseq(indiv_data, save_filename=paste0(baboon,"_phylum_timecourse_gapped"), gapped=TRUE, legend=TRUE, legend_level="phylum")
+
+# visualize autocorrelation
+metadata <- read_metadata(data)
+
+lags <- calc_autocorrelation(data,
+                             metadata,
+                             lag.max=36,
+                             date_diff_units="months",
+                             resample=FALSE,
+                             use_alr=TRUE,
+                             alr_ref=NULL)
+plot_mean_autocorrelation(lags,
+                          filename=paste("plots/autocorrelation_36months_GPdiagnostic",sep=""),
+                          width=10,
+                          height=4)
+
 abundances <- otu_table(data)@.Data
 alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
 max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min))
@@ -150,6 +170,7 @@ max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min
 sigma <- sqrt(median(max_min_diff)) / 3
 # scale down by larger size of Gamma relative to Sigma
 sigma <- D/N
+cat("Using sigma:",sigma,"\n")
 # sigma <- 1
 
 # we can make informed(ish) choices for kernel parameters
@@ -170,40 +191,23 @@ cat("Using bandwidth (periodic):",rho_per,"\n")
 # x <- 1:730 # distance
 # lines(x, 0.15*sigma^2*exp(-2*(sin(pi*x/period)^2)/(rho^2)), col="blue")
 
-alr_ref <- 9
-
 Gamma <- function(X) 0.15*PER(X, sigma=sigma, rho=rho_per, period=period, jitter=0) + 0.85*SE(X, sigma=sigma, rho=rho_se, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
 
-fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01", date_upper_limit="2003-11-30", alr_ref=alr_ref)
-#fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma)
+indiv_metadata <- read_metadata(indiv_data)
+baseline_date <- indiv_metadata$collection_date[1]
+observations <- sapply(indiv_metadata$collection_date, function(x) round(difftime(x, baseline_date, units="days"))) + 1
+data_obj <- list(ys=otu_table(indiv_data)@.Data, observations=observations)
+
+fit_obj <- fit_to_baboon(baboon, data_obj, Gamma, 
+                         date_lower_limit="2001-10-01", date_upper_limit="2003-11-30", alr_ref=alr_ref)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
 
-plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name=NULL) # high abundance
-plot_predictions(fit_obj, predict_obj, LR_coord=20, save_name=NULL) # low abundance
-
-if(FALSE) {
-LR_coords <- NULL
-# chosen because they give (1) a reference (2) an apparent positive covary-er (3) zero covary-er
-if(baboon == "ACA") {
-  LR_coords <- c(19, 21, 20)
-} else if(baboon == "DUX") {
-  LR_coords <- c(19, 21, 20)
-} else if(baboon == "LOG") {
-  LR_coords <- c(1, 15, 7)
-} else if(baboon == "THR") {
-  LR_coords <- c(1, 15, 3)
-} else if(baboon == "VAI") {
-  LR_coords <- c(1, 25, 21)
-}
-
-if(!is.null(LR_coords)) {
-  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[1], save_name=paste0(baboon,"_ref"))
-  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[2], save_name=paste0(baboon,"_pos"))
-  plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[3], save_name=paste0(baboon,"_neu"))
-}
+LR_coords <- c(1,2,3)
+plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[1], save_name=paste0(baboon,"_ref"))
+plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[2], save_name=paste0(baboon,"_pos"))
+plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[3], save_name=paste0(baboon,"_neu"))
 
 save(fit_obj, file=paste0("subsetted_indiv_data/",baboon,"_bassetfit.RData"))
-}
 
 
 

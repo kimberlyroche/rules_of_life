@@ -665,7 +665,7 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
 # plot proportional change over time
 # note: palette size would probably have to increase to accomodate legend_level finer than family!
 plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=TRUE, legend_level="family") {
-  n <- nsamples(data)
+  n <- phyloseq::nsamples(data)
   p <- apply_proportion(data)
   df <- psmelt(p)
   df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
@@ -699,18 +699,19 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   df3 <- df3[order(df3$Sample),]
 
   df3$Sample <- factor(df3$Sample, levels=unique(df3$Sample))
+  level_idx <- 7
+  if(legend_level == "kingdom") { level_idx = 1; }
+  if(legend_level == "phylum") { level_idx = 2; }
+  if(legend_level == "class") { level_idx = 3; }
+  if(legend_level == "order") { level_idx = 4; }
+  if(legend_level == "family") { level_idx = 5; }
+  if(legend_level == "genus") { level_idx = 6; }
   # replace ASV sequences with their (abbrev.) taxonomy for readability
   for(i in 1:dim(df3)[1]) {
     # show labels as order/family/genus
     # species is NA for all
     if(df3$OTU[i] != na.string) {
-      if(legend_level == "species") {
-        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:6]),collapse="/")
-      } else if(legend_level == "genus") {
-        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4:5]),collapse="/")
-      } else {
-        df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],4]),collapse="/")
-      }
+      df3$OTU[i] <- paste(as.vector(tax_table(data)[df3$OTU[i],level_idx]),collapse="/")
     }
   }
 
@@ -798,6 +799,7 @@ calc_autocorrelation <- function(data,
     lag.sums <- numeric(lag.max)
     lag.measured <- numeric(lag.max)
     for(indiv in individuals) {
+      cat("Individual",indiv,"...\n")
       # pick an individual
       # this weird syntactic hack seems to be necessary for subset_samples?
       # apparently the thing you're filtering against must be globally available

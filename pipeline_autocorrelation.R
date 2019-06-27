@@ -14,17 +14,11 @@ lag.max <- as.numeric(args[3]) # e.g. 26
 lag.units <- args[4] # weeks, months, seasons
 resample <- as.logical(args[5])
 
-data_type <- "16S"
-level <- "family"
-lag.max <- 36
-lag.units <- "months"
-resample <- FALSE
-
 # read in 16S
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
-#data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE) # 9 is low-count cohort
-alr_ref <- 9
+data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
+# data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE) # 9 is low-count cohort
+alr_ref <- ntaxa(data)
 metadata <- read_metadata(data)
 
 if(data_type == "metagenomics") {
