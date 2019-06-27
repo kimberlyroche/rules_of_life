@@ -135,26 +135,19 @@ baboon <- "ACA"
 load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 
 # parameter settings for GP kernels
-# sigma should be approx. the standard deviation between (ALR) samples
 
-if(FALSE) {
-glom_data <- load_glommed_data(level=level, replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
-alr_ref <- 9 # low-count cohort
-# get mean abundances
-abundances <- otu_table(data)@.Data
-abundance_means <- colMeans(abundances)
-alr_mean <- driver::alr(abundance_means, d=alr_ref)
-# estimate the variance
-total_samples <- nrow(abundances)
-alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
-centered_abundances <- t(alr_abundances) - matrix(t(alr_mean), nrow=length(alr_mean), ncol=total_samples)
-alr_var <- mean(apply(centered_abundances, 2, function(x) t(x)%*%x))
-sigma <- sqrt(alr_var)
-}
+# set sigma -- this is too big
+# in practice sigma of one looks about right, can we motivate this?
+# glom_data <- load_glommed_data(level=level, replicates=TRUE)
+# data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+# alr_ref <- 9 # low-count cohort
+# abundances <- otu_table(data)@.Data
+# alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
+# max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min))
+# sigma <- sqrt(median(max_min_diff))
+sigma <- 1
 
 # we can make informed(ish) choices for kernel parameters
-sigma <- 1
 c <- 0.1 # desired correlation
 dd <- 60 # distance in days where we should hit that correlation
 rho_se <- sqrt(-dd^2/(2*log(c)))
@@ -180,7 +173,8 @@ fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma, date_lower_limit="2001-10-01
 #fit_obj <- fit_to_baboon(baboon, indiv_data, Gamma)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
 
-plot_predictions(fit_obj, predict_obj, LR_coord=3, save_name=NULL)
+plot_predictions(fit_obj, predict_obj, LR_coord=1, save_name=NULL) # high abundance
+plot_predictions(fit_obj, predict_obj, LR_coord=20, save_name=NULL) # low abundance
 
 if(FALSE) {
 LR_coords <- NULL
