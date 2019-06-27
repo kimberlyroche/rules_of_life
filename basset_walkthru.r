@@ -138,14 +138,19 @@ load(paste0("subsetted_indiv_data/",baboon,"_data.RData"))
 
 # set sigma -- this is too big
 # in practice sigma of one looks about right, can we motivate this?
-# glom_data <- load_glommed_data(level=level, replicates=TRUE)
-# data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
-# alr_ref <- 9 # low-count cohort
-# abundances <- otu_table(data)@.Data
-# alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
-# max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min))
-# sigma <- sqrt(median(max_min_diff))
-sigma <- 1
+glom_data <- load_glommed_data(level=level, replicates=TRUE)
+data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+alr_ref <- 9 # low-count cohort
+abundances <- otu_table(data)@.Data
+alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
+max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min))
+# scale sigma by 1/3 since Sigma (posterior taxonomic covariance) contributes to log ratio
+# variance *twice*; the idea here is the diagonal of gamma will account for about 1/3 of the
+# observed variance in log ratios; this probably isn't quite right but let's see if it's close???
+sigma <- sqrt(median(max_min_diff)) / 3
+# scale down by larger size of Gamma relative to Sigma
+sigma <- D/N
+# sigma <- 1
 
 # we can make informed(ish) choices for kernel parameters
 c <- 0.1 # desired correlation
