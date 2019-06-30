@@ -214,10 +214,10 @@ Gamma <- function(X) 0.15*PER(X, sigma=sigma, rho=rho_per, period=period, jitter
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
 
-LR_coords <- c(1,2,3)
-plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[1], save_name=paste0(baboon,"_",LR_coords[1]))
-plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[2], save_name=paste0(baboon,"_",LR_coords[2]))
-plot_predictions(fit_obj, predict_obj, LR_coord=LR_coords[3], save_name=paste0(baboon,"_",LR_coords[3]))
+LR_coords <- c(1,2,7,8,9)
+for(coord in LR_coords) {
+  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord))
+}
 
 Sigma <- fit_obj$fit$Sigma
 save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit.RData"))
