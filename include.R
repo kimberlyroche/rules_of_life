@@ -664,11 +664,16 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
 
 # plot proportional change over time
 # note: palette size would probably have to increase to accomodate legend_level finer than family!
-plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=TRUE, legend_level="family") {
+plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
+                                     legend=TRUE, legend_level="family", selected_samples=NULL) {
   n <- phyloseq::nsamples(data)
   p <- apply_proportion(data)
   df <- psmelt(p)
-  df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance))
+  df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance, SID=df$sid))
+  if(!is.null(selected_samples)) {
+    df2$alpha <- 0.1
+    df2[df2$SID %in% selected_samples,]$alpha <- 1
+  }
 
   # for gapped plots, this is the OTU ID placeholder we'll use for dummy data
   na.string <- ".N/A"
@@ -676,7 +681,8 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   # replace Sample ID's with their dates for readability
   metadata <- sample_data(data)
   for(i in 1:dim(df2)[1]) {
-    df2$Sample[i] <- metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]]
+    df2$Sample[i] <- paste(metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]],
+                           metadata[metadata$sample_id==df2$Sample[i],"sid"][[1]])
   }
 
   # make sure the dates are in order and fix the order by converting to factors
@@ -724,19 +730,28 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   } else {
     img_width <- 10
   }
-  p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
-    geom_bar(position="fill", stat="identity") +
-    scale_fill_manual(values=coul) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    theme(legend.text=element_text(size=8))
+  if(!is.null(selected_samples)) {
+    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU, alpha=alpha)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_fill_manual(values=coul) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8)) +
+      theme(legend.position="none")
+  } else {
+    p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU)) + 
+      geom_bar(position="fill", stat="identity") +
+      scale_fill_manual(values=coul) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(legend.text=element_text(size=8))
+    if(legend) {
+      p <- p + theme(legend.position="bottom")
+    } else {
+      p <- p + theme(legend.position="none")
+    }
+  }
   if(n < 20) {
     # these are likely replicates
     img_width <- 5
-  }
-  if(legend) {
-    p <- p + theme(legend.position="bottom")
-  } else {
-    p <- p + theme(legend.position="none")
   }
   ggsave(paste("plots/",save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
 }
