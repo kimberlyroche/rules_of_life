@@ -1,5 +1,5 @@
 # plot 16S autocorrelation
-# usage: pipeline_autocorrelation.R 16S family 156 weeks FALSE
+# usage: Rscript pipeline_autocorrelation.R 16S phylum 36 months FALSE
 
 source("include.R")
 
@@ -18,7 +18,7 @@ resample <- as.logical(args[5])
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
 data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
 # data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE) # 9 is low-count cohort
-alr_ref <- ntaxa(data)
+# alr_ref <- ntaxa(data)
 metadata <- read_metadata(data)
 
 if(data_type == "metagenomics") {
@@ -34,8 +34,7 @@ lags <- calc_autocorrelation(data,
                              lag.max=lag.max,
                              date_diff_units=lag.units,
                              resample=resample,
-                             use_alr=TRUE,
-                             alr_ref=alr_ref)
+                             use_lr="alr")
 if(resample) {
   plot_bounded_autocorrelation(lags,
                                filename=paste("plots/autocorrelation_",lag.max,lag.units,"_",data_type,"_bounded",sep=""),

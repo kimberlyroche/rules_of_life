@@ -4,13 +4,13 @@ if(length(args) < 1) {
 }
 level <- args[1]
 
-fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern="*_bassetfit.RData", full.names=TRUE, recursive=FALSE)
-individuals <- sapply(fitted_models, function(x) { idx <- regexpr("_bassetfit.RData", x); return(substr(x, idx-3, idx-1)) } )
+fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern="*_bassetfit_.RData", full.names=TRUE, recursive=FALSE)
+individuals <- sapply(fitted_models, function(x) { idx <- regexpr("_bassetfit_.RData", x); return(substr(x, idx-3, idx-1)) } )
 names(individuals) <- NULL
 
 for(i in 1:length(individuals)) {
   cat("Processing baboon",individuals[i],"...\n")
-  load(paste0("subsetted_indiv_data/",level,"/",individuals[i],"_bassetfit.RData"))
+  load(paste0("subsetted_indiv_data/",level,"/",individuals[i],"_bassetfit_.RData"))
   cat("Mean trace:",mean(apply(Sigma, 3, function(x) sum(diag(x)))),"\n")
   cat("Sigma has",dim(Sigma)[3],"samples\n")
   temp <- apply(Sigma, c(1,2), mean)

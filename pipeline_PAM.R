@@ -85,12 +85,3 @@ plot_timecourse_phyloseq(ACA_data, paste0("ACA_medoids_k",k), gapped=FALSE, lege
 selected_samples <- sample_data(VIG_data)$sid[medoids]
 selected_samples <- selected_samples[!is.na(selected_samples)]
 plot_timecourse_phyloseq(VIG_data, paste0("VIG_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
-
-
-
-
-
-
-
-
-

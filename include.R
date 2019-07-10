@@ -778,7 +778,7 @@ calc_autocorrelation <- function(data,
                                  resample=FALSE,
                                  lag.max=26,
                                  date_diff_units="weeks",
-                                 use_alr=FALSE,
+                                 use_lr="clr",
                                  alr_ref=NULL,
                                  resample_rate=0.2) {
   if(date_diff_units != "weeks" && date_diff_units != "months" && date_diff_units != "seasons") {
@@ -800,13 +800,17 @@ calc_autocorrelation <- function(data,
     #rounds <- 10 # for testing
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
-  
-  if(use_alr) {
+
+  # TBD: try various CoDa proportionality measures
+  if(use_lr == "clr") {
+    log_ratios <- apply_clr(data)
+  } else if(use_lr == "alr") {
     log_ratios <- apply_alr(data, d=alr_ref)
   } else {
     log_ratios <- apply_ilr(data)
   }
   log_ratios <- scale(log_ratios, center=TRUE, scale=FALSE)
+
   for(r in 1:rounds) {
     if(resample) {
       cat("Resampling iteration",r,"\n")
