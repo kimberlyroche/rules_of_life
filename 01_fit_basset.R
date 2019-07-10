@@ -1,9 +1,10 @@
-#library(stray)
-devtools::load_all("/data/mukherjeelab/labraduck")
+library(stray)
+#devtools::load_all("/data/mukherjeelab/labraduck")
 
 # for reference, individuals passable as arguments are:
 # "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
 
+if(FALSE) {
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
   stop("Usage: Rscript 01_fit_basset.R ACA family 9", call.=FALSE)
@@ -15,12 +16,21 @@ if(length(args) > 2) {
 } else {
   alr_ref <- NULL
 }
+}
+
+baboon <- "ACA"
+level <- "family"
+alr_ref <- NULL
 
 # testing
-#date_lower_limit <- "2001-10-01"
-#date_upper_limit <- "2003-11-30"
-date_lower_limit <- NULL
-date_upper_limit <- NULL
+date_lower_limit <- "2001-10-01"
+date_upper_limit <- "2002-11-30"
+
+date_lower_limit <- "2004-05-24"
+date_upper_limit <- "2008-10-25"
+
+#date_lower_limit <- NULL
+#date_upper_limit <- NULL
 
 vizualization <- FALSE
 
@@ -79,7 +89,7 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   return(list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit))
 }
 
-plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") {
+plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
   observations <- fit_obj$X
   alr_tidy <- gather_array(fit_obj$alr_ys, "LR_value", "timepoint", "LR_coord")
   
@@ -193,7 +203,7 @@ cat("Using sigma:",sigma,"\n")
 
 # we can make informed(ish) choices for kernel parameters
 c <- 0.1 # desired correlation
-dd <- 120 # distance in days where we should hit that correlation
+dd <- 30 # distance in days where we should hit that correlation
 rho_se <- sqrt(-dd^2/(2*log(c)))
 cat("Using bandwidth (squared exponential):",rho_se,"\n")
 # simulate
@@ -209,18 +219,23 @@ cat("Using bandwidth (periodic):",rho_per,"\n")
 # x <- 1:730 # distance
 # lines(x, 0.15*sigma^2*exp(-2*(sin(pi*x/period)^2)/(rho^2)), col="blue")
 
-Gamma <- function(X) 0.15*PER(X, sigma=sigma, rho=rho_per, period=period, jitter=0) + 0.85*SE(X, sigma=sigma, rho=rho_se, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
+Gamma <- function(X) 0.1*PER(X, sigma=sigma, rho=rho_per, period=period, jitter=0) +
+  0.1*CONST(X, sigma=0.1) +
+  0.8*SE(X, sigma=sigma, rho=rho_se, jitter=0) +
+  (1e-8)*diag(ncol(X)) # pretty arbitrary
 
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
-predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
+predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=5) # interpolates
 
-LR_coords <- c(1,2,7,8,9)
+#LR_coords <- c(1,2,7,8,9)
+LR_coords <- c(1)
 for(coord in LR_coords) {
-  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord))
+#  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord))
+  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=NULL)
 }
 
-Sigma <- fit_obj$fit$Sigma
-save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit.RData"))
+#Sigma <- fit_obj$fit$Sigma
+#save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit.RData"))
 
 
 
