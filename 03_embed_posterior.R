@@ -32,12 +32,12 @@ plot_Sigma_ordination <- function(fit, labels, label_type, legend=TRUE) {
 }
 
 args <- commandArgs(trailingOnly=TRUE)
-if(length(args) < 3) {
-  stop("Testing usage: Rscript 03_embed_posterior.R family 26 TRUE", call.=FALSE)
+if(length(args) < 2) {
+  stop("Testing usage: Rscript 03_embed_posterior.R family 26", call.=FALSE)
 }
 level <- args[1]
 D <- as.numeric(args[2])
-use_Riemann <- as.logical(args[3])
+use_Riemann <- TRUE
 
 # testing
 #date_lower_limit <- "2001-10-01"
@@ -47,8 +47,8 @@ date_upper_limit <- NULL
 
 sourceCpp("cov_viz_test.cpp")
 
-fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern="*_bassetfit.RData", full.names=TRUE, recursive=FALSE)
-individuals <- sapply(fitted_models, function(x) { idx <- regexpr("_bassetfit.RData", x); return(substr(x, idx-3, idx-1)) } )
+fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern="*_bassetfit_.RData", full.names=TRUE, recursive=FALSE)
+individuals <- sapply(fitted_models, function(x) { idx <- regexpr("_bassetfit_.RData", x); return(substr(x, idx-3, idx-1)) } )
 names(individuals) <- NULL
 
 # get group membership; use social group in which this individual spent the largest time
@@ -85,7 +85,7 @@ all_samples <- matrix(NA, D-1, (D-1)*n_samples_subset*n_indiv)
 indiv_labels <- c()
 group_labels <- c()
 for(i in 1:n_indiv) {
-  load(paste0("subsetted_indiv_data/",level,"/",individuals[i],"_bassetfit.RData"))
+  load(paste0("subsetted_indiv_data/",level,"/",individuals[i],"_bassetfit_.RData"))
   Sigma <- Sigma[,,1:n_samples_subset]
   all_samples[,((i-1)*(D-1)*n_samples_subset+1):(i*(D-1)*n_samples_subset)] <- Sigma
   indiv_labels <- c(indiv_labels, rep(individuals[i], n_samples_subset))

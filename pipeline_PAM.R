@@ -9,7 +9,7 @@ source("include.R")
 # run PAM clustering (K-medoids)
 # =============================================================================
 
-# usage: pipeline_PAM.R 0.65
+# usage: Rscript pipeline_PAM.R 0.65
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0) {

@@ -6,19 +6,49 @@ devtools::load_all("/data/mukherjeelab/labraduck")
 
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
-  stop("Usage: Rscript 01_fit_basset.R ACA family 9", call.=FALSE)
+  # arguments are+
+  #   baboon sname
+  #   agglomeration level
+  #   SE scale
+  #   PER scale
+  #   WN scale
+  #   days decay for SE kernel
+  #   ALR reference taxon index
+  #   plot save name append string
+  stop("Usage: Rscript 01_fit_basset.R ACA family 2 0.2 0.1 90 9", call.=FALSE)
 }
 baboon <- args[1]
 level <- args[2]
-if(length(args) > 2) {
-  alr_ref <- as.numeric(args[3])
+if(length(args) >= 3) {
+  se_weight <- as.numeric(args[3])
+  per_weight <- se_weight*as.numeric(args[4])
+  wn_weight <- se_weight*as.numeric(args[5])
+} else {
+  se_weight <- 1
+  per_weight <- 0.2
+  wn_weight <- 0.1 # I'm using this to soak up a bit of daily variation
+}
+if(length(args) == 6) {
+  dd_se <- as.numeric(args[6])
+} else {
+  dd_se <- 90
+}
+if(length(args) == 7) {
+  alr_ref <- as.numeric(args[7])
 } else {
   alr_ref <- NULL
+}
+if(length(args) >= 8) {
+  save_append <- args[8]
+} else {
+  save_append <- ""
 }
 
 # testing
 #date_lower_limit <- "2001-10-01"
-#date_upper_limit <- "2003-11-30"
+#date_upper_limit <- "2003-01-01"
+#date_lower_limit <- "2004-05-24"
+#date_upper_limit <- "2008-10-25"
 date_lower_limit <- NULL
 date_upper_limit <- NULL
 
@@ -31,17 +61,18 @@ library(tidyverse)
 
 source("include.R")
 
+WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
+  dist <- as.matrix(dist(t(X)))
+  G <- diag(ncol(dist))*sigma^2 + jitter*diag(ncol(dist))
+  return(G)
+}
+
 # X is Q x N as in other kernels
 # bandwidth: rho as chosen gives antiphase observations a correlation of ~0.1
 PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
   dist <- as.matrix(dist(t(X)))
   G <- sigma^2 * exp(-2*(sin(pi*dist/period)^2)/(rho^2)) + jitter*diag(ncol(dist))
   return(G)
-}
-
-# constant kernel; has the predictable effect of flattening the whole trajectory
-CONST <- function(X, sigma=1) {
-  return(sigma^2)
 }
 
 get_predictions <- function(X, fit, n_samples=2000){
@@ -141,8 +172,7 @@ if(vizualization) {
                              lag.max=36,
                              date_diff_units="months",
                              resample=FALSE,
-                             use_alr=TRUE,
-                             alr_ref=NULL)
+                             use_lr="alr")
   plot_mean_autocorrelation(lags,
                              filename=paste("plots/autocorrelation_36months_GPdiagnostic",sep=""),
                              width=10,
@@ -179,48 +209,30 @@ rownames(Y) <- NULL
 D <- nrow(Y)
 N <- ncol(Y)
 
-# abundances <- otu_table(data)@.Data
-# alr_abundances <- driver::alr(abundances+0.65, d=alr_ref)
-# max_min_diff <- abs(apply(alr_abundances, 2, max) - apply(alr_abundances, 2, min))
-# scale sigma by 1/3 since Sigma (posterior taxonomic covariance) contributes to log ratio
-# variance *twice*; the idea here is the diagonal of gamma will account for about 1/3 of the
-# observed variance in log ratios; this probably isn't quite right but let's see if it's close???
-# sigma <- sqrt(median(max_min_diff)) / 3
-# scale down by larger size of Gamma relative to Sigma
-# sigma <- D/N
-sigma <- 1
-cat("Using sigma:",sigma,"\n")
-
-# we can make informed(ish) choices for kernel parameters
-c <- 0.1 # desired correlation
-dd <- 120 # distance in days where we should hit that correlation
-rho_se <- sqrt(-dd^2/(2*log(c)))
-cat("Using bandwidth (squared exponential):",rho_se,"\n")
-# simulate
-# x <- 1:730 # distance
-# plot(x, (sigma^2)*exp(-(x^2)/(2*rho^2)), type="l", ylim=c(0, 1))
+#dd_se <- 30
+dc <- 0.1 # desired SE minimum correlation
+se_sigma <- 1
+rho_se <- sqrt(-dd_se^2/(2*log(dc))) # back calculate
 
 period <- 365
-c <- 0.1 # desired correlation
-dd <- 180 # distance in days where we should hit that correlation
-rho_per <- sqrt(-2*(sin(pi*dd/period)^2)/(log(c)))
-cat("Using bandwidth (periodic):",rho_per,"\n")
-# simulate
-# x <- 1:730 # distance
-# lines(x, 0.15*sigma^2*exp(-2*(sin(pi*x/period)^2)/(rho^2)), col="blue")
+per_sigma <- 1
+rho_per <- 1
 
-Gamma <- function(X) 0.15*PER(X, sigma=sigma, rho=rho_per, period=period, jitter=0) + 0.85*SE(X, sigma=sigma, rho=rho_se, jitter=0) + (1e-8)*diag(ncol(X)) # pretty arbitrary
+Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
+                     per_weight*PER(X, sigma=per_sigma, rho=rho_per, period=period, jitter=0) +
+                     wn_weight*WHITENOISE(X, sigma=1, jitter=0) +
+                     (1e-8)*diag(ncol(X)) # pretty arbitrary
 
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
 
-LR_coords <- c(1,2,7,8,9)
+LR_coords <- c(1,8)
 for(coord in LR_coords) {
-  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord))
+  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord,"_",save_append))
 }
 
 Sigma <- fit_obj$fit$Sigma
-save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit.RData"))
+save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit_",save_append,".RData"))
 
 
 
