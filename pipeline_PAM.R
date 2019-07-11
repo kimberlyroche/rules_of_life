@@ -37,9 +37,9 @@ k <- 30
 res_cr <- Cluster_Medoids(as.matrix(rep_dist), k, verbose=TRUE, threads=4)
 medoids <- logical(nrow(rep_counts))
 medoids[res_cr$medoid_indices] <- TRUE
-df <- data.frame(x=res_tsne$Y[,1], y=res_tsne$Y[,2], SID=rownames(res_mds), Medoid=medoids)
+df <- data.frame(x=res_tsne$Y[,1], y=res_tsne$Y[,2], SID=rownames(rep_counts), Medoid=medoids)
 p <- ggplot() +
-  geom_point(data=df[df$Medoid==FALSE,], aes(x=x, y=y, color=SID), size=1, alpha=0.5) +
+  geom_point(data=df[df$Medoid==FALSE,], aes(x=x, y=y, color=SID), size=1, alpha=0.66) +
   geom_point(data=df[df$Medoid==TRUE,], aes(x=x, y=y, color=SID), size=2)
 p
 
@@ -48,11 +48,11 @@ p
 
 ACA_data <- subset_samples(data, sname=="ACA")
 ACA_season <- sample_data(ACA_data)$season
-DUI_data <- subset_samples(data, sname=="DUI")
-DUI_season <- sample_data(DUI_data)$season
-counts <- rbind(otu_table(ACA_data)@.Data, otu_table(DUI_data)@.Data)
-sname_labels <- c(rep("ACA", nsamples(ACA_data)), rep("DUI", nsamples(DUI_data)))
-season_labels <- c(ACA_season, DUI_season)
+VIG_data <- subset_samples(data, sname=="VIG")
+VIG_season <- sample_data(VIG_data)$season
+counts <- rbind(otu_table(ACA_data)@.Data, otu_table(VIG_data)@.Data)
+sname_labels <- c(rep("ACA", nsamples(ACA_data)), rep("VIG", nsamples(VIG_data)))
+season_labels <- c(ACA_season, VIG_season)
 labels <- paste(sname_labels, season_labels)
 rownames(counts) <- labels
 colnames(counts) <- NULL
@@ -67,7 +67,7 @@ p <- ggplot(df) +
 p
 
 # cluster an re-label
-k <- 20
+k <- 10
 res_cr <- Cluster_Medoids(as.matrix(rep_dist), k, verbose=TRUE, threads=4)
 medoids <- logical(nrow(counts))
 medoids[res_cr$medoid_indices] <- TRUE
@@ -82,6 +82,6 @@ selected_samples <- sample_data(ACA_data)$sid[medoids]
 selected_samples <- selected_samples[!is.na(selected_samples)]
 plot_timecourse_phyloseq(ACA_data, paste0("ACA_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
 
-selected_samples <- sample_data(DUI_data)$sid[medoids]
+selected_samples <- sample_data(VIG_data)$sid[medoids]
 selected_samples <- selected_samples[!is.na(selected_samples)]
-plot_timecourse_phyloseq(DUI_data, paste0("DUI_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
+plot_timecourse_phyloseq(VIG_data, paste0("VIG_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)

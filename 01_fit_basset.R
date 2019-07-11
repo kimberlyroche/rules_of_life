@@ -1,9 +1,10 @@
-#library(stray)
-devtools::load_all("/data/mukherjeelab/labraduck")
+library(stray)
+#devtools::load_all("/data/mukherjeelab/labraduck")
 
 # for reference, individuals passable as arguments are:
 # "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
 
+if(FALSE) {
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
   # arguments are+
@@ -110,7 +111,7 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   return(list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit))
 }
 
-plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name="out") {
+plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
   observations <- fit_obj$X
   alr_tidy <- gather_array(fit_obj$alr_ys, "LR_value", "timepoint", "LR_coord")
   
@@ -224,7 +225,7 @@ Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
                      (1e-8)*diag(ncol(X)) # pretty arbitrary
 
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
-predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100) # interpolates
+predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=5) # interpolates
 
 LR_coords <- c(1,8)
 for(coord in LR_coords) {
@@ -233,7 +234,3 @@ for(coord in LR_coords) {
 
 Sigma <- fit_obj$fit$Sigma
 save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit_",save_append,".RData"))
-
-
-
-

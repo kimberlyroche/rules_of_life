@@ -671,7 +671,7 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
   df <- psmelt(p)
   df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance, SID=df$sid))
   if(!is.null(selected_samples)) {
-    df2$alpha <- 0.1
+    df2$alpha <- 0.25
     df2[df2$SID %in% selected_samples,]$alpha <- 1
   }
 
@@ -753,7 +753,7 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
     # these are likely replicates
     img_width <- 5
   }
-  ggsave(paste("plots/",save_filename,".png",sep=""), plot=p, scale=2, width=img_width, height=4, units="in")
+  ggsave(paste("plots/",save_filename,".png",sep=""), plot=p, scale=1.5, dpi=100, width=img_width, height=3, units="in")
 }
 
 # this is just a wrapper to call plot_timecourse_phyloseq on a representative sample of individuals
