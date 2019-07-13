@@ -21,11 +21,11 @@ plot_Sigma_ordination <- function(fit, labels, label_type, legend=TRUE) {
   if(!legend) {
     p <- p + theme(legend.position='none')
   }
-  plot_save_name <- paste0("Sigma_posterior_ordination_",label_type,"_")
+  plot_save_name <- paste0("Sigma_posterior_ordination_",label_type)
   if(use_Riemann) {
-    plot_save_name <- paste0(plot_save_name,"Riemann.png")
+    plot_save_name <- paste0(plot_save_name,".png")
   } else {
-    plot_save_name <- paste0(plot_save_name,"Frobenius.png")
+    plot_save_name <- paste0(plot_save_name,"_Frobenius.png")
   }
   ggsave(paste0("plots/basset/",level,"/",plot_save_name), scale=2,
            width=4, height=4, units="in", dpi=100)
@@ -37,6 +37,11 @@ if(length(args) < 2) {
 }
 level <- args[1]
 D <- as.numeric(args[2])
+if(length(args) > 2) {
+  tag <- args[3]
+} else {
+  tag <- NULL
+}
 use_Riemann <- TRUE
 
 # testing
@@ -47,8 +52,14 @@ date_upper_limit <- NULL
 
 sourceCpp("cov_viz_test.cpp")
 
-fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern="*_bassetfit_.RData", full.names=TRUE, recursive=FALSE)
-individuals <- sapply(fitted_models, function(x) { idx <- regexpr("_bassetfit_.RData", x); return(substr(x, idx-3, idx-1)) } )
+pattern_str <- "*_bassetfit.RData"
+regexpr_str <- "_bassetfit.RData"
+if(!is.null(tag)) {
+  pattern_str <- paste0("*_bassetfit_",tag,".RData")
+  regexpr_str <- paste0("_bassetfit_",tag,".RData")
+}
+fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern=pattern_str, full.names=TRUE, recursive=FALSE)
+individuals <- sapply(fitted_models, function(x) { idx <- regexpr(regexpr_str, x); return(substr(x, idx-3, idx-1)) } )
 names(individuals) <- NULL
 
 # get group membership; use social group in which this individual spent the largest time
@@ -73,21 +84,33 @@ if(!is.null(date_lower_limit) & !is.null(date_upper_limit)) {
     slice(which.max(n))
 }
 
-cat("Group membership:\n")
-print(tbl_df(primary_group), n=50)
+#cat("Group membership:\n")
+#print(tbl_df(primary_group), n=50)
 
-n_samples <- 100 # eta samples to draw; Kalman filter, simulation smoother run on these
+# get sample count (slow)
+
+sample_count <- c()
+for(indiv in individuals) {
+  cat("Parsing individual",indiv,"...\n")
+  indiv_subset <- subset_samples(glom_data, sname==indiv)
+  this_count <- phyloseq::nsamples(indiv_subset)
+  sample_count <- c(sample_count, this_count)
+}
+sample_count_labels <- as.factor(round(sample_count, -1)) # discretize
 
 n_samples_subset <- 100
+P <- D-1 # ALR
+#P <- D # CLR
 
 n_indiv <- length(individuals)
-all_samples <- matrix(NA, D-1, (D-1)*n_samples_subset*n_indiv)
+all_samples <- matrix(NA, P, (P)*n_samples_subset*n_indiv)
 indiv_labels <- c()
 group_labels <- c()
 for(i in 1:n_indiv) {
-  load(paste0("subsetted_indiv_data/",level,"/",individuals[i],"_bassetfit_.RData"))
+  fn <- paste0("subsetted_indiv_data/",level,"/",individuals[i],regexpr_str)
+  load(fn)
   Sigma <- Sigma[,,1:n_samples_subset]
-  all_samples[,((i-1)*(D-1)*n_samples_subset+1):(i*(D-1)*n_samples_subset)] <- Sigma
+  all_samples[,((i-1)*(P)*n_samples_subset+1):(i*(P)*n_samples_subset)] <- Sigma
   indiv_labels <- c(indiv_labels, rep(individuals[i], n_samples_subset))
   group_labels <- c(group_labels, rep(primary_group[primary_group$sname == individuals[i], c("grp")][[1]], n_samples_subset))
 }
@@ -96,10 +119,10 @@ group_labels <- as.factor(group_labels)
 distance_mat <- matrix(NA, n_samples_subset*n_indiv, n_samples_subset*n_indiv)
 for(i in 1:(n_indiv*n_samples_subset)) {
   for(j in i:(n_indiv*n_samples_subset)) {
-    i_idx <- (i-1)*(D-1)
-    A <- all_samples[,(i_idx+1):(i_idx+(D-1))]
-    j_idx <- (j-1)*(D-1)
-    B <- all_samples[,(j_idx+1):(j_idx+(D-1))]
+    i_idx <- (i-1)*(P)
+    A <- all_samples[,(i_idx+1):(i_idx+(P))]
+    j_idx <- (j-1)*(P)
+    B <- all_samples[,(j_idx+1):(j_idx+(P))]
     distance_mat[i,j] <- mat_dist(A, B, use_Riemann=use_Riemann)
     distance_mat[j,i] <- distance_mat[i,j]
   }
@@ -112,3 +135,4 @@ cat("Lambda 3:",fit$eig[3],"\n")
 
 plot_Sigma_ordination(fit, indiv_labels, "indiv", legend=FALSE)
 plot_Sigma_ordination(fit, group_labels, "group")
+plot_Sigma_ordination(fit, sample_count_labels, "counts")

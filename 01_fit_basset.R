@@ -1,10 +1,9 @@
-library(stray)
-#devtools::load_all("/data/mukherjeelab/labraduck")
+#library(stray)
+devtools::load_all("/data/mukherjeelab/labraduck")
 
 # for reference, individuals passable as arguments are:
 # "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
 
-if(FALSE) {
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
   # arguments are+
@@ -16,7 +15,7 @@ if(length(args) < 2) {
   #   days decay for SE kernel
   #   ALR reference taxon index
   #   plot save name append string
-  stop("Usage: Rscript 01_fit_basset.R ACA family 2 0.2 0.1 90 9", call.=FALSE)
+  stop("Usage: Rscript 01_fit_basset.R ACA family 1.35 0.15 0.75 90 9", call.=FALSE)
 }
 baboon <- args[1]
 level <- args[2]
@@ -25,9 +24,9 @@ if(length(args) >= 3) {
   per_weight <- se_weight*as.numeric(args[4])
   wn_weight <- se_weight*as.numeric(args[5])
 } else {
-  se_weight <- 1
-  per_weight <- 0.2
-  wn_weight <- 0.1 # I'm using this to soak up a bit of daily variation
+  se_weight <- 2
+  per_weight <- 0.25
+  wn_weight <- 0
 }
 if(length(args) == 6) {
   dd_se <- as.numeric(args[6])
@@ -37,10 +36,10 @@ if(length(args) == 6) {
 if(length(args) == 7) {
   alr_ref <- as.numeric(args[7])
 } else {
-  alr_ref <- NULL
+  alr_ref <- 9
 }
 if(length(args) >= 8) {
-  save_append <- args[8]
+  save_append <- paste0("_",args[8])
 } else {
   save_append <- ""
 }
@@ -48,12 +47,13 @@ if(length(args) >= 8) {
 # testing
 #date_lower_limit <- "2001-10-01"
 #date_upper_limit <- "2003-01-01"
-#date_lower_limit <- "2004-05-24"
-#date_upper_limit <- "2008-10-25"
+#date_lower_limit <- "2004-05-24" # this includes a big gap if run on ACA
+#date_upper_limit <- "2008-10-25" # useful to check effect of prior mean
 date_lower_limit <- NULL
 date_upper_limit <- NULL
 
-vizualization <- FALSE
+# generate plots for these (basically random) individuals, for diagnostics
+plot_these <- c("POW", "DUI", "COO", "YAI", "ACA", "ZIZ")
 
 library(phyloseq)
 library(dplyr)
@@ -62,28 +62,14 @@ library(tidyverse)
 
 source("include.R")
 
-WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
-  dist <- as.matrix(dist(t(X)))
-  G <- diag(ncol(dist))*sigma^2 + jitter*diag(ncol(dist))
-  return(G)
-}
-
-# X is Q x N as in other kernels
-# bandwidth: rho as chosen gives antiphase observations a correlation of ~0.1
-PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
-  dist <- as.matrix(dist(t(X)))
-  G <- sigma^2 * exp(-2*(sin(pi*dist/period)^2)/(rho^2)) + jitter*diag(ncol(dist))
-  return(G)
-}
-
-get_predictions <- function(X, fit, n_samples=2000){
+get_predictions <- function(X, fit, n_samples=100){
   cat("Predicting from 1 to",max(X),"\n")
   X_predict <- t(1:(max(X))) # time point range, fill in any missing
   predicted <- predict(fit, X_predict, iter=n_samples) # predicts samples from the posterior (default = 2000)
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
-fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
+fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL, save_name=NULL) {
   D <- nrow(Y)
   N <- ncol(Y)
   
@@ -101,24 +87,26 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   Xi <- Xi*(upsilon-D-1)
   
   alr_ys <- driver::alr((t(Y)+0.5))
+  if(!is.null(save_name) & baboon %in% plot_these) {
+    png(paste0(save_name))
+    image(cov(t(alr_ys)))
+    dev.off()
+  }
   alr_means <- colMeans(alr_ys)
   Theta <- function(X) matrix(alr_means, D-1, ncol(X))
-  #Theta <- function(X) matrix(0, D-1, ncol(X))
   
   fit <- stray::basset(Y, observations, upsilon, Theta, Gamma, Xi)
-  #fit.clr <- to_clr(fit)
-  #fit.alr <- to_alr(fit, alr_ref)
   return(list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit))
 }
 
 plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
   observations <- fit_obj$X
-  alr_tidy <- gather_array(fit_obj$alr_ys, "LR_value", "timepoint", "LR_coord")
+  lr_tidy <- gather_array(fit_obj$alr_ys, "LR_value", "timepoint", "LR_coord")  
   
   # replace timepoints with observation dates
   map <- data.frame(timepoint=1:length(observations), observation=c(observations))
-  alr_tidy <- merge(alr_tidy, map, by="timepoint")
-  alr_tidy <- alr_tidy[,!(names(alr_tidy) %in% c("timepoint"))]
+  lr_tidy <- merge(lr_tidy, map, by="timepoint")
+  lr_tidy <- lr_tidy[,!(names(lr_tidy) %in% c("timepoint"))]
 
   no_samples <- dim(predict_obj$Y_predict)[3]
   posterior_samples <- gather_array(predict_obj$Y_predict[LR_coord,,], "LR_value", "observation", "sample_no")
@@ -142,11 +130,11 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
     geom_ribbon(aes(ymin=p2.5, ymax=p97.5), fill="darkgrey", alpha=0.5) +
     geom_ribbon(aes(ymin=p25, ymax=p75), fill="darkgrey", alpha=0.9) +
     geom_line(color="blue") + 
-    geom_point(data=alr_tidy[alr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
+    geom_point(data=lr_tidy[lr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
     theme_minimal() + 
     theme(axis.title.x = element_blank(), 
           axis.text.x = element_text(angle=45)) +
-    ylab("ALR coord")
+    ylab("LR coord")
   if(is.null(save_name)) {
     show(p)
   } else {
@@ -160,25 +148,6 @@ data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbos
 
 # cut this down to the desired individual
 indiv_data <- subset_samples(data, sname==baboon)
-
-if(vizualization) {
-  # visualize the data at this level
-  plot_timecourse_phyloseq(indiv_data, save_filename=paste0(baboon,"_phylum_timecourse"), gapped=FALSE, legend=TRUE, legend_level="phylum")
-  plot_timecourse_phyloseq(indiv_data, save_filename=paste0(baboon,"_phylum_timecourse_gapped"), gapped=TRUE, legend=TRUE, legend_level="phylum")
-
-  # visualize autocorrelation
-  metadata <- read_metadata(data)
-  lags <- calc_autocorrelation(data,
-                             metadata,
-                             lag.max=36,
-                             date_diff_units="months",
-                             resample=FALSE,
-                             use_lr="alr")
-  plot_mean_autocorrelation(lags,
-                             filename=paste("plots/autocorrelation_36months_GPdiagnostic",sep=""),
-                             width=10,
-                             height=4)
-}
 
 # get observations as differences from baseline in units of days
 indiv_metadata <- read_metadata(indiv_data)
@@ -224,13 +193,21 @@ Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
                      wn_weight*WHITENOISE(X, sigma=1, jitter=0) +
                      (1e-8)*diag(ncol(X)) # pretty arbitrary
 
-fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
-predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=5) # interpolates
+fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref, save_name=paste0("plots/basset/",level,"/",baboon,"_empcov.png"))
 
-LR_coords <- c(1,8)
+predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
+
+LR_coords <- c()
+if(level == "phylum") {
+  LR_coords <- c(1,2,3,7,8)
+} else if(level == "family") {
+  LR_coords <- c(1,2,3,20,21)
+}
 for(coord in LR_coords) {
-  plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord,"_",save_append))
+  if(baboon %in% plot_these) {
+    plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord,save_append))
+  }
 }
 
-Sigma <- fit_obj$fit$Sigma
-save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit_",save_append,".RData"))
+Sigma <- fit_obj$fit$Sigma[,,1:100] # just save a subset for space for now; ALR
+save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))

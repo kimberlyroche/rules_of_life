@@ -203,8 +203,8 @@ read_metadata_metagenomics <- function(metagenomics, full_data, full_metadata) {
 
 # recode date as numeric: number of days since earliest sample date
 # these are frequently *fractional* because of leap years!!!
-date_to_num <- function(date) {
-  as.numeric(difftime(date, as.Date("2000-04-21"), units="days"))
+date_to_num <- function(date, baseline="2000-04-21") {
+  as.numeric(difftime(date, as.Date(baseline), units="days"))
 }
 
 filter_data_omit <- function(count_threshold=3, sample_threshold=0.9, data=NULL) {
@@ -1764,13 +1764,23 @@ pull_indiv_data <- function(sname, asv_data, pseudocount=0.5, date_begin="1900-0
   return(list(ys=ys, observation_vec=observation_vec, sname=sname))
 }
 
+# ====================================================================================================================
+# GAUSSIAN PROCESS WORKUP : KERNELS
+# ====================================================================================================================
 
+# X is Q x N as in other kernels
+# bandwidth: rho as chosen gives antiphase observations a correlation of ~0.1
+PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
+  dist <- as.matrix(dist(t(X)))
+  G <- sigma^2 * exp(-2*(sin(pi*dist/period)^2)/(rho^2)) + jitter*diag(ncol(dist))
+  return(G)
+}
 
-
-
-
-
-
+WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
+  dist <- as.matrix(dist(t(X)))
+  G <- diag(ncol(dist))*sigma^2 + jitter*diag(ncol(dist))
+  return(G)
+}
 
 
 

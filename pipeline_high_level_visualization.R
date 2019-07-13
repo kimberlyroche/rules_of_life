@@ -3,6 +3,44 @@ source("include.R")
 # NOTE: refactored a lot of code; have yet to re-test everything in this file!
 
 # ====================================================================================================================
+# get noise (1) from replicates and (2) overall
+# ====================================================================================================================
+
+glom_data <- load_glommed_data(level="family", replicates=TRUE)
+filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.66)
+replicates <- subset_samples(filtered, sample_status==2)
+metadata <- sample_data(replicates)
+rep_sid <- unique(metadata$sid)
+var_clr <- c()
+var_alr <- c()
+for(rs in rep_sid) {
+	rep_subset <- subset_samples(replicates, sid==rs)
+	counts <- otu_table(rep_subset)@.Data
+	sample_counts <- apply(counts, 1, sum)
+	if(nrow(counts) > 2 & min(sample_counts) < 5000) {
+		exclude <- which.min(sample_counts)
+		cat("Excluding",exclude,"with counts =",sample_counts[exclude],"!\n")
+		counts <- counts[-exclude,]
+	}
+	alr_counts <- driver::alr(counts + 0.5)
+	clr_counts <- driver::clr(counts + 0.5)
+	var_alr <- c(var_alr, apply(alr_counts, 2, var))
+	var_clr <- c(var_clr, apply(clr_counts, 2, var))
+}
+cat("CLR replicate variance:",mean(var_clr),"\n")
+cat("ALR replicate variance:",mean(var_alr),"\n")
+
+counts <- otu_table(filtered)@.Data
+clr_counts <- driver::clr(counts + 0.5)
+alr_counts <- driver::alr(counts + 0.5)
+var_clr <- apply(clr_counts, 2, var)
+var_alr <- apply(alr_counts, 2, var)
+cat("CLR variance:",mean(var_clr),"\n")
+cat("ALR variance:",mean(var_alr),"\n")
+
+quit()
+
+# ====================================================================================================================
 # plot sample overview: all samples with time on x-axis x individual on y-axis
 # ====================================================================================================================
 
