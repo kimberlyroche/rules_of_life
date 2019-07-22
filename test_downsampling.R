@@ -7,6 +7,7 @@ library(driver)
 library(tidyverse)
 
 source("include.R")
+sourceCpp("cov_viz_test.cpp")
 
 # take the best-sampled individual and successively downsample them; do we see systematic effects
 # of Sigma from increased uncertainty in the GP fits?
@@ -16,7 +17,6 @@ level <- "family"
 alr_ref <- 9
 
 downsample_to <- seq(1, 0.2, by=-0.1)
-downsample_to <- c(1, 0.2)
 samples_per <- 100
 downsample_reps <- 10
 
@@ -32,11 +32,14 @@ indiv_metadata <- read_metadata(indiv_data)
 all_observations <- indiv_metadata$collection_date
 
 Sigma_max <- NULL
+Sigma_med <- NULL
 Sigma_min <- NULL
 
 for(ds in downsample_to) {
 
-  Sigma <- array(NA, dim=c(26, 26, downsample_reps*samples_per))
+  #coord_dim <- 26 # CLR
+  coord_dim <- 26 # ALR
+  Sigma <- array(NA, dim=c(25, 25, downsample_reps*samples_per))
 
   for(dsr in 1:downsample_reps) {
 
@@ -95,12 +98,16 @@ for(ds in downsample_to) {
     Theta <- function(X) matrix(alr_means, D-1, ncol(X))
     
     fit <- stray::basset(Y, observations, upsilon, Theta, Gamma, Xi, n_samples=samples_per)
-    fit.clr <- to_clr(fit)
-    Sigma[,,(((dsr-1)*samples_per)+1):(dsr*samples_per)] <- fit.clr$Sigma[,,1:samples_per]
+    #fit.clr <- to_clr(fit)
+
+    Sigma[,,(((dsr-1)*samples_per)+1):(dsr*samples_per)] <- fit$Sigma[,,1:samples_per]
   }
 
   if(ds == max(downsample_to)) {
     Sigma_max <- Sigma
+  }
+  if(ds == median(downsample_to)) {
+    Sigma_med <- Sigma
   }
   if(ds == min(downsample_to)) {
     Sigma_min <- Sigma
@@ -122,6 +129,43 @@ for(ds in downsample_to) {
   dev.off()
 
 }
+
+get_Sigma_spread <- function(Sigma) {
+  d <- c()
+  dcor <- c()
+  for(i in 1:(dim(Sigma)[3]-1)) {
+    A <- Sigma[,,i]
+    Acor <- cov2cor(A)
+    for(j in (i+1):dim(Sigma)[3]) {
+      B <- Sigma[,,j]
+      Bcor <- cov2cor(B)
+      d <- c(d, mat_dist(A, B, use_Riemann=TRUE))
+      dcor <- c(dcor, mat_dist(Acor, Bcor, use_Riemann=FALSE))
+    }
+  }
+  return(list(distances=d, distances_corr=dcor))
+}
+
+# how does posterior spread change? mean Riemannian distance between Sigma samples
+d_max <- get_Sigma_spread(Sigma_max)
+d_med <- get_Sigma_spread(Sigma_med)
+d_min <- get_Sigma_spread(Sigma_min)
+# covariance
+all_d <- c(d_max$distances, d_med$distances, d_min$distances)
+xlim <- c(min(all_d), max(all_d))
+png("dist_change.png")
+plot(density(d_max$distances), xlim=xlim)
+lines(density(d_med$distances), col="red")
+lines(density(d_min$distances), col="blue")
+dev.off()
+# correlation
+all_d <- c(d_max$distances_corr, d_med$distances_corr, d_min$distances_corr)
+xlim <- c(min(all_d), max(all_d))
+png("dist_change_corr.png")
+plot(density(d_max$distances_corr), xlim=xlim)
+lines(density(d_med$distances_corr), col="red")
+lines(density(d_min$distances_corr), col="blue")
+dev.off()
 
 meanSmax <- apply(Sigma_max, c(1,2), mean)
 meanSmin <- apply(Sigma_min, c(1,2), mean)

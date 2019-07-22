@@ -26,7 +26,7 @@ for(i in 1:length(individuals)) {
   cat("Mean trace:",mean(apply(Sigma, 3, function(x) sum(diag(x)))),"\n")
   cat("Sigma has",dim(Sigma)[3],"samples\n")
   temp <- apply(Sigma, c(1,2), mean)
-  png(paste0("plots/basset/",level,"/",individuals[i],"_meanpostcov.png"))
+  png(paste0("plots/basset/",level,"/",individuals[i],"_meanpostcorr.png"))
   image(cov2cor(temp))
   dev.off()
 }
