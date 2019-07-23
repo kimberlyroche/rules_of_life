@@ -1,5 +1,6 @@
 #library(stray)
 devtools::load_all("/data/mukherjeelab/labraduck")
+library(driver)
 
 # for reference, individuals passable as arguments are:
 # "DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
@@ -43,6 +44,8 @@ if(length(args) >= 8) {
 } else {
   save_append <- ""
 }
+
+cat(paste0("Running stray::basset with with parameters:\n\tbaboon=",baboon,"\n\tlevel=",level,"\n\tSE kernel weight=",se_weight,"\n\tPER kernel weight=",per_weight,"\n\tdd_se=",dd_se,"\n\talr_ref=",alr_ref,"\n"))
 
 # testing
 #date_lower_limit <- "2001-10-01"
@@ -209,5 +212,8 @@ for(coord in LR_coords) {
   }
 }
 
-Sigma <- fit_obj$fit$Sigma[,,1:100] # just save a subset for space for now; ALR
+# my heart says this is kosher but need to double-check
+V <- driver::create_default_ilr_base(ncategories(fit_obj$fit))
+fit.ilr <- to_ilr(fit_obj$fit, V)
+Sigma <- fit.ilr$Sigma[,,1:100] # just save a subset for space for now; ILR
 save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))

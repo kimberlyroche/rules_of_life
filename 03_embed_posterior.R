@@ -99,7 +99,7 @@ for(indiv in individuals) {
 sample_count_labels <- as.factor(round(sample_count, -1)) # discretize
 
 n_samples_subset <- 100
-P <- D-1 # ALR
+P <- D-1 # ALR or ILR
 #P <- D # CLR
 
 n_indiv <- length(individuals)
