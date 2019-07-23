@@ -72,9 +72,12 @@ get_predictions <- function(X, fit, n_samples=100){
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
-fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL, save_name=NULL) {
+fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   D <- nrow(Y)
   N <- ncol(Y)
+
+  cat("D x N:",D,",",N,"\n")
+  quit()
   
   # stray uses the D^th element as the ALR reference by default
   # do some row shuffling in Y to put the reference at the end
@@ -90,11 +93,6 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL, save_nam
   Xi <- Xi*(upsilon-D-1)
   
   alr_ys <- driver::alr((t(Y)+0.5))
-  if(!is.null(save_name) & baboon %in% plot_these) {
-    png(paste0(save_name))
-    image(cov(t(alr_ys)))
-    dev.off()
-  }
   alr_means <- colMeans(alr_ys)
   Theta <- function(X) matrix(alr_means, D-1, ncol(X))
   
@@ -196,7 +194,7 @@ Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
                      wn_weight*WHITENOISE(X, sigma=1, jitter=0) +
                      (1e-8)*diag(ncol(X)) # pretty arbitrary
 
-fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref, save_name=paste0("plots/basset/",level,"/",baboon,"_empcov.png"))
+fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
 
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
 
@@ -212,7 +210,8 @@ for(coord in LR_coords) {
   }
 }
 
-# my heart says this is kosher but need to double-check
+# IS IT KOSHER TO FIT IN THE ALR AND THEN TRANSFORM TO ILR AFTER FITTING?
+# I THINK THIS IS COOL BUT NEED TO REVISIT THIS
 V <- driver::create_default_ilr_base(ncategories(fit_obj$fit))
 fit.ilr <- to_ilr(fit_obj$fit, V)
 Sigma <- fit.ilr$Sigma[,,1:100] # just save a subset for space for now; ILR
