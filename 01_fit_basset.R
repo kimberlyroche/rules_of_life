@@ -16,7 +16,7 @@ if(length(args) < 2) {
   #   days decay for SE kernel
   #   ALR reference taxon index
   #   plot save name append string
-  stop("Usage: Rscript 01_fit_basset.R ACA family 1.35 0.15 0.75 90 9", call.=FALSE)
+  stop("Usage: Rscript 01_fit_basset.R ACA family 1 0.1 0.05 90 9", call.=FALSE)
 }
 baboon <- args[1]
 level <- args[2]
@@ -76,9 +76,6 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   D <- nrow(Y)
   N <- ncol(Y)
 
-  cat("D x N:",D,",",N,"\n")
-  quit()
-  
   # stray uses the D^th element as the ALR reference by default
   # do some row shuffling in Y to put the reference at the end
   if(!is.null(alr_ref)) {
@@ -145,7 +142,11 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
 
 # read in and filter full data set at this phylogenetic level
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+# previous thresholding: data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+# this thresholding was chosen on the basis of retaining 98.7% of counts
+# it retains taxa (1) with taxonomic identification to at least level=level and (2) which are present
+#     at least a 5-count in at least 1/3 of samples
+data <- filter_data(glom_data, count_threshold=5, sample_threshold=0.33, collapse_level=level, verbose=TRUE)
 
 # cut this down to the desired individual
 indiv_data <- subset_samples(data, sname==baboon)
@@ -214,5 +215,11 @@ for(coord in LR_coords) {
 # I THINK THIS IS COOL BUT NEED TO REVISIT THIS
 V <- driver::create_default_ilr_base(ncategories(fit_obj$fit))
 fit.ilr <- to_ilr(fit_obj$fit, V)
-Sigma <- fit.ilr$Sigma[,,1:100] # just save a subset for space for now; ILR
-save(Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))
+
+# just save a subset for now
+subset_sz <- 100
+Eta <- fit.ilr$Eta[,,1:subset_sz]
+Lambda <- fit.ilr$Lambda[,,1:subset_sz]
+Sigma <- fit.ilr$Sigma[,,1:subset_sz]
+
+save(V, Eta, Lambda, Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))

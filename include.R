@@ -160,13 +160,18 @@ perform_agglomeration <- function(level="genus", replicates=TRUE) {
 # e.g. count_threshold=3, sample_threshold=0.2 filters taxa with no more than a 2-count in 80% of samples into an
 # "Other" category, labeled by an arbitrary sequence variant in that "Other" category (see the print statement
 # below identifying it for reference)
-filter_data <- function(data, count_threshold=3, sample_threshold=0.2, verbose=FALSE) {
+filter_data <- function(data, count_threshold=3, sample_threshold=0.2, collapse_level=NULL, verbose=FALSE) {
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
   retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=T))@.Data)
   #collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
   counts <- otu_table(data)@.Data
   collapse_indices <- apply(counts, 2, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) < sample_threshold)
+  if(!is.na(collapse_level)) {
+    tt <- tax_table(data)@.Data
+    collapse_tax_indices <- apply(tt, 1, function(x) is.na(x[collapse_level]))
+    collapse_indices <- collapse_indices | collapse_tax_indices
+  }
   collapse_taxnames <- names(collapse_indices[which(collapse_indices == TRUE)])
   merged_data <- merge_taxa(data, collapse_taxnames, 1)
   if(verbose) {
@@ -398,7 +403,7 @@ metagenomics_proportions_tidy <- function(metagenomics_data, sname, metadata) {
   return(df.prop.ordered)
 }
 
-# expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}}
+# expects a tidy array with columns |enzyme{factor;number}| |sample{factor;date}| |proportion{float}|
 plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metagenomics_timecourse", gapped=FALSE, legend=FALSE) {
   na.string <- ".N/A"
   # basically no way to make this legend legible, so haven't tested that

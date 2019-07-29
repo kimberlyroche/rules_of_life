@@ -1,7 +1,7 @@
 source("include.R")
 
 glom_data <- load_glommed_data(level="phylum", replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, collapse_level="phylum", verbose=TRUE)
 
 # get average ALR "travel" (min-max delta within a coordinate within an individual)
 cat("Parsing individuals...\n")
@@ -22,7 +22,8 @@ cat("\tSE allotment approx",mean_sd*0.9,"\n")
 cat("\tPER allotment approx",mean_sd*0.1,"\n")
 
 glom_data <- load_glommed_data(level="family", replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+#data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE)
+data <- filter_data(glom_data, count_threshold=5, sample_threshold=0.33, collapse_level="family", verbose=TRUE)
 
 # get average ALR "travel" (min-max delta within a coordinate within an individual)
 cat("Parsing individuals...\n")

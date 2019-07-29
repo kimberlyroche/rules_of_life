@@ -6,11 +6,12 @@ source("include.R")
 # allowable label types: individual, group, counts, density
 
 args <- commandArgs(trailingOnly=TRUE)
-if(length(args) < 2) {
-  stop("Testing usage: Rscript 04_visualize_embedding.R family individual", call.=FALSE)
+if(length(args) < 3) {
+  stop("Testing usage: Rscript 04_visualize_embedding.R family Lambda counts", call.=FALSE)
 }
 level <- args[1]
-label_type <- args[2]
+which_measure <- args[2]
+label_type <- args[3]
 
 get_other_labels <- function(df, data, individuals, annotation="group") {
   labels <- numeric(nrow(df))
@@ -30,6 +31,7 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
   if(annotation == "counts" | annotation == "density") {
     for(indiv in individuals) {
       cat("Parsing individual",indiv,"...\n")
+      indiv <<- indiv # needs to be global (bug)
       indiv_subset <- subset_samples(data, sname==indiv)
       sample_count <- phyloseq::nsamples(indiv_subset)
       labels[df$label == indiv] <- round(sample_count, -1) # discretize
@@ -51,32 +53,33 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
   return(df2)
 }
 
-plot_axes <- function(df, axis1, axis2, label_type, legend=TRUE) {
+plot_axes <- function(df, df_centroids=NULL, axis1="x", axis2="y", label_type="individual", legend=TRUE) {
   p <- ggplot() + geom_point(data=df, aes_string(x=axis1, y=axis2, color="labels"))
   if(label_type == "individual") {
     # label the centroids directly
     p <- p + geom_text(data=df_centroids, aes_string(x=paste0("mean_",axis1), y=paste0("mean_",axis2), label="labels"), color="black", fontface="bold")
   }
-  if(!legend | label_type == individual) {
+  if(!legend | label_type == "individual") {
     p <- p + theme(legend.position='none')
   }
-  plot_save_name <- paste0("Sigma_ordination_",label_type,"_",axis1,axis2)
-  ggsave(paste0("plots/basset/",level,"/",plot_save_name), scale=2,
+  plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,".png")
+  ggsave(paste0("plots/basset/",level,"/",plot_save_name), plot=p, scale=2,
            width=4, height=4, units="in", dpi=100)
 }
 
-plot_Sigma_ordination <- function(level, label_type, legend=TRUE) {
-  load(paste0("plots/basset/",level,"/Sigma_ordination.RData")) # 'df' object
+plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {
+  load(paste0("plots/basset/",level,"/",which_measure,"_ordination.RData")) # 'df' object
+  load(paste0("plots/basset/",level,"/",which_measure,"_ordination_centroids.RData")) # 'df_centroids' object
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     df <- get_other_labels(df, glom_data, unique(df$label), annotation=label_type)
   }
   # axes 1 & 2
-  plot_axes(df, "x", "y", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x", "y", label_type, legend=legend)
   # axes 2 & 3
-  plot_axes(df, "y", "z", label_type, legend=legend)
+  plot_axes(df, df_centroids, "y", "z", label_type, legend=legend)
   # axes 1 & 3
-  plot_axes(df, "x", "z", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x", "z", label_type, legend=legend)
 }
 
-plot_Sigma_ordination(level, label_type)
+plot_ordination(level, which_measure, label_type)
