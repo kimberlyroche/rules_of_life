@@ -1,5 +1,6 @@
-#library(stray)
-devtools::load_all("/data/mukherjeelab/labraduck")
+library(stray)
+#devtools::load_all("/data/mukherjeelab/Mongrel/stray")
+#devtools::load_all("/data/mukherjeelab/Mongrel/labraduck")
 library(driver)
 
 # for reference, individuals passable as arguments are:
@@ -16,7 +17,7 @@ if(length(args) < 2) {
   #   days decay for SE kernel
   #   ALR reference taxon index
   #   plot save name append string
-  stop("Usage: Rscript 01_fit_basset.R ACA family 1 0.1 0.05 90 9", call.=FALSE)
+  stop("Usage: Rscript 01_fit_basset.R ECH family 1.98 0.22 0 90", call.=FALSE)
 }
 baboon <- args[1]
 level <- args[2]
@@ -37,7 +38,7 @@ if(length(args) == 6) {
 if(length(args) == 7) {
   alr_ref <- as.numeric(args[7])
 } else {
-  alr_ref <- 9
+  alr_ref <- NULL
 }
 if(length(args) >= 8) {
   save_append <- paste0("_",args[8])
@@ -86,7 +87,7 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   upsilon <- D-1+10 # lesser certainty
   GG <- cbind(diag(D-1), -1) # log contrast for ALR with last taxon as reference;
   # take diag as covariance over log abundances
-  Xi <- GG%*%(diag(D))%*%t(GG)
+  Xi <- GG%*%(diag(D)*1)%*%t(GG)
   Xi <- Xi*(upsilon-D-1)
   
   alr_ys <- driver::alr((t(Y)+0.5))
@@ -196,6 +197,7 @@ Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
                      (1e-8)*diag(ncol(X)) # pretty arbitrary
 
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
+save(fit_obj, file="test.RData")
 
 predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
 

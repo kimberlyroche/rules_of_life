@@ -28,6 +28,12 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       labels[df$label == indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
     }
   }
+  if(annotation == "matgroup") {
+    metadata <- sample_data(data)
+    for(indiv in individuals) {
+      labels[df$label == indiv] <- metadata[metadata$sname == indiv,]$matgrp[[1]]
+    }
+  }
   if(annotation == "counts" | annotation == "density") {
     for(indiv in individuals) {
       cat("Parsing individual",indiv,"...\n")
@@ -63,8 +69,12 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x", axis2="y", label_type="i
     p <- p + theme(legend.position='none')
   }
   plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,".png")
+  img_width <- 4
+  if(legend) {
+    img_width <- 4.5
+  }
   ggsave(paste0("plots/basset/",level,"/",plot_save_name), plot=p, scale=2,
-           width=4, height=4, units="in", dpi=100)
+           width=img_width, height=4, units="in", dpi=100)
 }
 
 plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {

@@ -1,5 +1,5 @@
-#library(stray)
-devtools::load_all("/data/mukherjeelab/labraduck")
+library(stray)
+#devtools::load_all("/data/mukherjeelab/Mongrel/labraduck")
 
 library(phyloseq)
 library(dplyr)
