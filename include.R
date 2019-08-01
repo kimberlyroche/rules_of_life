@@ -167,7 +167,7 @@ filter_data <- function(data, count_threshold=3, sample_threshold=0.2, collapse_
   #collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
   counts <- otu_table(data)@.Data
   collapse_indices <- apply(counts, 2, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) < sample_threshold)
-  if(!is.na(collapse_level)) {
+  if(!is.null(collapse_level)) {
     tt <- tax_table(data)@.Data
     collapse_tax_indices <- apply(tt, 1, function(x) is.na(x[collapse_level]))
     collapse_indices <- collapse_indices | collapse_tax_indices
@@ -442,7 +442,8 @@ plot_timecourse_metagenomics <- function(metagenomics_prop, save_filename="metag
     geom_bar(position="fill", stat="identity") +
     scale_fill_manual(values=coul) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    theme(legend.text=element_text(size=8))
+    theme(legend.text=element_text(size=8)) +
+    theme(axis.text.x = element_text(size=20))
   if(legend) {
     p <- p + theme(legend.position="bottom")
   } else {

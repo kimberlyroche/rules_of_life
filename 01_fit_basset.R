@@ -213,15 +213,28 @@ for(coord in LR_coords) {
   }
 }
 
-# IS IT KOSHER TO FIT IN THE ALR AND THEN TRANSFORM TO ILR AFTER FITTING?
-# I THINK THIS IS COOL BUT NEED TO REVISIT THIS
+subset_sz <- 100
+
+if(FALSE) {
+Eta <- fit_obj$fit$Eta[,,1:subset_sz]
+Lambda <- fit_obj$fit$Lambda[,,1:subset_sz]
+Sigma <- fit_obj$fit$Sigma[,,1:subset_sz]
+save(Eta, Lambda, Sigma, file="test_ALR.RData")
+}
+
 V <- driver::create_default_ilr_base(ncategories(fit_obj$fit))
 fit.ilr <- to_ilr(fit_obj$fit, V)
-
-# just save a subset for now
-subset_sz <- 100
 Eta <- fit.ilr$Eta[,,1:subset_sz]
 Lambda <- fit.ilr$Lambda[,,1:subset_sz]
 Sigma <- fit.ilr$Sigma[,,1:subset_sz]
+#save(Eta, Lambda, Sigma, file="test_ILR.RData")
+
+if(FALSE) {
+fit.clr <- to_clr(fit_obj$fit)
+Eta <- fit.clr$Eta[,,1:subset_sz]
+Lambda <- fit.clr$Lambda[,,1:subset_sz]
+Sigma <- fit.clr$Sigma[,,1:subset_sz]
+save(Eta, Lambda, Sigma, file="test_CLR.RData")
+}
 
 save(V, Eta, Lambda, Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))

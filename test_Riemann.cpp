@@ -13,11 +13,11 @@ using Eigen::VectorXd;
 double mat_dist(Eigen::MatrixXd A, Eigen::MatrixXd B, bool use_Riemann) {
   double d = -1;
   if(use_Riemann) {
-    MatrixXd Ainv = A.inverse();
-    Eigen::LLT<MatrixXd> LLT_Ainv;
-    LLT_Ainv.compute(Ainv);
-    MatrixXd U = LLT_Ainv.matrixU();
-    MatrixXd temp = (U.transpose())*B*U;
+    Eigen::LLT<MatrixXd> LLT_A;
+    LLT_A.compute(A);
+    MatrixXd L = LLT_A.matrixL();
+    MatrixXd invL = L.inverse();
+    MatrixXd temp = invL*B*(invL.transpose());
     Eigen::EigenSolver<MatrixXd> es(temp);
     d = sqrt(es.eigenvalues().array().log().abs2().sum());
   } else {

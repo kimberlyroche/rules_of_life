@@ -7,7 +7,7 @@ source("include.R")
 
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 3) {
-  stop("Testing usage: Rscript 04_visualize_embedding.R family Lambda counts", call.=FALSE)
+  stop("Testing usage: Rscript 03_visualize_embedding.R family Lambda counts", call.=FALSE)
 }
 level <- args[1]
 which_measure <- args[2]
@@ -60,6 +60,7 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
 }
 
 plot_axes <- function(df, df_centroids=NULL, axis1="x", axis2="y", label_type="individual", legend=TRUE) {
+  show(head(df))
   p <- ggplot() + geom_point(data=df, aes_string(x=axis1, y=axis2, color="labels"))
   if(label_type == "individual") {
     # label the centroids directly

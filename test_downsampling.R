@@ -7,7 +7,7 @@ library(driver)
 library(tidyverse)
 
 source("include.R")
-sourceCpp("cov_viz_test.cpp")
+sourceCpp("test_Riemann.cpp")
 
 # take the best-sampled individual and successively downsample them; do we see systematic effects
 # of Sigma from increased uncertainty in the GP fits?

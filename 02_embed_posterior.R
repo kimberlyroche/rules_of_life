@@ -17,7 +17,7 @@ use_Riemann <- TRUE
 date_lower_limit <- NULL
 date_upper_limit <- NULL
 
-sourceCpp("cov_viz_test.cpp")
+sourceCpp("mat_dist.cpp")
 
 pattern_str <- "*_bassetfit.RData"
 regexpr_str <- "_bassetfit.RData"
@@ -55,17 +55,7 @@ for(i in 1:n_indiv) {
 }
 
 if(which_measure == "Sigma") {
-  distance_mat <- matrix(NA, n_samples_subset*n_indiv, n_samples_subset*n_indiv)
-  for(i in 1:(n_indiv*n_samples_subset)) {
-    for(j in i:(n_indiv*n_samples_subset)) {
-      i_idx <- (i-1)*(P)
-      A <- all_samples[,(i_idx+1):(i_idx+(P))]
-      j_idx <- (j-1)*(P)
-      B <- all_samples[,(j_idx+1):(j_idx+(P))]
-      distance_mat[i,j] <- mat_dist(A, B, use_Riemann=use_Riemann)
-      distance_mat[j,i] <- distance_mat[i,j]
-    }
-  }
+  distance_mat <- mat_dist(all_samples, n_indiv, n_samples_subset)
 } else {
   distance_mat <- dist(all_samples)
 }
