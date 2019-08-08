@@ -11,8 +11,8 @@ level <- "family"
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
 filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.66)
 
-fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern=paste0("*_bassetfit_",tag,".RData"), full.names=TRUE, recursive=FALSE)
-individuals <- sapply(fitted_models, function(x) { idx <- regexpr(paste0("_bassetfit_",tag,".RData"), x); return(substr(x, idx-3, idx-1)) } )
+fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern=paste0("*_bassetfit_",tag,".rds"), full.names=TRUE, recursive=FALSE)
+individuals <- sapply(fitted_models, function(x) { idx <- regexpr(paste0("_bassetfit_",tag,".rds"), x); return(substr(x, idx-3, idx-1)) } )
 cat(individuals)
 names(individuals) <- NULL
 
@@ -47,7 +47,7 @@ for(indiv in individuals) {
     max_d_indiv <- indiv
     max_d_days <- col_range
   }
-  load(paste0("subsetted_indiv_data/family/",indiv,"_bassetfit_",tag,".RData"))
+  Sigma <- readRDS(paste0("subsetted_indiv_data/family/",indiv,"_bassetfit_",tag,".rds"))$fit$Sigma
   var_scale <- c(var_scale, sum(diag(apply(Sigma, c(1,2), mean))))
   off_diag <- apply(Sigma, 3, function(x) { y=cov2cor(x); diag(y)=0; mean(y) } )
   off_diag_net <- c(off_diag_net, mean(off_diag))

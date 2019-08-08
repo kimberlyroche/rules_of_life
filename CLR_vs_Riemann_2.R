@@ -6,11 +6,11 @@ sourceCpp("mat_dist.cpp")
 
 filenames <- c("test_ALR", "test_ILR", "test_CLR")
 for(fn in filenames) {
-  load(paste0(fn,".RData"))
+  Sigma <- readRDS(paste0(fn,".rds"))$fit$Sigma
   if(fn == "test_CLR") {
-    truncSigma <- array(NA, dim=c(dim(Sigma)[1]-1,dim(Sigma)[2]-1, dim(Sigma)[3]))
-    for(i in 1:dim(Sigma)[3]) {
-      truncSigma[,,i] <- Sigma[1:(dim(Sigma)[1]-1),1:(dim(Sigma)[2]-1),i]
+    truncSigma <- array(NA, dim=c(dim(fit_obj$fit$Sigma)[1]-1,dim(fit_obj$fit$Sigma)[2]-1, dim(fit_obj$fit$Sigma)[3]))
+    for(i in 1:dim(fit_obj$fit$Sigma)[3]) {
+      truncSigma[,,i] <- fit_obj$fit$Sigma[1:(dim(fit_obj$fit$Sigma)[1]-1),1:(dim(fit_obj$fit$Sigma)[2]-1),i]
     }
     Sigma <- truncSigma
   }

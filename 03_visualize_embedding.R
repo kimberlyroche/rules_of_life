@@ -79,8 +79,8 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x", axis2="y", label_type="i
 }
 
 plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {
-  load(paste0("plots/basset/",level,"/",which_measure,"_ordination.RData")) # 'df' object
-  load(paste0("plots/basset/",level,"/",which_measure,"_ordination_centroids.RData")) # 'df_centroids' object
+  df <- readRDS(paste0("plots/basset/",level,"/",which_measure,"_ordination.rds"))
+  df_centroids <- readRDS(paste0("plots/basset/",level,"/",which_measure,"_ordination_centroids.rds"))
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     df <- get_other_labels(df, glom_data, unique(df$label), annotation=label_type)

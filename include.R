@@ -202,6 +202,16 @@ read_metadata_metagenomics <- function(metagenomics, full_data, full_metadata) {
   return(subset_metadata)
 }
 
+fitted_individuals <- function(level="family") {
+  pattern_str <- "*_bassetfit.rds"
+  regexpr_str <- "_bassetfit.rds"
+  fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern=pattern_str, full.names=TRUE, recursive=FALSE)
+  individuals <- sapply(fitted_models, function(x) { idx <- regexpr(regexpr_str, x); return(substr(x, idx-3, idx-1)) } )
+  names(individuals) <- NULL
+  return(list(individuals=individuals, pattern_str=pattern_str, regexpr_str=regexpr_str))
+}
+
+
 # ====================================================================================================================
 # DATA TRANSFORMATION, ETC.
 # ====================================================================================================================

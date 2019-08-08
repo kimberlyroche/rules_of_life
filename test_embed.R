@@ -19,15 +19,15 @@ date_upper_limit <- NULL
 
 sourceCpp("test_Riemann.cpp")
 
-pattern_str <- "*_bassetfit.RData"
-regexpr_str <- "_bassetfit.RData"
-fitted_models <- list.files(path=paste0("subsetted_indiv_data/",level), pattern=pattern_str, full.names=TRUE, recursive=FALSE)
-individuals <- sapply(fitted_models, function(x) { idx <- regexpr(regexpr_str, x); return(substr(x, idx-3, idx-1)) } )
-names(individuals) <- NULL
+indiv_obj <- fitted_individuals(level="family")
+individuals <- indiv_obj$individuals
+pattern_str <- indiv_obj$pattern_str
+regexpr_str <- indiv_obj$regexpr_str
 
 # get dimension D
-fn <- paste0("subsetted_indiv_data/",level,"/",individuals[1],regexpr_str)
-load(fn)
+fit <- readRDS(paste0("subsetted_indiv_data/",level,"/",individuals[1],regexpr_str))$fit
+Lambda <- fit$Lambda
+Sigma <- fit$Sigma
 P <- dim(Lambda)[1]
 N <- dim(Lambda)[2]
 n_samples_subset <- 100
@@ -79,9 +79,9 @@ cat("Eigval 3:",fit$eig[3],"\n")
 cat("Eigval 4:",fit$eig[4],"\n")
 
 df <- data.frame(x=fit$points[,1], y=fit$points[,2], z=fit$points[,3], labels=indiv_labels)
-save(df, file=paste0("plots/basset/",level,"/",which_measure,"_ordination.RData"))
+save(df, file=paste0("plots/basset/",level,"/",which_measure,"_ordination.rds"))
 
 # centroids are useful for labeling plots
 df_centroids <- df %>% group_by(labels) %>% summarise(mean_x=mean(x), mean_y=mean(y), mean_z=mean(z))
-save(df_centroids, file=paste0("plots/basset/",level,"/",which_measure,"_ordination_centroids.RData"))
+save(df_centroids, file=paste0("plots/basset/",level,"/",which_measure,"_ordination_centroids.rds"))
 

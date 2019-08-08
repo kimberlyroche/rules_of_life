@@ -66,13 +66,6 @@ library(tidyverse)
 
 source("include.R")
 
-get_predictions <- function(X, fit, n_samples=100){
-  cat("Predicting from 1 to",max(X),"\n")
-  X_predict <- t(1:(max(X))) # time point range, fill in any missing
-  predicted <- predict(fit, X_predict, iter=n_samples) # predicts samples from the posterior (default = 2000)
-  return(list(X_predict=X_predict, Y_predict=predicted))
-}
-
 fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   D <- nrow(Y)
   N <- ncol(Y)
@@ -96,49 +89,6 @@ fit_to_baboon <- function(baboon, Y, observations, Gamma, alr_ref=NULL) {
   
   fit <- stray::basset(Y, observations, upsilon, Theta, Gamma, Xi)
   return(list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit))
-}
-
-plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
-  observations <- fit_obj$X
-  lr_tidy <- gather_array(fit_obj$alr_ys, "LR_value", "timepoint", "LR_coord")  
-  
-  # replace timepoints with observation dates
-  map <- data.frame(timepoint=1:length(observations), observation=c(observations))
-  lr_tidy <- merge(lr_tidy, map, by="timepoint")
-  lr_tidy <- lr_tidy[,!(names(lr_tidy) %in% c("timepoint"))]
-
-  no_samples <- dim(predict_obj$Y_predict)[3]
-  posterior_samples <- gather_array(predict_obj$Y_predict[LR_coord,,], "LR_value", "observation", "sample_no")
-  # get quantiles
-  
-  post_quantiles <- posterior_samples %>%
-    group_by(observation) %>%
-    summarise(p2.5 = quantile(LR_value, prob=0.025),
-              p5 = quantile(LR_value, prob=0.05),
-              p10 = quantile(LR_value, prob=0.1),
-              p25 = quantile(LR_value, prob=0.25),
-              p50 = quantile(LR_value, prob=0.5),
-              mean = mean(LR_value),
-              p75 = quantile(LR_value, prob=0.75),
-              p90 = quantile(LR_value, prob=0.9),
-              p95 = quantile(LR_value, prob=0.95),
-              p97.5 = quantile(LR_value, prob=0.975)) %>%
-    ungroup()
-
-  p <- ggplot(post_quantiles, aes(x=observation, y=mean)) +
-    geom_ribbon(aes(ymin=p2.5, ymax=p97.5), fill="darkgrey", alpha=0.5) +
-    geom_ribbon(aes(ymin=p25, ymax=p75), fill="darkgrey", alpha=0.9) +
-    geom_line(color="blue") + 
-    geom_point(data=lr_tidy[lr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
-    theme_minimal() + 
-    theme(axis.title.x = element_blank(), 
-          axis.text.x = element_text(angle=45)) +
-    ylab("LR coord")
-  if(is.null(save_name)) {
-    show(p)
-  } else {
-    ggsave(paste0("plots/basset/",level,"/",save_name,".png"), scale=2, width=12, height=2, units="in", dpi=100)
-  }
 }
 
 # read in and filter full data set at this phylogenetic level
@@ -197,44 +147,21 @@ Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
                      (1e-8)*diag(ncol(X)) # pretty arbitrary
 
 fit_obj <- fit_to_baboon(baboon, Y, observations, Gamma, alr_ref=alr_ref)
-save(fit_obj, file="test.RData")
 
-predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
+fit_obj$kernelparams$se_weight <- se_weight
+fit_obj$kernelparams$se_sigma <- se_sigma
+fit_obj$kernelparams$rho_se <- rho_se
+fit_obj$kernelparams$per_weight <- per_weight
+fit_obj$kernelparams$per_sigma <- per_sigma
+fit_obj$kernelparams$rho_per <- rho_per
+fit_obj$kernelparams$wn_weight <- wn_weight
+fit_obj$kernelparams$period <- period
 
-LR_coords <- c()
-if(level == "phylum") {
-  LR_coords <- c(1,2,3,7,8)
-} else if(level == "family") {
-  LR_coords <- c(1,2,3,20,21)
-}
-for(coord in LR_coords) {
-  if(baboon %in% plot_these) {
-    plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_name=paste0(baboon,"_",coord,save_append))
-  }
-}
+# chop down for size savings; can't seem to pass desired sample number to stray with any effect (?)
+# check this
+fit_obj$fit$iter <- 100
+fit_obj$fit$Eta <- fit_obj$fit$Eta[,,1:fit_obj$fit$iter]
+fit_obj$fit$Lambda <- fit_obj$fit$Lambda[,,1:fit_obj$fit$iter]
+fit_obj$fit$Sigma <- fit_obj$fit$Sigma[,,1:fit_obj$fit$iter]
 
-subset_sz <- 100
-
-if(FALSE) {
-Eta <- fit_obj$fit$Eta[,,1:subset_sz]
-Lambda <- fit_obj$fit$Lambda[,,1:subset_sz]
-Sigma <- fit_obj$fit$Sigma[,,1:subset_sz]
-save(Eta, Lambda, Sigma, file="test_ALR.RData")
-}
-
-V <- driver::create_default_ilr_base(ncategories(fit_obj$fit))
-fit.ilr <- to_ilr(fit_obj$fit, V)
-Eta <- fit.ilr$Eta[,,1:subset_sz]
-Lambda <- fit.ilr$Lambda[,,1:subset_sz]
-Sigma <- fit.ilr$Sigma[,,1:subset_sz]
-#save(Eta, Lambda, Sigma, file="test_ILR.RData")
-
-if(FALSE) {
-fit.clr <- to_clr(fit_obj$fit)
-Eta <- fit.clr$Eta[,,1:subset_sz]
-Lambda <- fit.clr$Lambda[,,1:subset_sz]
-Sigma <- fit.clr$Sigma[,,1:subset_sz]
-save(Eta, Lambda, Sigma, file="test_CLR.RData")
-}
-
-save(V, Eta, Lambda, Sigma, file=paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".RData"))
+saveRDS(fit_obj, paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit",save_append,".rds"))
