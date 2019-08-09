@@ -28,7 +28,9 @@ regexpr_str <- indiv_obj$regexpr_str
 
 # get dimension D
 fit_obj <- readRDS(paste0("subsetted_indiv_data/",level,"/",individuals[1],regexpr_str))
-Lambda <- fit_obj$fit$Lambda
+fit.clr <- to_clr(fit_obj$fit)
+#Lambda <- fit_obj$fit$Lambda
+Lambda <- fit.clr$Lambda
 Sigma <- fit_obj$fit$Sigma
 
 P <- dim(Lambda)[1]
@@ -47,10 +49,14 @@ for(i in 1:n_indiv) {
   fn <- paste0("subsetted_indiv_data/",level,"/",individuals[i],regexpr_str)
   fit <- readRDS(fn)$fit
   # to ILR
-  V <- driver::create_default_ilr_base(ncategories(fit))
-  fit.ilr <- to_ilr(fit, V)
-  Lambda <- fit.ilr$Lambda
-  Sigma <- fit.ilr$Sigma
+  #V <- driver::create_default_ilr_base(ncategories(fit))
+  #fit.ilr <- to_ilr(fit, V)
+  #Lambda <- fit.ilr$Lambda
+  #Sigma <- fit.ilr$Sigma
+  # to CLR
+  fit.clr <- to_clr(fit)
+  Lambda <- fit.clr$Lambda
+  Sigma <- fit.clr$Sigma
 
   if(which_measure == "Sigma") {
     Sigma <- Sigma[,,1:n_samples_subset]

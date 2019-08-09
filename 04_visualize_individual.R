@@ -60,8 +60,8 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_name=NULL) {
     theme_minimal() +
     theme(axis.title.x = element_blank(),
           axis.text.x = element_text(angle=45)) +
-    ylab("LR coord") +
-    ylim(c(-10, 10))
+    ylab("LR coord")
+    #ylim(c(-10, 10))
   if(is.null(save_name)) {
     show(p)
   } else {
@@ -84,7 +84,8 @@ for(baboon in baboons) {
   cat("\tPlotting mean covariance/correlation...\n")
   # load Sigma samples
   fit_obj <- readRDS(paste0("subsetted_indiv_data/",level,"/",baboon,"_bassetfit.rds"))
-  Sigma <- fit_obj$fit$Sigma
+  fit.clr <- to_clr(fit_obj$fit)
+  Sigma <- fit.clr$Sigma
   meanSigma <- apply(Sigma, c(1,2), mean)
   cat("\t\tTrace:",sum(diag(meanSigma)),"\n")
   df <- driver::gather_array(meanSigma, "value", "feature_row", "feature_col")
@@ -114,7 +115,7 @@ for(baboon in baboons) {
 
     predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
 
-    LR_coords <- c(2, 4, 27)
+    LR_coords <- c(6)
     #if(level == "phylum") {
     #  LR_coords <- c(1,2,3,7,8)
     #} else if(level == "family") {

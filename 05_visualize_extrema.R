@@ -16,16 +16,43 @@ plot_extreme_Lambda <- function(coordinate, no_indiv=10, trundate_taxa=10, save_
   max_sort <- df_centroids %>% arrange(desc(get(coordinate)))
   max_cohort <- as.vector(unlist(max_sort[1:no_indiv,"labels"]))
 
+  # first pass: get non-tiny proportions to retain
+  allLambda <- NULL
+  for(baboon in c(min_cohort, max_cohort)) {
+    cat("Loading individual",baboon,"(1)\n")
+    fit_obj <- readRDS(paste0("subsetted_indiv_data/family/",baboon,"_bassetfit.rds"))
+    fit.clr <- to_clr(fit_obj$fit)
+    Lambda <- fit.clr$Lambda
+    collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
+    propLambda <- clrInv(collLambda)
+    if(is.null(allLambda)) {
+      allLambda <- propLambda
+    } else {
+      allLambda <- rbind(allLambda, propLambda)
+    }
+  }
+  mean_all <- apply(allLambda, 2, mean)
+  retain_prop <- mean_all > 0.01
+  for(i in 1:length(retain_prop)) {
+    if(retain_prop[i]) {
+      cat("Retaining CLR coord",i,"with mean",mean_all[i],"\n")
+    }
+  }
+
   # stupid feature naming is for the benefit of plot_timecourse_metagenomics
   df <- data.frame(sample=c(), enzyme=c(), proportion=c())
 
   for(baboon in c(min_cohort, max_cohort)) {
-    cat("Loading individual",baboon,"\n")
-    Lambda <- readRDS(paste0("subsetted_indiv_data/family/",baboon,"_bassetfit.rds"))$fit$Lambda
+    cat("Loading individual",baboon,"(2)\n")
+    fit_obj <- readRDS(paste0("subsetted_indiv_data/family/",baboon,"_bassetfit.rds"))
+    fit.clr <- to_clr(fit_obj$fit)
+    Lambda <- fit.clr$Lambda
     collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
-    propLambda <- ilrInv(collLambda, V=V) # applied with default basis, so V=NULL should be ok?
-    avgProp <- colMeans(propLambda)[1:truncate_taxa] # truncate to make readable
-    df <- rbind(df, data.frame(sample=rep(baboon, truncate_taxa), enzyme=as.factor(1:truncate_taxa), proportion=avgProp))
+    #propLambda <- ilrInv(collLambda, V=V) # applied with default basis, so V=NULL should be ok?
+    propLambda <- clrInv(collLambda)
+    avgProp <- colMeans(propLambda)[retain_prop] # truncate to make readable
+    df <- rbind(df, data.frame(sample=rep(baboon, length(avgProp)),
+                               enzyme=as.factor(1:length(avgProp)), proportion=avgProp))
   }
   df$sample <- as.factor(df$sample)
   plot_timecourse_metagenomics(df, save_filename=paste0(save_filename))
@@ -119,14 +146,14 @@ plot_diag_Sigma <- function(lrtransform="alr", save_filename="test") {
   }
 }
 
-#plot_extreme_Lambda("mean_x", no_indiv=10, trundate_taxa=10, save_filename=paste0("basset/",level,"/Lambda_ordination_PC1_extrema"))
-#plot_extreme_Lambda("mean_y", no_indiv=10, trundate_taxa=10, save_filename=paste0("basset/",level,"/Lambda_ordination_PC2_extrema"))
+plot_extreme_Lambda(coordinate="mean_x", no_indiv=10, trundate_taxa=10, save_filename=paste0("basset/",level,"/Lambda_ordination_PC1_extrema"))
+plot_extreme_Lambda(coordinate="mean_y", no_indiv=10, trundate_taxa=10, save_filename=paste0("basset/",level,"/Lambda_ordination_PC2_extrema"))
 
 #plot_extreme_Sigma("mean_x", no_indiv=10, save_filename=paste0("plots/basset/",level,"/Sigma_ordination_PC1_extrema"))
 #plot_extreme_Sigma("mean_y", no_indiv=10, save_filename=paste0("plots/basset/",level,"/Sigma_ordination_PC2_extrema"))
 
 #plot_diag_Sigma(lrtransform="alr", save_filename=paste0("plots/basset/",level,"/Sigma_diagonal"))
-plot_diag_Sigma(lrtransform="clr", save_filename=paste0("plots/basset/",level,"/Sigma_diagonal"))
+#plot_diag_Sigma(lrtransform="clr", save_filename=paste0("plots/basset/",level,"/Sigma_diagonal"))
 #plot_diag_Sigma(lrtransform="ilr", save_filename=paste0("plots/basset/",level,"/Sigma_diagonal"))
 
 # transform through all possible ALR references
