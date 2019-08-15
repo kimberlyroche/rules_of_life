@@ -1,24 +1,16 @@
-# plot 16S autocorrelation
-# usage: Rscript pipeline_autocorrelation.R 16S phylum 36 months FALSE
-
-source("include.R")
+source("include/R/general.R")
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 5) {
-  stop("Argument for data type (16S | metagenomics) (level) (lag) (lag units) (resample) missing!\n")
+  stop("Arguments: (16S | metagenomics) (level) (lag) (lag units) (resample)\n")
 }
-
 data_type <- args[1] # 16S, metagenomics
 level <- args[2] # species, genus, family
 lag.max <- as.numeric(args[3]) # e.g. 26
 lag.units <- args[4] # weeks, months, seasons
 resample <- as.logical(args[5])
 
-# read in 16S
-glom_data <- load_glommed_data(level=level, replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-# data <- filter_data(glom_data, count_threshold=10, sample_threshold=0.66, verbose=TRUE) # 9 is low-count cohort
-# alr_ref <- ntaxa(data)
+data <- load_and_filter(level)
 metadata <- read_metadata(data)
 
 if(data_type == "metagenomics") {

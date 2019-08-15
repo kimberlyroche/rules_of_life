@@ -100,18 +100,13 @@ fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_a
     Y <- Y[c(setdiff(1:D,alr_ref),alr_ref),]
   }
   
-  # ALR prior covariance
-  upsilon <- D-1+10 # lesser certainty
-  GG <- cbind(diag(D-1), -1) # log contrast for ALR with last taxon as reference
-  # take diag as covariance over log abundances; scale 1 is probably shit here but
-  Xi <- GG%*%(diag(D)*1)%*%t(GG)
-  Xi <- Xi*(upsilon-D-1)
+  prior_obj <- default_ALR_prior(D)
   
-  alr_ys <- driver::alr((t(Y)+0.5))
+  alr_ys <- driver::alr((t(Y)+pc))
   alr_means <- colMeans(alr_ys)
   Theta <- function(X) matrix(alr_means, D-1, ncol(X))
   
-  fit <- stray::basset(Y, observations, upsilon, Theta, Gamma, Xi)
+  fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
   fit_obj <- list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit)
   
   # dumb as hell but for later prediction, these need to be loaded into the workspace
@@ -132,6 +127,17 @@ fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_a
   fit_obj$fit$Sigma <- fit_obj$fit$Sigma[,,1:fit_obj$fit$iter]
   
   saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
+}
+
+# predict from fitted stray::basset model; predictions are in CLR by default
+#   X is the observation vector in days (e.g. 1,2,17,21,22...); this will be interpolated
+#   fit is a strayfit/bassetfit object
+get_predictions <- function(X, fit, n_samples=100) {
+  cat("Predicting from 1 to",max(X),"\n")
+  X_predict <- t(1:(max(X)))
+  fit.clr <- to_clr(fit)
+  predicted <- predict(fit.clr, X_predict, iter=n_samples) # predicts samples from the posterior (default = 2000)
+  return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
 # ====================================================================================================================
@@ -237,8 +243,8 @@ embed_posteriors <- function(level, which_measure="Sigma") {
   df_centroids <- df %>%
     group_by(labels) %>%
     summarise(mean_x1=mean(x1), mean_x2=mean(x2),
-              mean_x1=mean(x3), mean_x2=mean(x4),
-              mean_x1=mean(x5), mean_x2=mean(x6))
+              mean_x3=mean(x3), mean_x4=mean(x4),
+              mean_x5=mean(x5), mean_x6=mean(x6))
   saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
 }
 
@@ -398,42 +404,6 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
   plot_timecourse_metagenomics(df, save_filename=paste0(GP_plot_dir,level,"/",save_filename))
 }
 
-# plot on- or off-diagonal elements from covariance matrices for most extreme individuals in
-# chosen coordinate of BASELINE embedding; this is a terrible visualization
-#   coordinate is 1...K
-#   level is taxonomic level (e.g. family)
-#   no_indiv are # individuals at each extreme to visualize
-plot_extreme_Sigma <- function(coordinate, level, no_indiv=10, save_filename="extreme_Sigma") {
-  df_centroids <- readRDS(paste0(GP_plot_dir,level,"/Sigma_ordination_centroids.rds"))
-  min_sort <- df_centroids %>% arrange(get(coordinate))
-  min_cohort <- as.vector(unlist(min_sort[1:no_indiv,"labels"]))
-  max_sort <- df_centroids %>% arrange(desc(get(coordinate)))
-  max_cohort <- as.vector(unlist(max_sort[1:no_indiv,"labels"]))
-  
-  df_on <- data.frame(sample=c(), feature=c(), value=c())
-  df_off <- data.frame(sample=c(), feature=c(), value=c())
-  for(baboon in c(min_cohort, max_cohort)) {
-    cat("Loading individual",baboon,"\n")
-    Sigma <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))$fit$Sigma
-    meanSigma <- apply(Sigma, c(1,2), mean)
-    diagSigma <- diag(meanSigma)
-    df_on <- rbind(df_on, data.frame(sample=rep(baboon, length(diagSigma)), feature=as.factor(1:length(diagSigma)), value=diagSigma))
-    upperSigma <- c(meanSigma[upper.tri(meanSigma)])
-    df_off <- rbind(df_off, data.frame(sample=rep(baboon, length(upperSigma)), feature=as.factor(1:length(upperSigma)), value=upperSigma))
-  }
-  df_on$sample <- as.factor(df_on$sample)
-  df_off$sample <- as.factor(df_off$sample)
-  
-  p <- ggplot(df_on, aes(feature, sample)) +
-    geom_tile(aes(fill = value), colour = "white") +
-    scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred")
-  ggsave(paste0(GP_plot_dir,level,"/",save_filename,"_ondiag.png"), plot=p, scale=2, width=6, height=6, units="in", dpi=72)
-  p <- ggplot(df_off, aes(feature, sample)) +
-    geom_tile(aes(fill = value), colour = "white") +
-    scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred")
-  ggsave(paste0(GP_plot_dir,level,"/",save_filename,"_offdiag.png"), plot=p, scale=2, width=10, height=6, units="in", dpi=72)
-}
-
 # plot the diagonal of the element-wise mean covariance across individuals in a single heatmap
 # the idea here is to compare at a glance the total variation for each log ratio across all individuals
 #   level is taxonomic level (e.g. family)
@@ -457,7 +427,7 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
     baboon <- individuals[i]
     cat("Loading fit for",baboon,"\n")
     fit <- readRDS(paste0(model_dir,level,"/",baboon,regexpr_str))$fit
-    clr_ys <- driver::clr(t(fit$Y) + 0.5)
+    clr_ys <- driver::clr(t(fit$Y) + pc)
     tax_var <- apply(clr_ys, 2, sd)
     if(lrtransform == "clr") {
       fit <- to_clr(fit)
@@ -489,6 +459,108 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
     scale_fill_gradient2(low = "white", high = "darkred") +
     theme(axis.text.x = element_text(face="bold", size=17, angle=90))
   ggsave(paste0(GP_plot_dir,level,"/all_Sigma_diag_",lrtransform,".png"), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
+}
+
+# ====================================================================================================================
+# PREDICTION PLOTTING (RIBBONS)
+# ====================================================================================================================
+
+# generate ribbon plots for stray::basset fit; assumes predictions have been made in the CLR!!!
+#   fit_obj contains the strayfit/bassetfit object and metadata
+#   predict object contains the predictions from the strayfit/bassetfit object
+#   LR_coord is the logratio coordinate to plot
+plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NULL) {
+  observations <- fit_obj$X
+  clr_ys <- driver::clr(t(fit_obj$Y) + pc)
+  lr_tidy <- gather_array(clr_ys, "LR_value", "timepoint", "LR_coord")
+  
+  # replace timepoints with observation dates
+  map <- data.frame(timepoint=1:length(observations), observation=c(observations))
+  lr_tidy <- merge(lr_tidy, map, by="timepoint")
+  lr_tidy <- lr_tidy[,!(names(lr_tidy) %in% c("timepoint"))]
+  
+  no_samples <- dim(predict_obj$Y_predict)[3]
+  posterior_samples <- gather_array(predict_obj$Y_predict[LR_coord,,], "LR_value", "observation", "sample_no")
+  # get quantiles
+  
+  post_quantiles <- posterior_samples %>%
+    group_by(observation) %>%
+    summarise(p2.5 = quantile(LR_value, prob=0.025),
+              p5 = quantile(LR_value, prob=0.05),
+              p10 = quantile(LR_value, prob=0.1),
+              p25 = quantile(LR_value, prob=0.25),
+              p50 = quantile(LR_value, prob=0.5),
+              mean = mean(LR_value),
+              p75 = quantile(LR_value, prob=0.75),
+              p90 = quantile(LR_value, prob=0.9),
+              p95 = quantile(LR_value, prob=0.95),
+              p97.5 = quantile(LR_value, prob=0.975)) %>%
+    ungroup()
+  
+  p <- ggplot(post_quantiles, aes(x=observation, y=mean)) +
+    geom_ribbon(aes(ymin=p2.5, ymax=p97.5), fill="darkgrey", alpha=0.5) +
+    geom_ribbon(aes(ymin=p25, ymax=p75), fill="darkgrey", alpha=0.9) +
+    geom_line(color="blue") +
+    geom_point(data=lr_tidy[lr_tidy$LR_coord==LR_coord,], aes(x=observation, y=LR_value), alpha=0.5) +
+    theme_minimal() +
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(angle=45)) +
+    ylab("LR coord")
+  #ylim(c(-10, 10))
+  if(is.null(save_filename)) {
+    show(p)
+  } else {
+    ggsave(paste0(GP_plot_dir,level,"/",save_filename,".png"), scale=2, width=12, height=1.5, units="in", dpi=100)
+  }
+}
+
+plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=NULL) {
+  data <- load_and_filter(level)
+  for(baboon in individuals) {
+    cat(paste0("Visualizing individual '",baboon,"' at level '",level,"'...\n"))
+    indiv_data <- subset_samples(data, sname==baboon)
+    if(timecourse) {
+      cat("\tPlotting timecourse...\n")
+      plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=FALSE, 
+                               legend=TRUE, legend_level=level)
+    }
+    if(covcor) {
+      cat(paste0("Plotting element-wise mean covariance/correlation for individual '",baboon,"'...\n"))
+      fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
+      fit.clr <- to_clr(fit_obj$fit)
+      Sigma <- fit.clr$Sigma
+      meanSigma <- apply(Sigma, c(1,2), mean)
+      df <- driver::gather_array(meanSigma, "value", "feature_row", "feature_col")
+      p <- ggplot(df, aes(feature_row, feature_col)) +
+        geom_tile(aes(fill = value), colour = "white") +
+        scale_fill_gradient2(low = "darkblue", mid = "white", high = "darkred")
+      ggsave(paste0(GP_plot_dir,level,"/",baboon,"_mean_cov.png"), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
+      meanSigma_corr <- cov2cor(meanSigma)
+      df <- driver::gather_array(meanSigma_corr, "value", "feature_row", "feature_col")
+      p <- ggplot(df, aes(feature_row, feature_col)) +
+        geom_tile(aes(fill = value), colour = "white") +
+        scale_fill_gradient2(low = "darkblue", mid = "white", high = "darkred")
+      ggsave(paste0(GP_plot_dir,level,"/",baboon,"_mean_corr.png"), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
+    }
+    if(!is.null(predict_coords) & length(predict_coords) > 0) {
+      cat(paste0("Generating predictive plots for individual '",baboon,"'...\n"))
+      
+      # a dumb hack for now; these need to be global
+      se_weight <<- fit_obj$kernelparams$se_weight
+      se_sigma <<- fit_obj$kernelparams$se_sigma
+      rho_se <<- fit_obj$kernelparams$rho_se
+      per_weight <<- fit_obj$kernelparams$per_weight
+      per_sigma <<- fit_obj$kernelparams$per_sigma
+      rho_per <<- fit_obj$kernelparams$rho_per
+      period <<- fit_obj$kernelparams$period
+      
+      predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
+
+      for(coord in predict_coords) {
+        plot_predictions(fit_obj, predict_obj, LR_coord=coord, save_filename=paste0(baboon,"_",coord))
+      }
+    }
+  }
 }
 
 

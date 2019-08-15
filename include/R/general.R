@@ -10,10 +10,13 @@ library(RcppEigen)
 library(LaplacesDemon) # various sampling distributions
 library(RColorBrewer)
 library(tidyverse)
+library(stringr)
 
 data_dir <- "data/"
 model_dir <- "output/model_fits/"
 plot_dir <- "output/plots/"
+
+pc <- 0.5
 
 sourceCpp("include/cpp/fast_corr.cpp")
 
@@ -142,24 +145,6 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
-# use phyloseq::tax_glom to collapse taxa to level=level
-perform_agglomeration <- function(level="genus", replicates=TRUE) {
-  data <- read_data(replicates=replicates)
-  cat("Zero counts (original):",(1 - get_tiny_counts(data, 1)),"\n")
-  if(!replicates) {
-    # remove technical replicates
-    data <- subset_samples(data, sample_status==0)
-  }
-  cat("Agglomerating data...\n")
-  glom_data <- glom_counts(data, level=level)
-  if(replicates) {
-    save(glom_data, file=paste("glom_data_",level,"_reps.RData",sep=""))
-  } else {
-    save(glom_data, file=paste("glom_data_",level,".RData",sep=""))
-  }
-  cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
-}
-
 # filter data below a count threshold in a minimum number of samples into an "Other" category
 # e.g. count_threshold=3, sample_threshold=0.2 filters taxa with no more than a 2-count in 80% of samples into an
 # "Other" category, labeled by an arbitrary sequence variant in that "Other" category (see the print statement
@@ -220,4 +205,20 @@ print_readable_taxonomy <- function(level="family") {
   for(i in 1:(nrow(tt)-1)) {
     cat(tt[i,5],"/",tt[nrow(tt),5],"\n")
   }
+}
+
+# stray uses the D^th element as the ALR reference by default
+# do some row shuffling in Y to put the reference at the end if there's
+# some specific reference we want to use
+reorient_count_matrix <- function(Y, alr_ref) {
+  Y <- Y[c(setdiff(1:D,alr_ref),alr_ref),]
+  return(Y)
+}
+
+default_ALR_prior <- function(D, log_var_scale=1) {
+  upsilon <- D-1+10 # lesser certainty
+  GG <- cbind(diag(D-1), -1) # log contrast for ALR with last taxon as reference
+  Xi <- GG%*%(diag(D)*log_var_scale)%*%t(GG) # take diag as covariance over log abundances
+  Xi <- Xi*(upsilon-D-1)
+  return(list(upsilon=upsilon, Xi=Xi))
 }

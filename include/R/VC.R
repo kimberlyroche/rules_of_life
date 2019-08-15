@@ -1,8 +1,8 @@
+source("include/R/general.R")
+
 # ====================================================================================================================
 # ESTIMATION OF VARIANCE COMPONENTS
 # ====================================================================================================================
-
-require("include.R")
 
 # plots crude variance components (per-individual) for diagnostic purposes
 plot_cov <- function(datamat, filename) {
@@ -13,7 +13,7 @@ plot_cov <- function(datamat, filename) {
     ylab("samples") +
     theme_minimal() +
     guides(fill=guide_legend(title="covariance"))
-  ggsave(paste("plots/",filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste(plot_dir,filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 # pass in zero-filtered data

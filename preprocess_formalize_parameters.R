@@ -7,8 +7,7 @@ source("include/general.R")
 levels <- c("phylum", "family")
 
 for(level in levels) {
-  glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, collapse_level=level)
+  data <- load_and_filter(level)
 
   metadata <- sample_data(data)
   indiv_sd <- c()
@@ -16,7 +15,7 @@ for(level in levels) {
     cat("Parsing individual",indiv,"\n")
     data_subset <- subset_samples(data, sname == indiv)
     if(nsamples(data_subset) > 1) {
-      alr_data <- driver::alr(otu_table(data_subset)@.Data + 0.5)
+      alr_data <- driver::alr(otu_table(data_subset)@.Data + pc)
       tax_sd <- apply(alr_data, 2, sd)
       indiv_sd <- c(indiv_sd, tax_sd)
     }

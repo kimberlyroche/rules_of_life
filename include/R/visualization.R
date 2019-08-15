@@ -1,8 +1,8 @@
+source("include/R/general.R")
+
 # ====================================================================================================================
 # VISUALIZATION -- HISTOGRAMS
 # ====================================================================================================================
-
-require("include.R")
 
 histogram_abundances <- function(data, filename="histogram") {
   df <- gather_array(data)
@@ -10,7 +10,7 @@ histogram_abundances <- function(data, filename="histogram") {
     geom_histogram(aes(x=var), binwidth=0.25) +
     theme_minimal() +
     xlab("log ratio abundance")
-  ggsave(paste(filename,".png",sep=""), plot=p)
+  ggsave(paste0(plot_dir,filename,".png",sep=""), plot=p)
 }
 
 histogram_indiv_samples <- function(data) {
@@ -20,7 +20,7 @@ histogram_indiv_samples <- function(data) {
     geom_histogram(aes(x=n), binwidth=5) +
     theme_minimal() +
     xlab("per-individual samples")
-  ggsave("histogram_per_individual_samples.png", plot=p)
+  ggsave(paste0(plot_dir,"histogram_per_individual_samples.png"), plot=p)
 }
 
 histogram_sample_density <- function(data, units="weeks") {
@@ -67,7 +67,7 @@ histogram_sample_density <- function(data, units="weeks") {
   if(units == "weeks") {
     p <- p + xlim(0, 100)
   }
-  ggsave("histogram_sample_distance.png", plot=p)
+  ggsave(paste0(plot_dir,"histogram_sample_distance.png"), plot=p)
 }
 
 # takes a list of correlations or covariances
@@ -82,7 +82,7 @@ histogram_corr <- function(data, filename, cov=FALSE) {
   } else {
     p <- p + xlim(-1, 1) + xlab("correlation")
   }
-  ggsave(paste(filename,".png",sep=""), plot=p)
+  ggsave(paste0(plot_dir,filename,".png"), plot=p)
 }
 
 # ====================================================================================================================
@@ -106,8 +106,7 @@ plot_corr_matrix <- function(data, filename, cov=FALSE) {
   } else {
     p <- p + guides(fill=guide_legend(title="correlation"))
   }
-  #ggsave(paste(filename,".pdf",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
-  ggsave(paste(filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(paste0(plot_dir,filename,".png"), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 visualize_groupwise_covariance <- function(data, md, group, sample=1000000) {
@@ -213,7 +212,7 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
     theme_minimal() +
     xlab("ASV no.") +
     ylab(paste("Percent counts >= ",threshold,sep=""))
-  ggsave(save_filename, plot=p, scale=1.5, width=5, height=3, units="in")
+  ggsave(paste0(plot_dir,save_filename,".png"), plot=p, scale=1.5, width=5, height=3, units="in")
 }
 
 # plot proportional change over time
@@ -307,7 +306,7 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
     # these are likely replicates
     img_width <- 5
   }
-  ggsave(paste("plots/",save_filename,".png",sep=""), plot=p, scale=1.5, dpi=100, width=img_width, height=3, units="in")
+  ggsave(paste0(save_filename,".png"), plot=p, scale=1.5, dpi=100, width=img_width, height=3, units="in")
 }
 
 # this is just a wrapper to call plot_timecourse_phyloseq on a representative sample of individuals
@@ -473,7 +472,7 @@ plot_mean_autocorrelation <- function(lags, filename="autocorrelation", width=6,
     theme_minimal() +
     theme(axis.line.x=element_line(), axis.line.y=element_line()) +
     geom_hline(yintercept = 0)
-  ggsave(paste(filename,".png",sep=""), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
+  ggsave(paste0(plot_dir,filename,".png"), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
 }
 
 plot_bounded_autocorrelation <- function(lags, filename="autocorrelation", width=6, height=3) {
@@ -487,5 +486,5 @@ plot_bounded_autocorrelation <- function(lags, filename="autocorrelation", width
     theme_minimal() +
     theme(axis.line.x=element_line(), axis.line.y=element_line()) +
     geom_hline(yintercept = 0)
-  ggsave(paste(filename,".png",sep=""), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
+  ggsave(paste0(plot_dir,filename,".png"), plot=p, dpi=100, scale=1.5, width=width, height=height, units="in")
 }

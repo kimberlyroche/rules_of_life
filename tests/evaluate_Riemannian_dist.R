@@ -1,3 +1,7 @@
+# generate fake data and compare 
+#   (1) two means of calculating Riemannian distance which should be identical
+#   (2) preservation of distances across log ratio transformations
+
 library(LaplacesDemon)
 library(driver)
 
@@ -73,5 +77,11 @@ RiemannR(B.clr,A.clr)
 RiemannR2(A.clr,B.clr)
 RiemannR2(B.clr,A.clr)
 
-
-
+# note truncation of CLR(Sigma) to give same distance went as:
+#   D <- dim(Sigma)[1]
+#   N <- dim(Sigma)[3]
+#   truncSigma <- array(NA, dim=c(D-1, D-1, N))
+#   for(i in 1:N) {
+#     truncSigma[,,i] <- Sigma[1:(D-1), 1:(D-1), i]
+#   }
+#   Sigma <- truncSigma

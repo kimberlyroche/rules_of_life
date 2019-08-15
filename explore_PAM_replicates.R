@@ -1,15 +1,15 @@
-library(driver)
+source("include/R/general.R")
+
+# additional clustering/ordination stuff
 library(ClusterR)
 #library(cluster)
 #library(psych)
 #library(Rcpp)
 library(Rtsne)
 
-source("include.R")
-
 # read in and filter full data set at this phylogenetic level
-glom_data <- load_glommed_data(level="family", replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2, verbose=TRUE)
+level <- "family"
+data <- load_and_filter(level)
 replicates <- subset_samples(data, sample_status==2)
 cat("Number of replicate samples:",nsamples(replicates),"\n")
 cat("Taxa in each replicate:",ntaxa(replicates),"\n")
@@ -28,7 +28,7 @@ rownames(rep_counts) <- rep_meta$sid
 colnames(rep_counts) <- NULL
 
 # embed (Aitchison distance)
-rep_clr <- driver::clr(rep_counts + 0.5) # CLR
+rep_clr <- driver::clr(rep_counts + pc) # CLR
 rep_dist <- dist(rep_clr)
 res_tsne <- Rtsne(rep_dist)
 
@@ -80,8 +80,8 @@ p
 # visualize medoids on a timecourse
 selected_samples <- sample_data(ACA_data)$sid[medoids]
 selected_samples <- selected_samples[!is.na(selected_samples)]
-plot_timecourse_phyloseq(ACA_data, paste0("ACA_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
+plot_timecourse_phyloseq(ACA_data, paste0(plot_dir,"ACA_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
 
 selected_samples <- sample_data(VIG_data)$sid[medoids]
 selected_samples <- selected_samples[!is.na(selected_samples)]
-plot_timecourse_phyloseq(VIG_data, paste0("VIG_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)
+plot_timecourse_phyloseq(VIG_data, paste0(plot_dir,"VIG_medoids_k",k), gapped=FALSE, legend=FALSE, selected_samples=selected_samples)

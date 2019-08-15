@@ -1,33 +1,17 @@
-# what does this file do?
-
-library(driver)
-library(phyloseq)
-library(ggplot2)
-
-source("include.R")
+source("include/R/general.R")
 
 translate_month <- function(x) {
   if(x == 2) { return("Feb") }
-  #if(x == 3) { return("Mar") }
+  if(x == 3) { return("Mar") }
   if(x == 4) { return("Apr") }
   if(x == 5) { return("May") }
   if(x == 6) { return("Jun") }
   if(x == 7) { return("Jul") }
 }
 
-cosine_angle <- function(vec1, vec2) {
-  y.t <- as.vector(sample_lr[,j])
-  y.tt <- sqrt(y.t%*%y.t)
-  y.h <- as.vector(sample_lr[,k])
-  y.hh <- sqrt(y.h%*%y.h)
-  cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
-}
-
-glom_data <- load_glommed_data(level="genus", replicates=TRUE)
-filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-
-# get replicates and unique instances of sname x date pairs
-replicates <- subset_samples(glom_data, sample_status==2) # replicates only
+level <- "genus"
+data <- load_and_filter(level)
+replicates <- subset_samples(data, sample_status==2) # replicates only
 md <- read_metadata(replicates)
 unique_replicates <- unique(md[,c("sname","collection_date")])
 
@@ -55,12 +39,13 @@ for(i in 1:dim(unique_replicates)[1]) {
   for(j in 1:(dim(sample_lr)[2]-1)) {
     for(k in 2:dim(sample_lr)[2]) {
       if(j != k) {
-        y.t <- as.vector(sample_lr[,j])
-        y.tt <- sqrt(y.t%*%y.t)
-        y.h <- as.vector(sample_lr[,k])
-        y.hh <- sqrt(y.h%*%y.h)
-        cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
-        total_corr <- total_corr + (y.t%*%y.h)/(y.tt*y.hh)
+        #y.t <- as.vector(sample_lr[,j])
+        #y.tt <- sqrt(y.t%*%y.t)
+        #y.h <- as.vector(sample_lr[,k])
+        #y.hh <- sqrt(y.h%*%y.h)
+        #cat("Corr:",((y.t%*%y.h)/(y.tt*y.hh)),"\n")
+        this_corr <- cor(c(sample_lr[,j]), c(sample_lr[,k]))
+        total_corr <- total_corr + this_corr
         pairs <- pairs + 1
       }
     }
@@ -83,7 +68,7 @@ p <- ggplot(plot_data, aes(x)) +
   xlab("correlation between replicates") +
   xlim(c(-1, 1))
 p
-ggsave("plots/correlation_between_replicates.png", scale=1.5, width=4, height=4, units="in")
+ggsave(paste0(plot_dir,"correlation_between_replicates.png"), scale=1.5, width=4, height=4, units="in")
 
 # what is up with lower-correlation replicates?
 # check the counts-per-replicates for low-correlation sets of replicates
@@ -129,11 +114,12 @@ for(i in 1:(dim(unique_replicates)[1]-1)) {
       pairs <- 0
       for(k in 1:(dim(sample_lr.i)[2]-1)) {
         for(m in 2:dim(sample_lr.j)[2]) {
-          y.t <- as.vector(sample_lr.i[,k])
-          y.tt <- sqrt(y.t%*%y.t)
-          y.h <- as.vector(sample_lr.j[,m])
-          y.hh <- sqrt(y.h%*%y.h)
-          total_corr <- total_corr + (y.t%*%y.h)/(y.tt*y.hh)
+          #y.t <- as.vector(sample_lr.i[,k])
+          #y.tt <- sqrt(y.t%*%y.t)
+          #y.h <- as.vector(sample_lr.j[,m])
+          #y.hh <- sqrt(y.h%*%y.h)
+          this_corr <- cor(c(sample_lr.i[,k]), c(sample_lr.i[,m]))
+          total_corr <- total_corr + this_corr
           pairs <- pairs + 1
         }
       }
@@ -149,7 +135,7 @@ p <- ggplot(plot_data, aes(x)) +
   xlab("correlation across unrelated replicates") +
   xlim(c(-1, 1))
 p
-ggsave("plots/correlation_across_replicates.png", scale=1.5, width=4, height=4, units="in")
+ggsave(paste0(plot_dir,"correlation_across_replicates.png"), scale=1.5, width=4, height=4, units="in")
 
 # ====================================================================================================================
 # plot selected replicate sets
@@ -170,4 +156,4 @@ for(i in 1:length(fake_dates)) {
   mod_dates[i] <- paste(fake_dates[i],i,sep="_rep")
 }
 sample_data(merged_samples)$collection_date <- mod_dates
-plot_timecourse_phyloseq(merged_samples, paste("plots/",individual,"_replicate_timecourse",sep=""), gapped=F, legend=T, legend_level="family")
+plot_timecourse_phyloseq(merged_samples, paste0(plot_dir,individual,"_replicate_timecourse"), gapped=F, legend=T, legend_level="family")

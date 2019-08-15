@@ -5,6 +5,8 @@
 #   just within the first for individuals identified in check_indivs or for all fitted
 #   models if check_indivs is NULL
 
+source("include/R/GP.R")
+
 args <- commandArgs(trailingOnly = TRUE)
 if(length(args) < 1) {
   cat("Arguments: (level)")
@@ -13,13 +15,11 @@ if(length(args) < 1) {
 
 level <- args[1]
 
-source("include/general.R")
-
 #check_indivs <- c("ECH", "LAV", "LOB", "LYE", "MON", "NOB", "ONY", "OPH", "QUA", "TAL", "VET", "YAI")
 check_indivs <- NULL
 
 if(is.null(check_indivs)) {
-  fitted_models <- get_fitted_models(level)
+  fitted_models <- get_fitted_modellist(level)$fitted_models
   for(fm in fitted_models) {
     fit <- readRDS(fm)$fit
     if(is.nan(fit$logMarginalLikelihood)) {

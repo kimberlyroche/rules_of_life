@@ -1,6 +1,8 @@
 # estimates within-group and between-group correlation
 
-source("include.R")
+source("include/R/general.R")
+
+# NOTE: refactored and untested
 
 use_individuals <- T # if TRUE we're asking about within-individual correlation vs. between individual correlation
                      # if FALSE we're asking about within- to between-groups
@@ -12,8 +14,8 @@ use_metagenomics <- T # if TRUE we're asking about correlation between Piphillin
                       # THIS IS UNFINISHED!
                       # THE FOR LOOP BELOW ASSUMES A PHYLOSEQ OBJECT IN ALL ITS SUBSAMPLING
 
-glom_data <- load_glommed_data(level="species", replicates=TRUE)
-data <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
+level <- "species"
+data <- load_and_filter(level)
 metadata <- read_metadata(data)
 
 if(use_metagenomics) {

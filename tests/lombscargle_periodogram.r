@@ -1,10 +1,10 @@
-source("include.R")
 library(lomb)
 
-glom_data <- load_glommed_data(level="genus", replicates=TRUE)
-filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-# family-agglomerated has replicates; remove these
-non_reps <- prune_samples(sample_data(filtered)$sample_status==0, filtered)
+source("../include/R/general.R")
+
+level <- "genus"
+data <- load_and_filter(level)
+non_reps <- prune_samples(sample_data(data)$sample_status==0, data)
 metadata <- read_metadata(non_reps)
 cat("Filtered down to",nsamples(non_reps),"samples x",ntaxa(non_reps),"taxa\n")
 
@@ -30,7 +30,7 @@ for(sname in best_sampled) {
     if(fit$peak.at[2] <= 0.01) {
       signif_peaks[length(signif_peaks)+1] <- fit$peak.at[1]
       if(plot_sample_periodogram) {
-        png(paste0("plots/periodogram_LS_sample_",sname,".png"), height=600, width=800)
+        png(paste0(plot_dir,"periodogram_LS_sample_",sname,".png"), height=600, width=800)
         plot(fit, type="l", main=paste0("Lomb-Scargle Periodogram (",sname,")"), xlab=NULL, ylab="normalised power", level=FALSE, log="")
         dev.off()
         plot_sample_periodogram <- FALSE
@@ -39,9 +39,9 @@ for(sname in best_sampled) {
   }
 }
 
-png("plots/periodogram_LS_allpeaks.png", height=600, width=800)
+png(plot_dir,"periodogram_LS_allpeaks.png", height=600, width=800)
 plot(density(all_peaks), main="Distribution of all peaks")
 dev.off()
-png("plots/periodogram_LS_signifpeaks.png", height=600, width=800)
+png(plot_dir,"periodogram_LS_signifpeaks.png", height=600, width=800)
 plot(density(signif_peaks), main="Distribution of significant peaks (p <= 0.01)")
 dev.off()

@@ -1,15 +1,15 @@
+source("include/R/general.R")
+
 # ====================================================================================================================
 # METAGENOMICS FILE HANDLING
 # ====================================================================================================================
-
-source("include/R/GP.R")
 
 # read in PiPhillin data from tab-delimited txt file
 #
 # returns a matrix where rows (and rownames) are enzymes and columns (and column names) are unordered samples
 read_metagenomics <- function(metadata, subset=TRUE) {
   # subset=TRUE -- just read in the "Filtered_enzymes.txt" shortlist
-  piphillin_dir <- "original_data/Piphillin_20190222"
+  piphillin_dir <- paste0(data_dir,"Piphillin_20190222")
   if(subset) {
     piphillin_file <- "Filtered_enzymes.txt"
     # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt

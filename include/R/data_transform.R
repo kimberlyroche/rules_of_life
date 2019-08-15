@@ -1,8 +1,8 @@
+source("include/R/general.R")
+
 # ====================================================================================================================
 # DATA TRANSFORMATION, ETC.
 # ====================================================================================================================
-
-require("include.R")
 
 # recode date as numeric: number of days since earliest sample date
 # these are frequently *fractional* because of leap years!!!

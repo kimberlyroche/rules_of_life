@@ -1,15 +1,16 @@
-source("include.R")
+source("include/R/general.R")
 
-# NOTE: refactored a lot of code; have yet to re-test everything in this file!
+# NOTE: refactored and untested
 
 # ====================================================================================================================
 # get noise (1) from replicates and (2) overall
 # ====================================================================================================================
 
-glom_data <- load_glommed_data(level="family", replicates=TRUE)
-filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.66)
-replicates <- subset_samples(filtered, sample_status==2)
+level <- "species"
+data <- load_and_filter(level)
+replicates <- subset_samples(data, sample_status==2)
 metadata <- sample_data(replicates)
+
 rep_sid <- unique(metadata$sid)
 var_clr <- c()
 var_alr <- c()
@@ -38,15 +39,9 @@ var_alr <- apply(alr_counts, 2, var)
 cat("CLR variance:",mean(var_clr),"\n")
 cat("ALR variance:",mean(var_alr),"\n")
 
-quit()
-
 # ====================================================================================================================
 # plot sample overview: all samples with time on x-axis x individual on y-axis
 # ====================================================================================================================
-
-glom_data <- load_glommed_data(level="species", replicates=TRUE)
-filtered <- filter_data(glom_data, count_threshold=3, sample_threshold=0.2)
-metadata <- read_metadata(filtered)
 
 # ====================================================================================================================
 # read in metagenomics
@@ -101,7 +96,7 @@ if(color_metagenomics) {
     ylab("") +
     theme(axis.text.x=element_blank()) +
     theme(axis.title.y=element_text(margin=margin(t=10, r=0, b=0, l=10)))
-ggsave("plots/ABRP_overview.png", scale=1.5, width=12, height=6, units="in")
+ggsave(paste0(plot_dir,"ABRP_overview.png"), scale=1.5, width=12, height=6, units="in")
 
 }
 
@@ -172,32 +167,32 @@ ord <- ordinate(baboon_counts, "PCoA", "bray")
 # label SEASON
 cat("Plotting seasonal labeling on ordination...\n")
 p <- plot_ordination(baboon_counts, ord, type="sample", color="season")
-ggsave("plots/season_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"season_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 
 # label GROUP
 # fix these categorical variables, so they don't accidentally plot as continuous values
 cat("Plotting collection group-wise labeling on ordination...\n")
 sample_data(baboon_counts)$grp <- as.factor(sample_data(baboon_counts)$grp)
 p <- plot_ordination(baboon_counts, ord, type="sample", color="grp")
-ggsave("plots/grp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"grp_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 
 # label SEX
 cat("Plotting sex-wise labeling on ordination...\n")
 p <- plot_ordination(baboon_counts, ord, type="sample", color="sex")
-ggsave("plots/sex_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"sex_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 
 # label MATERNAL GROUP
 cat("Plotting maternal group-wise labeling on ordination...\n")
 sample_data(baboon_counts)$matgrp <- as.factor(sample_data(baboon_counts)$matgrp)
 p <- plot_ordination(baboon_counts, ord, type="sample", color="matgrp")
-ggsave("plots/matgrp_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"matgrp_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 
 # label AGE
 cat("Plotting maternal age-wise labeling on ordination...\n")
 sample_data(baboon_counts)$age <- cut(sample_data(baboon_counts)$age, 
 	breaks=c(0, 4.5, 19, Inf), labels=c("juvenile", "adult", "geriatric"))
 p <- plot_ordination(baboon_counts, ord, type="sample", color="age")
-ggsave("plots/age_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"age_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 
 # resample where we want particularly samples witihn individuals
 baboon_counts <- subset_samples(filtered, sname %in% best_sampled)
@@ -205,5 +200,5 @@ ord <- ordinate(baboon_counts, "PCoA", "bray")
 # label INDIVIDUAL
 cat("Plotting individual labeling on ordination...\n")
 p <- plot_ordination(baboon_counts, ord, type="sample", color="sname")
-ggsave("plots/sname_ordination_100.png", plot=p, width=6, height=5, units="in", scale=1.5)
+ggsave(paste0(plot_dir,"sname_ordination_100.png"), plot=p, width=6, height=5, units="in", scale=1.5)
 }
