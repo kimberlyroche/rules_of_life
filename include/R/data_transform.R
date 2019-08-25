@@ -83,7 +83,7 @@ apply_alr <- function(data, pseudocount=0.65, d=NULL) {
     counts <- t(counts)
   }
   counts <- counts + pseudocount
-  return(driver::alr(counts))
+  return(driver::alr(counts, d=d))
 }
 
 geom_mean <- function(x) {

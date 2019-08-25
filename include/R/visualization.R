@@ -217,12 +217,13 @@ plot_percent_threshold <- function(data, threshold=3, save_filename) {
 
 # plot proportional change over time
 # note: palette size would probably have to increase to accomodate legend_level finer than family!
-plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
-                                     legend=TRUE, legend_level="family", selected_samples=NULL) {
+plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=TRUE, 
+                                     legend_level="family", selected_samples=NULL, are_replicates=FALSE) {
   n <- phyloseq::nsamples(data)
   p <- apply_proportion(data)
+  cat("Plotting ",n,"sample timecourse...\n")
   df <- psmelt(p)
-  df2 <- bind_cols(list(OTU=df$OTU, Sample=df$Sample, Abundance=df$Abundance, SID=df$sid))
+  df2 <- bind_cols(list(OTU=df$OTU, Sample=df$sample_id, Abundance=df$Abundance, SID=df$sid))
   if(!is.null(selected_samples)) {
     df2$alpha <- 0.25
     df2[df2$SID %in% selected_samples,]$alpha <- 1
@@ -232,15 +233,22 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE,
   na.string <- ".N/A"
   
   # replace Sample ID's with their dates for readability
-  metadata <- sample_data(data)
-  for(i in 1:dim(df2)[1]) {
-    df2$Sample[i] <- paste(metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]],
-                           metadata[metadata$sample_id==df2$Sample[i],"sid"][[1]])
+  if(!are_replicates) {
+    metadata <- sample_data(data)
+    for(i in 1:dim(df2)[1]) {
+      if(gapped) {
+        df2$Sample[i] <- metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]]
+      } else {
+        df2$Sample[i] <- paste(metadata[metadata$sample_id==df2$Sample[i],"collection_date"][[1]],
+                              metadata[metadata$sample_id==df2$Sample[i],"sid"][[1]])
+      }
+    }
   }
 
   # make sure the dates are in order and fix the order by converting to factors
   df3 <- df2[order(df2$Sample),]
   if(gapped) {
+    df3 <- df3[,c("OTU","Sample","Abundance")] # kill SID for this case
     # insert empty samples were gaps of 2 weeks or more exist
     gap.days <- 13
     dates_present <- unique(df3$Sample)

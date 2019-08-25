@@ -1,4 +1,6 @@
 source("include/R/general.R")
+source("include/R/data_transform.R")
+source("include/R/visualization.R")
 
 translate_month <- function(x) {
   if(x == 2) { return("Feb") }
@@ -8,6 +10,10 @@ translate_month <- function(x) {
   if(x == 6) { return("Jun") }
   if(x == 7) { return("Jul") }
 }
+
+# ====================================================================================================================
+# correlation WITHIN replicate sets
+# ====================================================================================================================
 
 level <- "genus"
 data <- load_and_filter(level)
@@ -157,3 +163,5 @@ for(i in 1:length(fake_dates)) {
 }
 sample_data(merged_samples)$collection_date <- mod_dates
 plot_timecourse_phyloseq(merged_samples, paste0(plot_dir,individual,"_replicate_timecourse"), gapped=F, legend=T, legend_level="family")
+
+

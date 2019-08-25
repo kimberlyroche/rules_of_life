@@ -149,7 +149,7 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
 # e.g. count_threshold=3, sample_threshold=0.2 filters taxa with no more than a 2-count in 80% of samples into an
 # "Other" category, labeled by an arbitrary sequence variant in that "Other" category (see the print statement
 # below identifying it for reference)
-filter_data <- function(data, count_threshold=10, sample_threshold=0.66, collapse_level=NULL, verbose=TRUE) {
+filter_data <- function(data, count_threshold=5, sample_threshold=0.2, collapse_level=NULL, verbose=TRUE) {
   total_counts <- sum(otu_table(data)@.Data)
   # get indices to collapse
   retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=T))@.Data)
