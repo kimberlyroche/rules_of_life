@@ -15,8 +15,9 @@ if(length(args) < 1) {
 
 level <- args[1]
 
-#check_indivs <- c("ECH", "LAV", "LOB", "LYE", "MON", "NOB", "ONY", "OPH", "QUA", "TAL", "VET", "YAI")
+check_indivs <- c("ECH", "LAV", "LOB", "LYE", "MON", "NOB", "ONY", "OPH", "QUA", "TAL", "VET", "YAI")
 check_indivs <- NULL
+check_indivs <- c("ECH")
 
 if(is.null(check_indivs)) {
   fitted_models <- get_fitted_modellist(level)$fitted_models

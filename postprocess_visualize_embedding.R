@@ -1,5 +1,21 @@
 source("include/R/GP.R")
 
+# available labels
+#   individual
+#   group
+#   matgroup
+#   counts
+#   density
+#   mom
+#   dad
+#   momrank
+#   drought
+#   largegroup
+#   momdied
+#   competingsib
+#   birthrate_all
+#   birthrate_surviving
+
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
   stop("Arguments: (level) (measure=Sigma|Lambda) (label type)", call.=FALSE)

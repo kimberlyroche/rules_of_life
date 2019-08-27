@@ -17,7 +17,6 @@ PER <- function(X, sigma=1, rho=1, period=24, jitter=1e-10){
 }
 
 # whitenoise kernel
-# not currently in use
 WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
   dist <- as.matrix(dist(t(X)))
   G <- diag(ncol(dist))*sigma^2 + jitter*diag(ncol(dist))
@@ -29,13 +28,14 @@ WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
 # ====================================================================================================================
 
 # fit Gaussian process to a single baboon series using stray::basset
-fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_append="",
+fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_append="",
                    date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL) {
   cat(paste0("Fitting stray::basset with with parameters:\n",
              "\tbaboon=",baboon,"\n",
              "\tlevel=",level,"\n",
              "\tSE kernel weight=",se_weight,"\n",
              "\tPER kernel weight=",per_weight,"\n",
+             "\tWN kernel weight=",wn_weight,"\n",
              "\tdd_se=",dd_se,"\n"))
 
   # read in and filter full data set at this phylogenetic level
@@ -76,6 +76,8 @@ fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_a
   
   D <- nrow(Y)
   N <- ncol(Y)
+
+  alr_ref <- pick_alr_ref(D)
   
   # square exponential kernel parameters
   dc <- 0.1 # desired minimum correlation
@@ -89,7 +91,8 @@ fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_a
   
   Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
     per_weight*PER(X, sigma=per_sigma, rho=rho_per, period=period, jitter=0) +
-    (1e-8)*diag(ncol(X)) # pretty arbitrary
+    wn_weight*WHITENOISE(X, sigma=1, jitter=0) +
+    (1e-10)*diag(ncol(X)) # pretty arbitrary
   
   D <- nrow(Y)
   N <- ncol(Y)
@@ -118,6 +121,7 @@ fit_GP <- function(baboon, level, se_weight=2, per_weight=0.25, dd_se=90, save_a
   fit_obj$kernelparams$per_sigma <- per_sigma
   fit_obj$kernelparams$rho_per <- rho_per
   fit_obj$kernelparams$period <- period
+  fit_obj$kernelparams$wn_weight <- wn_weight
   
   # chop down for size savings since /data/mukherjeelab is full as shit
   # can't seem to pass desired sample number to stray with any effect; debug this eventually
@@ -252,6 +256,15 @@ embed_posteriors <- function(level, which_measure="Sigma") {
 # EMBEDDING VISUALIZATION FNS.
 # ====================================================================================================================
 
+load_outcomes <- function() {
+  outcomes <- read.csv(paste0(data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
+  # note: may need to change this filtration eventually
+  outcomes <- outcomes[outcomes$sname %in% over_50,]
+  # filter to NA-less measures
+  outcomes <- outcomes[,apply(outcomes, 2, function(x) sum(is.na(x))==0)]
+  return(outcomes) # indexed by sname column
+}
+
 # get annotation labels
 #   df are the coordinates from the ordination
 #   data is the full ABRP phyloseq object
@@ -299,6 +312,58 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
     }
     labels <- round(labels*100)
   }
+  if(annotation %in% c("mom", "dad")) {
+    outcomes <- load_outcomes()
+    for(indiv in individuals) {
+      if(annotation == "mom") { label <- as.character(outcomes[outcomes$sname == indiv,]$mom) }
+      else { label <- as.character(outcomes[outcomes$sname == indiv,]$dad) }
+      if(label == "") { label <- NA }
+      labels[names(labels) == indiv] <- label
+    }
+  }
+  if(annotation %in% c("momrank", "drought", "largegroup", "momdied", "competingsib")) {
+    outcomes <- load_outcomes()
+    for(indiv in individuals) {
+      if(annotation == "momrank") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$mom_lowQuartRank }
+      if(annotation == "drought") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$bornInDrought }
+      if(annotation == "largegroup") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$born_largeGroup }
+      if(annotation == "momdied") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$mom_died }
+      if(annotation == "competingsib") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$has_CompetingSib }
+    }
+    labels <- as.factor(labels)
+  }
+  if(annotation %in% c("birthrate_all", "birthrate_surviving")) {
+    outcomes <- load_outcomes()
+    years <- sapply(as.vector(outcomes$birth_date), function(x) {
+      year <- as.numeric(strsplit(x, "/")[[1]][3]);
+      if(year < 10) { year <- year + 2000 }
+      else { year <- year + 1900 }
+    })
+    names(years) <- outcomes$sname
+
+    metadata <- sample_data(data)
+
+    for(indiv in individuals) {
+      if(outcomes[outcomes$sname==indiv,]$sex == "F") {
+        years_obs_cont <- difftime(max(metadata[metadata$sname==indiv,]$collection_date), min(metadata[metadata$sname==indiv,]$collection_date), units="weeks")/52
+        if(years_obs_cont >= 1) {
+          if(annotation == "birthrate_all") {
+            births <- outcomes[outcomes$sname==indiv,]$num_live_births_RAW
+          } else {
+            births <- outcomes[outcomes$sname==indiv,]$num_surv_births_RAW
+          }
+          score <- births/as.numeric(years_obs_cont)
+          labels[names(labels) == indiv] <- round(score,1)
+        } else {
+          labels[names(labels) == indiv] <- NA
+        }
+      } else {
+        labels[names(labels) == indiv] <- NA
+      }
+    }
+    labels <- as.factor(labels)
+  }
+
   df2 <- data.frame(x1=df$x1, x2=df$x2,
                     x3=df$x3, x4=df$x4,
                     x5=df$x5, x6=df$x6,
@@ -340,8 +405,11 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     df <- get_other_labels(df, glom_data, unique(df$label), annotation=label_type)
   }
-  # axes 1 & 2
   plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x3", "x4", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x4", "x5", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x5", "x6", label_type, legend=legend)
 }
 
 # ====================================================================================================================
@@ -517,16 +585,19 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NUL
 plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=NULL) {
   data <- load_and_filter(level)
   for(baboon in individuals) {
+    baboon <<- baboon
     cat(paste0("Visualizing individual '",baboon,"' at level '",level,"'...\n"))
     indiv_data <- subset_samples(data, sname==baboon)
     if(timecourse) {
       cat("\tPlotting timecourse...\n")
       plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=FALSE, 
-                               legend=TRUE, legend_level=level)
+                               legend=FALSE, legend_level=level)
+      plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=TRUE, 
+                               legend=FALSE, legend_level=level)
     }
+    fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
     if(covcor) {
       cat(paste0("Plotting element-wise mean covariance/correlation for individual '",baboon,"'...\n"))
-      fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
       fit.clr <- to_clr(fit_obj$fit)
       Sigma <- fit.clr$Sigma
       meanSigma <- apply(Sigma, c(1,2), mean)
@@ -553,6 +624,7 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       per_sigma <<- fit_obj$kernelparams$per_sigma
       rho_per <<- fit_obj$kernelparams$rho_per
       period <<- fit_obj$kernelparams$period
+      wn_weight <<- fit_obj$kernelparams$wn_weight
       
       predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
 

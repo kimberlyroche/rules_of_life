@@ -215,6 +215,10 @@ reorient_count_matrix <- function(Y, alr_ref) {
   return(Y)
 }
 
+pick_alr_ref <- function(no_taxa) {
+  return(round(no_taxa/2))
+}
+
 default_ALR_prior <- function(D, log_var_scale=1) {
   upsilon <- D-1+10 # lesser certainty
   GG <- cbind(diag(D-1), -1) # log contrast for ALR with last taxon as reference

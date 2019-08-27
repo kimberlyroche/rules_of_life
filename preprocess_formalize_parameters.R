@@ -4,7 +4,7 @@ source("include/R/general.R")
 source("include/R/data_transform.R")
 source("include/R/visualization.R")
 
-levels <- c("phylum", "family")
+levels <- c("phylum", "family", "genus")
 
 for(level in levels) {
   # estimate noise in replicates
@@ -15,7 +15,8 @@ for(level in levels) {
   cat("Percent replicates:",round(sum(sample_status == 2)/length(sample_status), 3),"\n")
   
   # apply log ratio transform
-  alr_ref <- round(ntaxa(data)/2)
+  cat("Number of taxa at this level:",ntaxa(data),"\n")
+  alr_ref <- pick_alr_ref(ntaxa(data))
   log_ratios <- apply_alr(data, d=alr_ref)
   unique_sids <- unique(md[md$sample_status == 2,]$sid)
   replicate_var <- c()
