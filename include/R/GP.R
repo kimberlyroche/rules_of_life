@@ -29,14 +29,16 @@ WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
 
 # fit Gaussian process to a single baboon series using stray::basset
 fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_append="",
-                   date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL) {
-  cat(paste0("Fitting stray::basset with with parameters:\n",
+                   date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL, verbose=TRUE, mean_only=FALSE) {
+  if(verbose) {
+    cat(paste0("Fitting stray::basset with with parameters:\n",
              "\tbaboon=",baboon,"\n",
              "\tlevel=",level,"\n",
              "\tSE kernel weight=",se_weight,"\n",
              "\tPER kernel weight=",per_weight,"\n",
              "\tWN kernel weight=",wn_weight,"\n",
              "\tdd_se=",dd_se,"\n"))
+  }
 
   # read in and filter full data set at this phylogenetic level
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
@@ -109,7 +111,11 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   alr_means <- colMeans(alr_ys)
   Theta <- function(X) matrix(alr_means, D-1, ncol(X))
   
-  fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
+  if(mean_only) {
+    fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE)
+  } else {
+    fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
+  }
   fit_obj <- list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit)
   
   # dumb as hell but for later prediction, these need to be loaded into the workspace
@@ -126,10 +132,19 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   # chop down for size savings since /data/mukherjeelab is full as shit
   # can't seem to pass desired sample number to stray with any effect; debug this eventually
   fit_obj$fit$iter <- 100
+  if(mean_only) {
+    fit_obj$fit$iter <- 1
+  }
   fit_obj$fit$Eta <- fit_obj$fit$Eta[,,1:fit_obj$fit$iter]
   fit_obj$fit$Lambda <- fit_obj$fit$Lambda[,,1:fit_obj$fit$iter]
   fit_obj$fit$Sigma <- fit_obj$fit$Sigma[,,1:fit_obj$fit$iter]
-  
+
+  if(mean_only) {
+    # just return this small, summary of the GP fit
+    return(fit_obj)
+  }
+
+  # otherwise, save the full posterior sample set
   saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
 }
 
@@ -178,9 +193,7 @@ get_fitted_modellist_details <- function(level="family") {
 # POSTERIOR EMBEDDING
 # ====================================================================================================================
 
-# embed posterior samples of (which_measure) using MDS and the appropriate distance metric
-#   which_measure: Sigma | Lambda
-embed_posteriors <- function(level, which_measure="Sigma") {
+calc_posterior_distances <- function(level, which_measure="Sigma", mean_distance=FALSE) {
   # grab all fitted models
   indiv_obj <- get_fitted_modellist_details(level=level)
   individuals <- indiv_obj$individuals
@@ -225,6 +238,14 @@ embed_posteriors <- function(level, which_measure="Sigma") {
   } else {
     distance_mat <- dist(all_samples)
   }
+
+  return(distance_mat)
+}
+
+# embed posterior samples of (which_measure) using MDS and the appropriate distance metric
+#   which_measure: Sigma | Lambda
+embed_posteriors <- function(level, which_measure="Sigma") {
+  distance_mat <- calc_posterior_distances(level, which_measure=which_measure)
 
   cat("Embedding posterior samples...\n")  
   fit <- cmdscale(distance_mat, eig=TRUE, k=6) # k is the number of dim
@@ -321,7 +342,7 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       labels[names(labels) == indiv] <- label
     }
   }
-  if(annotation %in% c("momrank", "drought", "largegroup", "momdied", "competingsib")) {
+  if(annotation %in% c("momrank", "drought", "largegroup", "momdied", "competingsib", "earlyadversity")) {
     outcomes <- load_outcomes()
     for(indiv in individuals) {
       if(annotation == "momrank") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$mom_lowQuartRank }
@@ -329,6 +350,7 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       if(annotation == "largegroup") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$born_largeGroup }
       if(annotation == "momdied") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$mom_died }
       if(annotation == "competingsib") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$has_CompetingSib }
+      if(annotation == "earlyadversity") { labels[names(labels) == indiv] <- outcomes[outcomes$sname == indiv,]$EarlyAdversityScore }
     }
     labels <- as.factor(labels)
   }

@@ -13,6 +13,7 @@ source("include/R/GP.R")
 #   largegroup
 #   momdied
 #   competingsib
+#   earlyadversity
 #   birthrate_all
 #   birthrate_surviving
 
