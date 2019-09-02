@@ -239,13 +239,15 @@ calc_posterior_distances <- function(level, which_measure="Sigma", mean_distance
     distance_mat <- dist(all_samples)
   }
 
-  return(distance_mat)
+  return(list(indiv_labels=indiv_labels, distance_mat=distance_mat))
 }
 
 # embed posterior samples of (which_measure) using MDS and the appropriate distance metric
 #   which_measure: Sigma | Lambda
 embed_posteriors <- function(level, which_measure="Sigma") {
-  distance_mat <- calc_posterior_distances(level, which_measure=which_measure)
+  post_dist_obj <- calc_posterior_distances(level, which_measure=which_measure)
+  indiv_labels <- post_dist_obj$indiv_labels
+  distance_mat <- post_dist_obj$distance_mat
 
   cat("Embedding posterior samples...\n")  
   fit <- cmdscale(distance_mat, eig=TRUE, k=6) # k is the number of dim
@@ -287,13 +289,13 @@ load_outcomes <- function() {
 }
 
 # get annotation labels
-#   df are the coordinates from the ordination
+#   df are the coordinates from the ordination (centroids!)
 #   data is the full ABRP phyloseq object
 #   individuals is a list of snames
 #   annotation is the label to grab
 get_other_labels <- function(df, data, individuals, annotation="group") {
   labels <- numeric(nrow(df))
-  names(labels) <- df$label
+  names(labels) <- df$labels
   if(annotation == "group") {
     metadata <- sample_data(data)
     primary_group <- metadata %>%
@@ -303,22 +305,22 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       tally() %>%
       slice(which.max(n))
     for(indiv in individuals) {
-      labels[df$label == indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
+      labels[df$labels == indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
     }
   }
   if(annotation == "matgroup") {
     metadata <- sample_data(data)
     for(indiv in individuals) {
-      labels[df$label == indiv] <- metadata[metadata$sname == indiv,]$matgrp[[1]]
+      labels[df$labels == indiv] <- metadata[metadata$sname == indiv,]$matgrp[[1]]
     }
   }
   if(annotation == "counts" | annotation == "density") {
     for(indiv in individuals) {
-      cat("Parsing individual",indiv,"...\n")
+      #cat("Parsing individual",indiv,"...\n")
       indiv <<- indiv # needs to be global (bug)
       indiv_subset <- subset_samples(data, sname==indiv)
       sample_count <- phyloseq::nsamples(indiv_subset)
-      labels[df$label == indiv] <- round(sample_count, -1) # discretize
+      labels[df$labels == indiv] <- round(sample_count, -1) # discretize
     }
   }
   if(annotation == "density") {
@@ -386,9 +388,9 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
     labels <- as.factor(labels)
   }
 
-  df2 <- data.frame(x1=df$x1, x2=df$x2,
-                    x3=df$x3, x4=df$x4,
-                    x5=df$x5, x6=df$x6,
+  df2 <- data.frame(x1=df$mean_x1, x2=df$mean_x2,
+                    x3=df$mean_x3, x4=df$mean_x4,
+                    x5=df$mean_x5, x6=df$mean_x6,
                     labels=as.factor(labels))
   return(df2)
 }
@@ -400,7 +402,12 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
 #   axis2 is the y-axis surrogate
 #   label_type is the annotation/label to grab
 plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type="individual", legend=TRUE) {
-  p <- ggplot() + geom_point(data=df, aes_string(x=axis1, y=axis2, color="labels"))
+  point_size <- 1
+  if(label_type != "individual") {
+    # i.e. we're plotting from df_centroids
+    point_size <- 3
+  }
+  p <- ggplot() + geom_point(data=df, aes_string(x=axis1, y=axis2, color="labels"), size=point_size)
   if(label_type == "individual") {
     # label the centroids directly
     p <- p + geom_text(data=df_centroids, aes_string(x=paste0("mean_",axis1), y=paste0("mean_",axis2), label="labels"),
@@ -414,8 +421,11 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
   if(legend) {
     img_width <- 4.5
   }
+  aspect_ratio <- max(df_centroids[,paste0("mean_",axis2)]) - min(df_centroids[,paste0("mean_",axis2)])
+  aspect_ratio <- aspect_ratio/(max(df_centroids[,paste0("mean_",axis1)]) - min(df_centroids[,paste0("mean_",axis1)]))
+  img_height <- aspect_ratio*img_width
   ggsave(paste0(GP_plot_dir,level,"/",plot_save_name), plot=p, scale=2,
-         width=img_width, height=4, units="in", dpi=100)
+         width=img_width, height=img_height, units="in", dpi=100)
 }
 
 # wrapper to plot ordination with 
@@ -425,7 +435,7 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {
   df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
-    df <- get_other_labels(df, glom_data, unique(df$label), annotation=label_type)
+    df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels), annotation=label_type))
   }
   plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend)
   plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend)
@@ -491,7 +501,7 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
                                enzyme=as.factor(1:length(avgProp)), proportion=avgProp))
   }
   df$sample <- as.factor(df$sample)
-  plot_timecourse_metagenomics(df, save_filename=paste0(GP_plot_dir,level,"/",save_filename))
+  plot_timecourse_metagenomics(df, save_filename=paste0(GP_plot_dir,level,"/",save_filename,"_",coordinate), legend=TRUE)
 }
 
 # plot the diagonal of the element-wise mean covariance across individuals in a single heatmap
@@ -614,8 +624,8 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       cat("\tPlotting timecourse...\n")
       plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=FALSE, 
                                legend=FALSE, legend_level=level)
-      plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=TRUE, 
-                               legend=FALSE, legend_level=level)
+      #plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse_gapped"), gapped=TRUE, 
+      #                         legend=FALSE, legend_level=level)
     }
     fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
     if(covcor) {
@@ -623,6 +633,7 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       fit.clr <- to_clr(fit_obj$fit)
       Sigma <- fit.clr$Sigma
       meanSigma <- apply(Sigma, c(1,2), mean)
+      cat("Mean Sigma trace:",sum(diag(meanSigma)),"\n")
       df <- driver::gather_array(meanSigma, "value", "feature_row", "feature_col")
       p <- ggplot(df, aes(feature_row, feature_col)) +
         geom_tile(aes(fill = value), colour = "white") +
