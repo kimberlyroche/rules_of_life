@@ -12,6 +12,6 @@ for(i in 2:length(args)) {
   individuals <- c(individuals, args[i])
 }
 
-#plot_ribbons_individuals(individuals, level, timecourse=TRUE, covcor=FALSE, predict_coords=c(1,10))
+#plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=c(28, 36, 95))
 plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=TRUE, predict_coords=NULL)
 #plot_ribbons_individuals(individuals, level, timecourse=TRUE, covcor=TRUE, predict_coords=NULL)
