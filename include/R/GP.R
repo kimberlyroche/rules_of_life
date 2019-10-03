@@ -44,7 +44,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   # read in and filter full data set at this phylogenetic level
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
   subsetted_data <- subset_samples(glom_data, sname %in% over_50)
-  data <- filter_data(subsetted_data, verbose=FALSE)
+  data <- filter_data(subsetted_data, level=level, verbose=FALSE)
   
   # global var hack still necessary for phyloseq subset_samples (I think)
   baboon <<- baboon
@@ -344,6 +344,23 @@ load_outcomes <- function() {
   return(outcomes) # indexed by sname column
 }
 
+get_group_labels <- function(data) {
+  metadata <- sample_data(data)
+  individuals <- unique(metadata$sname)
+  labels <- numeric(length(individuals))
+  names(labels) <- individuals
+  primary_group <- suppressWarnings(metadata %>%
+    select(c("sname", "collection_date", "grp")) %>%
+    filter(sname %in% individuals) %>% 
+    group_by(sname, grp) %>%
+    tally() %>%
+    slice(which.max(n)))
+  for(indiv in individuals) {
+    labels[indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
+  }
+  return(labels)
+}
+
 # get annotation labels
 #   df are the coordinates from the ordination (centroids!)
 #   data is the full ABRP phyloseq object
@@ -353,17 +370,21 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
   labels <- numeric(nrow(df))
   names(labels) <- df$labels
   if(annotation == "group") {
-    metadata <- sample_data(data)
-    primary_group <- metadata %>%
-      select(c("sname", "collection_date", "grp")) %>%
-      filter(sname %in% individuals) %>% 
-      group_by(sname, grp) %>%
-      tally() %>%
-      slice(which.max(n))
-    for(indiv in individuals) {
-      labels[df$labels == indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
-    }
+    # overwrite; lazy
+    labels <- get_group_labels(df)
   }
+#  if(annotation == "group") {
+#    metadata <- sample_data(data)
+#    primary_group <- metadata %>%
+#      select(c("sname", "collection_date", "grp")) %>%
+#      filter(sname %in% individuals) %>% 
+#      group_by(sname, grp) %>%
+#      tally() %>%
+#      slice(which.max(n))
+#    for(indiv in individuals) {
+#      labels[df$labels == indiv] <- primary_group[primary_group$sname == indiv,]$grp[[1]]
+#    }
+#  }
   if(annotation == "matgroup") {
     metadata <- sample_data(data)
     for(indiv in individuals) {
@@ -455,6 +476,14 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       labels[df$labels == indiv] <- round(mean(alpha_div_shannon), 1) # discretize
     }
     labels <- as.factor(labels)
+  }
+  if(annotation == "wetproportion") {
+    for(indiv in individuals) {
+      indiv <<- indiv
+      indiv_data <- subset_samples(data, sname==indiv)
+      season_vec <- sample_data(indiv_data)$season
+      labels[df$labels == indiv] <- round(sum(season_vec == "Wet")/length(season_vec),1) # discretize
+    }
   }
 
   df2 <- data.frame(x1=df$mean_x1, x2=df$mean_x2,
@@ -701,7 +730,7 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NUL
 plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=NULL) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
   subsetted_data <- subset_samples(glom_data, sname %in% over_50)
-  data <- filter_data(subsetted_data, verbose=FALSE)
+  data <- filter_data(subsetted_data, level=level, verbose=FALSE)
   #data <- load_and_filter(level)
   for(baboon in individuals) {
     baboon <<- baboon

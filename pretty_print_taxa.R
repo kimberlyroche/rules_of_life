@@ -9,7 +9,7 @@ for(level in names(print_what)) {
   if(!file.exists(fn)) {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     subsetted_data <- subset_samples(glom_data, sname %in% over_50)
-    data <- filter_data(subsetted_data, verbose=FALSE)
+    data <- filter_data(subsetted_data, level=level, verbose=FALSE)
     saveRDS(data, fn)
   } else {
     data <- readRDS(fn)

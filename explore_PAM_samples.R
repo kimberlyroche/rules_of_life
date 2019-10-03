@@ -1,4 +1,5 @@
 source("include/R/general.R")
+source("include/R/GP.R") # for load_outcomes()
 source("include/R/data_transform.R")
 source("include/R/visualization.R")
 
@@ -12,14 +13,36 @@ library(Rtsne)
 # read in and filter full data set at this phylogenetic level
 level <- "family"
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
-subsetted_data <- subset_samples(glom_data, sname %in% over_75)
-samples <- filter_data(subsetted_data, verbose=TRUE)
-cat("Number of replicate samples:",phyloseq::nsamples(samples),"\n")
-cat("Taxa in each replicate:",ntaxa(samples),"\n")
+subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+samples <- filter_data(subsetted_data, level=level, verbose=TRUE)
+cat("Number of samples:",phyloseq::nsamples(samples),"\n")
+cat("Taxa in each sample:",ntaxa(samples),"\n")
 
 # show replicates by SID, sname, date
 md <- sample_data(samples)
 table(md[,"sname"])
+
+# get group labels
+group_labels <- get_group_labels(samples)
+
+outcomes <- read.csv(paste0(data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
+temp <- outcomes[outcomes$sname %in% over_50,]
+temp <- temp[!is.na(temp$LRS_livebirths) & temp$LRS_livebirths > 0 &
+                   !is.na(temp$LRS_survbirths) & temp$LRS_survbirths > 0 &
+                   !is.na(temp$lifetime_rateLiveBirths) & temp$lifetime_rateLiveBirths > 0 &
+                   !is.na(temp$lifetime_rateSurvBirths) & temp$lifetime_rateSurvBirths > 0,]
+temp <- temp[!is.na(temp$known_lifespan) & temp$known_lifespan > 0,]
+temp <- temp[!is.na(temp$age_first_live_birth) & temp$age_first_live_birth > 0,]
+cat(paste0("There are ",nrow(temp)," individuals matching fitness annotation selection criteria!\n"))
+
+# show group breakdown; we just want to check that these are spread(ish) across social groups
+filtered_snames <- unique(as.vector(temp$sname))
+table(group_labels[filtered_snames])
+
+samples <- subset_samples(samples, sname %in% filtered_snames)
+cat("Number of samples:",phyloseq::nsamples(samples),"\n")
+
+# we'll choose 2000 of these ^^^ samples
 
 #d <- as.data.frame(rep_meta) %>% select(c(sid, sname, collection_date, season))
 #d %>%
