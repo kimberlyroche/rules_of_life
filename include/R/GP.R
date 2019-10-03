@@ -253,7 +253,7 @@ calc_posterior_distances <- function(level, which_measure="Sigma", indiv=NULL, m
   if(which_measure == "Sigma") {
     distance_mat <- Riemann_dist_samples(all_samples, n_indiv, n_samples)
   } else {
-    distance_mat <- dist(all_samples)
+    distance_mat <- as.matrix(dist(all_samples))
   }
 
   # look for NAs
