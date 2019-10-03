@@ -150,73 +150,48 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
-filter_data <- function(data, count_threshold=100, sample_threshold=20, verbose=TRUE) {
-  snames <- unique(sample_data(data)$sname)
-  counts <- otu_table(data)@.Data
-  total_counts <- sum(counts)
-  # a taxon must appear in at least {count_threshold} abundance in at least {sample_threshold} samples per individual
-  keep_indices <- rep(TRUE, ntaxa(data))
-  for(sname in snames) {
-    sname <<- sname
-    indiv_data <- subset_samples(data, sname==sname)
-    # these are the indices to remove!
-    keep_indices_indiv <- apply(counts, 2, function(x) sum(x >= count_threshold)/ntaxa(indiv_data) >= sample_threshold/100)
-    keep_indices <- keep_indices & keep_indices_indiv
-  }
-  collapse_indices <- !keep_indices
-  # collapse mitochondria too
-  tt <- tax_table(data)@.Data
-  collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
-  merged_data <- merge_taxa(data, which(collapse_indices == TRUE), 1)
-  retained_counts <- sum(counts[,!collapse_indices])
-  if(verbose) {
-    cat("Collapsing",sum(collapse_indices == TRUE),"taxa of",ntaxa(data),"\n")
-    collapse_tidx <- which(collapse_indices == TRUE)[1]
-    cat("\tOther category collapsed into index:",collapse_tidx,sep=" ","\n")
-    cat("\tTaxonomy of collapsed (BEFORE):",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
-    tax_table(merged_data)@.Data[collapse_tidx,] <- rep("Collapsed",7)
-    cat("\tTaxonomy of collapsed (AFTER):",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
-    cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
-    cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
-  }
-  return(merged_data)
-}
-
-# filter data below a count threshold in a minimum number of samples into an "Other" category
-# e.g. count_threshold=3, sample_threshold=0.2 filters taxa with no more than a 2-count in 80% of samples into an
-# "Other" category, labeled by an arbitrary sequence variant in that "Other" category (see the print statement
-# below identifying it for reference)
-filter_data_OLD <- function(data, count_threshold=5, sample_threshold=0.2, collapse_level=NULL, verbose=TRUE) {
-  total_counts <- sum(otu_table(data)@.Data)
-  # get indices to collapse
-  retained_counts <- sum(otu_table(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=T))@.Data)
-  #collapse_indices <- !as.logical(filter_taxa(data, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) >= sample_threshold, prune=F))
-  counts <- otu_table(data)@.Data
-  collapse_indices <- apply(counts, 2, function(x) sum(x >= count_threshold)/phyloseq::nsamples(data) < sample_threshold)
-  tt <- tax_table(data)@.Data
-  if(!is.null(collapse_level)) {
-    collapse_tax_indices <- apply(tt, 1, function(x) is.na(x[collapse_level]))
-    collapse_indices <- collapse_indices | collapse_tax_indices
-  }
-  collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
-  collapse_taxnames <- names(collapse_indices[which(collapse_indices == TRUE)])
-  merged_data <- merge_taxa(data, collapse_taxnames, 1)
-  if(verbose) {
-    cat("Collapsing",length(collapse_taxnames),"taxa of",ntaxa(data),"\n")
-    cat("\tOther category collapsed into:",collapse_taxnames[1],sep=" ","\n")
-    collapse_tidx <- which(rownames(tax_table(merged_data)) == collapse_taxnames[1])
-    cat("\tIndex of other in tax table:",collapse_tidx,"\n")
-    cat("\tTaxonomy of collapsed:",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
-    tax_table(merged_data)@.Data[collapse_tidx,] <- rep("Collapsed",7)
-    cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
-    cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
+filter_data <- function(data, level="genus", count_threshold=100, sample_threshold=20, verbose=TRUE) {
+  filter_fn <- paste0(data_dir,"filtered_",level,"_",count_threshold,"_",sample_threshold,".rds")
+  if(!file.exists(filter_fn)) {
+    snames <- unique(sample_data(data)$sname)
+    counts <- otu_table(data)@.Data
+    total_counts <- sum(counts)
+    # a taxon must appear in at least {count_threshold} abundance in at least {sample_threshold} samples per individual
+    keep_indices <- rep(TRUE, ntaxa(data))
+    for(sname in snames) {
+      sname <<- sname
+      cat("SNAME:",sname,"\n")
+      indiv_data <- subset_samples(data, sname==sname)
+      # these are the indices to remove!
+      keep_indices_indiv <- apply(counts, 2, function(x) sum(x >= count_threshold)/ntaxa(indiv_data) >= sample_threshold/100)
+      keep_indices <- keep_indices & keep_indices_indiv
+    }
+    collapse_indices <- !keep_indices
+    # collapse mitochondria too
+    tt <- tax_table(data)@.Data
+    collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
+    merged_data <- merge_taxa(data, which(collapse_indices == TRUE), 1)
+    saveRDS(merged_data, file=filter_fn)
+    retained_counts <- sum(counts[,!collapse_indices])
+    if(verbose) {
+      cat("Collapsing",sum(collapse_indices == TRUE),"taxa of",ntaxa(data),"\n")
+      collapse_tidx <- which(collapse_indices == TRUE)[1]
+      cat("\tOther category collapsed into index:",collapse_tidx,sep=" ","\n")
+      cat("\tTaxonomy of collapsed (BEFORE):",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
+      tax_table(merged_data)@.Data[collapse_tidx,] <- rep("Collapsed",7)
+      cat("\tTaxonomy of collapsed (AFTER):",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
+      cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
+      cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
+    }
+  } else {
+    merged_data <- readRDS(filter_fn)
   }
   return(merged_data)
 }
 
 load_and_filter <- function(level="family") {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, verbose=FALSE)
+  data <- filter_data(glom_data, level=level, verbose=FALSE)
   return(data)
 }
 

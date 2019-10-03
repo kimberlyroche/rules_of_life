@@ -14,7 +14,7 @@ cat("Testing presence between hosts...\n")
 for(level in levels) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
   glom_data_subset <- subset_samples(glom_data, sname %in% over_50)
-  data <- filter_data(glom_data_subset, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
+  data <- filter_data(glom_data_subset, level=level, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
   cat("^^^Assuming index of OTHER is 2. CHECK THIS.\n")
   for(indiv in c("ZIZ", "GAN")) {
     indiv_data <- subset_samples(data, sname==indiv)
@@ -33,7 +33,7 @@ if(FALSE) {
 cat("Testing presence between hosts...\n")
 for(level in levels) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
+  data <- filter_data(glom_data, level=level, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
   for(i in 1:length(over_50)) {
@@ -55,7 +55,7 @@ if(FALSE) {
 cat("Testing >10% presence between hosts...\n")
 for(level in levels) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, count_threshold=5, sample_threshold=0.2, collapse_level=level, verbose=FALSE)
+  data <- filter_data(glom_data, level=level, count_threshold=5, sample_threshold=0.2, collapse_level=level, verbose=FALSE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
   for(i in 1:length(over_50)) {
