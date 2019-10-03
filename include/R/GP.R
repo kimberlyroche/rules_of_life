@@ -29,7 +29,8 @@ WHITENOISE <- function(X, sigma=1, jitter=1e-10) {
 
 # fit Gaussian process to a single baboon series using stray::basset
 fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_append="",
-                   date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL, verbose=TRUE, mean_only=FALSE) {
+                   date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL, verbose=TRUE, mean_only=FALSE,
+                   max_iter=NULL, eps_f=NULL, eps_g=NULL) {
   if(verbose) {
     cat(paste0("Fitting stray::basset with with parameters:\n",
              "\tbaboon=",baboon,"\n",
@@ -42,7 +43,8 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 
   # read in and filter full data set at this phylogenetic level
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, collapse_level=level, verbose=FALSE)
+  subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+  data <- filter_data(subsetted_data, verbose=FALSE)
   
   # global var hack still necessary for phyloseq subset_samples (I think)
   baboon <<- baboon
@@ -79,7 +81,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   D <- nrow(Y)
   N <- ncol(Y)
 
-  alr_ref <- pick_alr_ref(D)
+  #alr_ref <- pick_alr_ref(D)
   
   # square exponential kernel parameters
   dc <- 0.1 # desired minimum correlation
@@ -112,9 +114,19 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   Theta <- function(X) matrix(alr_means, D-1, ncol(X))
   
   if(mean_only) {
-    fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE)
+    if(!is.null(max_iter) & !is.null(eps_f) & !is.null(eps_g)) {
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE,
+                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g)
+    } else {
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE)
+    }
   } else {
-    fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
+    if(!is.null(max_iter) & !is.null(eps_f) & !is.null(eps_g)) {
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi,
+                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g)
+    } else {
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
+    }
   }
   fit_obj <- list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit)
   
@@ -193,15 +205,19 @@ get_fitted_modellist_details <- function(level="family") {
 # POSTERIOR EMBEDDING
 # ====================================================================================================================
 
-calc_posterior_distances <- function(level, which_measure="Sigma", mean_distance=FALSE) {
+calc_posterior_distances <- function(level, which_measure="Sigma", indiv=NULL, mean_distance=FALSE) {
   # grab all fitted models
   indiv_obj <- get_fitted_modellist_details(level=level)
   individuals <- indiv_obj$individuals
+  if(!is.null(indiv)) {
+    individuals <- c(indiv)
+  }
   pattern_str <- indiv_obj$pattern_str
   regexpr_str <- indiv_obj$regexpr_str
   P <- indiv_obj$D - 1 # ILR, else P = D-1
   N <- indiv_obj$N
   n_samples <- indiv_obj$n_samples
+  #n_samples <- 1
   n_indiv <- length(individuals)
   if(which_measure == "Sigma") {
     all_samples <- matrix(NA, P, P*n_samples*n_indiv)
@@ -217,6 +233,7 @@ calc_posterior_distances <- function(level, which_measure="Sigma", mean_distance
     V <- driver::create_default_ilr_base(ncategories(fit))
     fit.ilr <- to_ilr(fit, V)
     Lambda <- fit.ilr$Lambda
+    #Sigma <- fit.ilr$Sigma[,,1,drop=FALSE]
     Sigma <- fit.ilr$Sigma
     # to CLR
     # fit.clr <- to_clr(fit)
@@ -239,13 +256,44 @@ calc_posterior_distances <- function(level, which_measure="Sigma", mean_distance
     distance_mat <- dist(all_samples)
   }
 
+  # look for NAs
+  cat("NAs in distance matrix:\n")
+  print(which(is.na(distance_mat), arr.ind=T))
+
+  sq_dist <- distance_mat^2
+
+  cat("\nNAs in SQUARED distance matrix:\n")
+  print(which(is.na(sq_dist), arr.ind=T))
+
+  save_sz <- format(object.size(distance_mat), units="Gb")
+  cat("\nDistance matrix save size:",save_sz,"\n")
+  if(save_sz < 50) {
+    saveRDS(distance_mat, "saved_distance_Sigma.rds")
+  }
+
+  upper_threshold <- 1e160
+  lower_threshold <- 1e-160
+
+  upper_list <- which(distance_mat > upper_threshold, arr.ind=T)
+  lower_list <- which(distance_mat < lower_threshold, arr.ind=T)
+  cat("\nIndices above",upper_threshold,"\n")
+  print(upper_list)
+  cat("\nIndices below",lower_threshold,"\n")
+  print(lower_list)
+
+  # for now, let's cheat
+  diag(distance_mat) <- 0
+
   return(list(indiv_labels=indiv_labels, distance_mat=distance_mat))
 }
 
 # embed posterior samples of (which_measure) using MDS and the appropriate distance metric
 #   which_measure: Sigma | Lambda
-embed_posteriors <- function(level, which_measure="Sigma") {
-  post_dist_obj <- calc_posterior_distances(level, which_measure=which_measure)
+embed_posteriors <- function(level, which_measure="Sigma", indiv=NULL) {
+  if(!is.null(indiv)) {
+    cat(paste0("Embedding: ",indiv,"\n"))
+  }
+  post_dist_obj <- calc_posterior_distances(level, which_measure=which_measure, indiv=indiv)
   indiv_labels <- post_dist_obj$indiv_labels
   distance_mat <- post_dist_obj$distance_mat
 
@@ -264,7 +312,11 @@ embed_posteriors <- function(level, which_measure="Sigma") {
                    x3=fit$points[,3], x4=fit$points[,4],
                    x5=fit$points[,5], x6=fit$points[,6],
                    labels=indiv_labels)
-  saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
+  if(is.null(indiv)) {
+    saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
+  } else {
+    saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_",indiv,".rds"))
+  }
   
   # centroids are useful for labeling plots
   df_centroids <- df %>%
@@ -272,7 +324,11 @@ embed_posteriors <- function(level, which_measure="Sigma") {
     summarise(mean_x1=mean(x1), mean_x2=mean(x2),
               mean_x3=mean(x3), mean_x4=mean(x4),
               mean_x5=mean(x5), mean_x6=mean(x6))
-  saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+  if(is.null(indiv)) {
+    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+  } else {
+    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids_",indiv,".rds"))
+  }
 }
 
 # ====================================================================================================================
@@ -377,13 +433,26 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
             births <- outcomes[outcomes$sname==indiv,]$num_surv_births_RAW
           }
           score <- births/as.numeric(years_obs_cont)
-          labels[names(labels) == indiv] <- round(score,1)
+          # labels[names(labels) == indiv] <- round(score,1)
+          labels[names(labels) == indiv] <- round(score*2)/2 # round to nearest half
         } else {
           labels[names(labels) == indiv] <- NA
         }
       } else {
         labels[names(labels) == indiv] <- NA
       }
+    }
+    labels <- as.factor(labels)
+  }
+  if(annotation == "alphadiv") {
+    for(indiv in individuals) {
+      indiv <<- indiv
+      indiv_data <- subset_samples(data, sname==indiv)
+      counts <- otu_table(indiv_data)@.Data # samples x taxa
+      props <- apply(counts, 1, function(x) x/sum(x)) # flipped after this: taxa x samples
+      props <- props + min(props[props != 0])*0.1 # pseudocount 10x smaller than non-zero min
+      alpha_div_shannon <- apply(props, 2, function(x) -sum(x*log2(x)))
+      labels[df$labels == indiv] <- round(mean(alpha_div_shannon), 1) # discretize
     }
     labels <- as.factor(labels)
   }
@@ -401,7 +470,7 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
 #   axis1 is the x-axis surrogate
 #   axis2 is the y-axis surrogate
 #   label_type is the annotation/label to grab
-plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type="individual", legend=TRUE) {
+plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type="individual", legend=TRUE, save_tag=NULL) {
   point_size <- 1
   if(label_type != "individual") {
     # i.e. we're plotting from df_centroids
@@ -416,7 +485,11 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
   if(!legend | label_type == "individual") {
     p <- p + theme(legend.position='none')
   }
-  plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,".png")
+  if(is.null(save_tag)) {
+    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,".png")
+  } else {
+    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,"_",indiv,".png")
+  }
   img_width <- 4
   if(legend) {
     img_width <- 4.5
@@ -430,18 +503,23 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
 
 # wrapper to plot ordination with 
 # allowable (label_types) values are: individual, group, counts, density
-plot_ordination <- function(level, which_measure, label_type, legend=TRUE) {
-  df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
-  df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv=NULL) {
+  if(is.null(indiv)) {
+    df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
+    df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+  } else {
+    df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_",indiv,".rds"))
+    df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids_",indiv,".rds"))
+  }
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels), annotation=label_type))
   }
-  plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend)
-  plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend)
-  plot_axes(df, df_centroids, "x3", "x4", label_type, legend=legend)
-  plot_axes(df, df_centroids, "x4", "x5", label_type, legend=legend)
-  plot_axes(df, df_centroids, "x5", "x6", label_type, legend=legend)
+  plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, "x3", "x4", label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, "x4", "x5", label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, "x5", "x6", label_type, legend=legend, save_tag=indiv)
 }
 
 # ====================================================================================================================
@@ -477,6 +555,7 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
     }
   }
   mean_all <- apply(allLambda, 2, mean)
+  print(mean_all)
   retain_prop <- mean_all > 0.01
   for(i in 1:length(retain_prop)) {
     if(retain_prop[i]) {
@@ -571,7 +650,12 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
 #   LR_coord is the logratio coordinate to plot
 plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NULL) {
   observations <- fit_obj$X
-  clr_ys <- driver::clr(t(fit_obj$Y) + pc)
+  # clr_ys <- driver::clr(t(fit_obj$Y) + pc)
+  # use the etas instead; there's an issue for low abundance taxa when using the direct
+  # CLR transformed counts here, they don't resemble the trajectory presumably (?)
+  # because the etas for low abundance taxa are heavily corrected
+  fit.clr <- to_clr(fit_obj$fit)
+  clr_ys <- t(apply(fit.clr$Eta, c(1,2), mean))
   lr_tidy <- gather_array(clr_ys, "LR_value", "timepoint", "LR_coord")
   
   # replace timepoints with observation dates
@@ -615,7 +699,10 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NUL
 }
 
 plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=NULL) {
-  data <- load_and_filter(level)
+  glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+  data <- filter_data(subsetted_data, verbose=FALSE)
+  #data <- load_and_filter(level)
   for(baboon in individuals) {
     baboon <<- baboon
     cat(paste0("Visualizing individual '",baboon,"' at level '",level,"'...\n"))
@@ -623,7 +710,7 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
     if(timecourse) {
       cat("\tPlotting timecourse...\n")
       plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=FALSE, 
-                               legend=FALSE, legend_level=level)
+                               legend=TRUE, legend_level=level)
       #plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse_gapped"), gapped=TRUE, 
       #                         legend=FALSE, legend_level=level)
     }
@@ -658,7 +745,8 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       rho_per <<- fit_obj$kernelparams$rho_per
       period <<- fit_obj$kernelparams$period
       wn_weight <<- fit_obj$kernelparams$wn_weight
-      
+
+      # note: this function CLR transforms by default!
       predict_obj <- get_predictions(fit_obj$X, fit_obj$fit, n_samples=100)
 
       for(coord in predict_coords) {

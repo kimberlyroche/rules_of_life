@@ -24,9 +24,12 @@ if(length(args) >= 3) {
     wn_weight <- sqrt(0.381)
   }
   if(level == "genus") {
-    se_weight <- sqrt(2.048)
-    per_weight <- sqrt(0.228)
-    wn_weight <- sqrt(0.416)
+    #se_weight <- sqrt(2.048)
+    #per_weight <- sqrt(0.228)
+    #wn_weight <- sqrt(0.416)
+    wn_weight <- sqrt(0.332)
+    se_weight <- sqrt(1.554)
+    per_weight <- sqrt(0.173)
   }
 }
 if(length(args) >= 6) {
@@ -41,4 +44,5 @@ if(length(args) >= 7) {
 }
 
 fit_GP(baboon, level, se_weight=se_weight, per_weight=per_weight, wn_weight=wn_weight,
-       dd_se=dd_se, save_append=save_append, date_lower_limit=NULL, date_upper_limit=NULL)
+       dd_se=dd_se, save_append=save_append, date_lower_limit=NULL, date_upper_limit=NULL,
+       max_iter=20000, eps_f=1e-11, eps_g=1e-5)

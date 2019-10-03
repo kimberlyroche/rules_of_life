@@ -20,6 +20,7 @@ check_indivs <- NULL
 
 if(is.null(check_indivs)) {
   fitted_models <- get_fitted_modellist(level)$fitted_models
+  print(fitted_models)
   for(fm in fitted_models) {
     fit <- readRDS(fm)$fit
     if(is.nan(fit$logMarginalLikelihood)) {

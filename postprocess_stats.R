@@ -2,14 +2,38 @@ source("include/R/general.R")
 source("include/R/GP.R")
 
 levels <- c("phylum", "family", "genus")
+levels <- c("family", "genus")
+count_threshold <- 1
+sample_threshold <- 0.05
+
+# -------------------------------------------------------------------------------------------------------
+# WHAT PROPORTION OF TAXA GET THROWN INTO NA FOR A HIGH ALPHA-DIV INDIVIDUAL?
+# -------------------------------------------------------------------------------------------------------
+
+cat("Testing presence between hosts...\n")
+for(level in levels) {
+  glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  glom_data_subset <- subset_samples(glom_data, sname %in% over_50)
+  data <- filter_data(glom_data_subset, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
+  cat("^^^Assuming index of OTHER is 2. CHECK THIS.\n")
+  for(indiv in c("ZIZ", "GAN")) {
+    indiv_data <- subset_samples(data, sname==indiv)
+    counts <- otu_table(indiv_data)@.Data # taxa are columns
+    prop_NA <- apply(counts, 1, function(x) x[2]/sum(x))
+    names(prop_NA) <- NULL
+    cat("Mean, sd proportion of NA in",indiv,":", round(mean(prop_NA), 3),",", round(sd(prop_NA), 3),"\n")
+  }
+}
 
 # -------------------------------------------------------------------------------------------------------
 # WHAT PROPORTION OF TAXA ARE PRESENT ACROSS HOSTS?
 # -------------------------------------------------------------------------------------------------------
+
 if(FALSE) {
 cat("Testing presence between hosts...\n")
 for(level in levels) {
-  data <- load_and_filter(level)
+  glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  data <- filter_data(glom_data, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
   for(i in 1:length(over_50)) {
@@ -21,14 +45,17 @@ for(level in levels) {
   cat("Level:",level,"\n")
   print(table(taxa))
 }
+}
 
 # -------------------------------------------------------------------------------------------------------
 # WHAT PROPORTION OF TAXA ARE PRESENT IN >= 10% SAMPLES  ACROSS HOSTS?
 # -------------------------------------------------------------------------------------------------------
 
+if(FALSE) {
 cat("Testing >10% presence between hosts...\n")
 for(level in levels) {
-  data <- load_and_filter(level)
+  glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  data <- filter_data(glom_data, count_threshold=5, sample_threshold=0.2, collapse_level=level, verbose=FALSE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
   for(i in 1:length(over_50)) {
@@ -41,10 +68,12 @@ for(level in levels) {
   print(table(taxa))
 }
 }
+
 # -------------------------------------------------------------------------------------------------------
 # DOES DISTANCE OVER BASELINE CORRELATE WITH DISTANCE OVER COVARIANCE MATRICES?
 # -------------------------------------------------------------------------------------------------------
 
+if(FALSE) {
 cat("Testing >10% presence between hosts...\n")
 for(level in levels) {
   cat("Level:",level,"\n")
@@ -114,4 +143,5 @@ for(level in levels) {
        xlab("distance(baseline)") +
        ylab("distance(covariance)")
   ggsave(paste0(plot_dir,"posterior_dist_vs_dist_",level,".png"), plot=p, scale=1.5, width=5, height=5, units="in", dpi=100)
+}
 }

@@ -285,7 +285,11 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   categories <- unique(df3$OTU)
   coul = brewer.pal(4, "Spectral")
   coul = colorRampPalette(coul)(length(unique(df3$OTU)))
+<<<<<<< HEAD
   if(gapped) {
+=======
+  if(gapped | !legend) {
+>>>>>>> 063792c847da92a8b20bc9f42a33a59ef2388113
     coul[1] <- "#DDDDDD"
     img_width <- 15
   } else {
@@ -314,7 +318,11 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
     # these are likely replicates
     img_width <- 5
   }
+<<<<<<< HEAD
   ggsave(paste0(save_filename,".png"), plot=p, scale=1.5, dpi=100, width=img_width, height=3, units="in")
+=======
+  ggsave(paste0(save_filename,".png"), plot=p, scale=1.5, dpi=100, width=img_width, height=6, units="in")
+>>>>>>> 063792c847da92a8b20bc9f42a33a59ef2388113
 }
 
 # this is just a wrapper to call plot_timecourse_phyloseq on a representative sample of individuals

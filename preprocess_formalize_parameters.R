@@ -5,11 +5,13 @@ source("include/R/data_transform.R")
 source("include/R/visualization.R")
 
 levels <- c("phylum", "family", "genus")
+levels <- c("genus")
 
 for(level in levels) {
   # estimate noise in replicates
   # we want variance between samples!
   data <- load_and_filter(level)
+  cat("Data loaded...\n")
   md <- read_metadata(data)
   sample_status <- md$sample_status
   cat("Percent replicates:",round(sum(sample_status == 2)/length(sample_status), 3),"\n")

@@ -25,7 +25,7 @@ for(indiv in individuals) {
   if(FALSE) {
     indiv_data <- subset_samples(glom_data, sname==indiv)
     family_data <- glom_counts(indiv_data, level="family", NArm=FALSE)
-    filtered <- filter_data(family_data, count_threshold=3, sample_threshold=0.2)
+    filtered <- filter_data(family_data)
     plot_timecourse_phyloseq(filtered, save_filename=paste0(plot_dir,indiv,"_timecourse"), gapped=F, legend=F)
     plot_timecourse_phyloseq(filtered, save_filename=paste0(plot_dir,indiv, "_timecourse_gapped"), gapped=T, legend=F)
   }

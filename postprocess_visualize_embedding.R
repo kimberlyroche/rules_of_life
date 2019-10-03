@@ -16,6 +16,7 @@ source("include/R/GP.R")
 #   earlyadversity
 #   birthrate_all
 #   birthrate_surviving
+#   alphadiv
 
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 2) {
