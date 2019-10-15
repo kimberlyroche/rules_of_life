@@ -20,19 +20,26 @@ check_indivs <- NULL
 
 if(is.null(check_indivs)) {
   fitted_models <- get_fitted_modellist(level)$fitted_models
-  print(fitted_models)
   for(fm in fitted_models) {
-    fit <- readRDS(fm)$fit
-    if(is.nan(fit$logMarginalLikelihood)) {
-      cat(fm,"\n")
-      cat("\tLL:",fit$logMarginalLikelihood,"\n\n")
-    }
+    tc_res <- tryCatch({
+      fit <- readRDS(fm)$fit
+      if(is.nan(fit$logMarginalLikelihood)) {
+        cat(fm,"\n")
+        cat("\tLL:",fit$logMarginalLikelihood,"\n\n")
+      }
+    }, error = function(e) {
+      cat("Unable to read model:",fm,"\n")
+    })
   }
 } else {
   for(indiv in check_indivs) {
     fm <- paste0(model_dir,level,"/",indiv,"_bassetfit.rds")
-    fit <- readRDS(fm)$fit
-    cat(fm,"\n")
-    cat("\tLL:",fit$logMarginalLikelihood,"\n\n")
+    tc_res <- tryCatch({
+      fit <- readRDS(fm)$fit
+      cat(fm,"\n")
+      cat("\tLL:",fit$logMarginalLikelihood,"\n\n")
+    }, error = function(e) {
+      cat("Unable to read model:",fm,"\n")
+    })
   }
 }

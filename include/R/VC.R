@@ -1,4 +1,6 @@
 source("include/R/general.R")
+source("include/R/data_transform.R")
+sourceCpp("include/cpp/dens_optim.cpp")
 
 # ====================================================================================================================
 # ESTIMATION OF VARIANCE COMPONENTS
@@ -43,8 +45,8 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
       # phyloseq::subset_samples is causing all kinds of issues, so let's subset on sname manually!
       # basically you can't use subset_samples inside functions or loops
       # see: https://github.com/joey711/phyloseq/issues/752
-      remove_idx <- as.character(get_variable(filtered, "sname")) == baboons[b]
-      baboon_counts <- prune_samples(remove_idx, filtered)
+      remove_idx <- as.character(get_variable(data, "sname")) == baboons[b]
+      baboon_counts <- prune_samples(remove_idx, data)
       # subset metadata
       baboon_metadata <- read_metadata(baboon_counts)
     } else {
@@ -261,8 +263,10 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
   
   # residual (white noise kernel)
   if(include_residual) {
-    empty_kernel <- matrix(within_group_corr, ns_all, ns_all)
-    diag(empty_kernel) <- 1
+    # not sure what I was going for here including group off-diagonal stuff
+    #empty_kernel <- matrix(within_group_corr, ns_all, ns_all)
+    #diag(empty_kernel) <- 1
+    empty_kernel <- matrix(1, ns_all, ns_all)
   } else {
     empty_kernel <- matrix(0, ns_all, ns_all)
   }

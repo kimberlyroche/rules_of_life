@@ -24,12 +24,9 @@ if(length(args) >= 3) {
     wn_weight <- sqrt(0.381)
   }
   if(level == "genus") {
-    #se_weight <- sqrt(2.048)
-    #per_weight <- sqrt(0.228)
-    #wn_weight <- sqrt(0.416)
-    wn_weight <- sqrt(0.332)
-    se_weight <- sqrt(1.554)
-    per_weight <- sqrt(0.173)
+    wn_weight <- sqrt(0.354)
+    se_weight <- sqrt(2.181)
+    per_weight <- sqrt(0.242)
   }
 }
 if(length(args) >= 6) {

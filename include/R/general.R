@@ -42,6 +42,20 @@ over_50 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI
              "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN",
              "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX",
              "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW")
+# individuals with # samples >= 40
+over_40 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS",
+             "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW",
+             "VIN", "TAL", "VEX", "VEI", "ALE", "MBE", "WHE", "WYN", "LOL", "HOL", "NOB", "VOT", "LYE",
+             "HON", "DAG", "DUN", "OTI", "LUI", "OFR", "LAZ", "ONY", "VEL", "ELV", "FAX", "ORI", "EAG",
+             "ODE", "NIK", "VAP", "WIP", "LOU", "NOO", "EVA", "EXO", "KOR", "NAR", "VOW", "HYM", "PAI",
+             "LAS", "VIO", "WEA", "DOU", "LIZ", "WAS", "ZIB", "QUA", "WEN", "WOB", "WOL", "HOK", "LAV",
+             "OBI", "POK", "SOR", "KOL", "ISR", "OMO", "SCE", "AFR", "MON", "NIN", "VEB", "ADD", "VOY",
+             "DRO", "LOC", "OJU", "OST", "DUB", "LEI", "VAA", "GAN", "HUM", "LUN", "VIV", "BUC", "LAN",
+             "LOX", "HAS", "SNA", "WUA", "YAI", "EGO", "ABB", "CRU", "LOF", "WAB", "ZIZ", "COD", "LEX",
+             "RAJ", "KIW", "LAO", "LIB", "NJU", "OBR", "OCE", "POW", "IAG", "MLO", "GYP", "LIT", "OPA",
+             "COT", "DIP", "LAW", "RHO", "VOR", "AMA", "AYU", "DUR", "FLA", "OAS", "VIB", "CAB", "CHE",
+             "HAV", "LUP", "MIC", "YOB", "PIT", "YAN", "LOZ", "TOG", "BEA", "DUD", "GOM", "HIB", "WAG",
+             "ETO", "KEL", "NUT", "WES", "IDI", "ISO", "PRU", "YOG", "ZAI")
 # individuals with at least 2 samples
 over_1 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI", "VIG", "VOG", "DAS",
             "CAI", "COB", "PEB", "OXY", "WRI", "NAP", "SEB", "COO", "LAD", "LOB", "WAD", "GAB", "LIW",
@@ -150,7 +164,8 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
-filter_data <- function(data, level="genus", count_threshold=100, sample_threshold=20, verbose=TRUE) {
+filter_data <- function(data, level="genus", count_threshold=50, sample_threshold=20, verbose=TRUE) {
+  cat("Filtering data at level",level,"with count threshold",count_threshold,"and sample threshold",sample_threshold,"\n")
   filter_fn <- paste0(data_dir,"filtered_",level,"_",count_threshold,"_",sample_threshold,".rds")
   if(!file.exists(filter_fn)) {
     snames <- unique(sample_data(data)$sname)
@@ -159,8 +174,8 @@ filter_data <- function(data, level="genus", count_threshold=100, sample_thresho
     # a taxon must appear in at least {count_threshold} abundance in at least {sample_threshold} samples per individual
     keep_indices <- rep(TRUE, ntaxa(data))
     for(sname in snames) {
+      cat("Parsing individual:",sname,"\n")
       sname <<- sname
-      cat("SNAME:",sname,"\n")
       indiv_data <- subset_samples(data, sname==sname)
       # these are the indices to remove!
       keep_indices_indiv <- apply(counts, 2, function(x) sum(x >= count_threshold)/ntaxa(indiv_data) >= sample_threshold/100)

@@ -285,11 +285,11 @@ plot_timecourse_phyloseq <- function(data, save_filename, gapped=FALSE, legend=T
   categories <- unique(df3$OTU)
   coul = brewer.pal(4, "Spectral")
   coul = colorRampPalette(coul)(length(unique(df3$OTU)))
+  img_width <- 15
   if(gapped | !legend) {
     coul[1] <- "#DDDDDD"
-    img_width <- 15
-  } else {
-    img_width <- 10
+#  } else {
+#    img_width <- 10
   }
   if(!is.null(selected_samples)) {
     p <- ggplot(df3, aes(x=Sample, y=Abundance, fill=OTU, alpha=alpha)) + 

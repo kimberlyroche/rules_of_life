@@ -43,9 +43,9 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 
   # read in and filter full data set at this phylogenetic level
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+  subsetted_data <- subset_samples(glom_data, sname %in% over_40)
   data <- filter_data(subsetted_data, level=level, verbose=FALSE)
-  
+
   # global var hack still necessary for phyloseq subset_samples (I think)
   baboon <<- baboon
   # cut this down to the desired individual
@@ -56,7 +56,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   baseline_date <- indiv_metadata$collection_date[1]
   observations <- sapply(indiv_metadata$collection_date, function(x) round(difftime(x, baseline_date, units="days"))) + 1
   Y <- otu_table(indiv_data)@.Data
-  
+
   # chop down to span of interest (if applicable)
   if(!is.null(date_lower_limit) & !is.null(date_upper_limit)) {
     # require both be present for now
@@ -106,7 +106,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   if(!is.null(alr_ref)) {
     Y <- Y[c(setdiff(1:D,alr_ref),alr_ref),]
   }
-  
+
   prior_obj <- default_ALR_prior(D)
   
   alr_ys <- driver::alr((t(Y)+pc))
@@ -128,6 +128,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
       fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
     }
   }
+
   fit_obj <- list(Y=Y, alr_ys=alr_ys, X=observations, fit=fit)
   
   # dumb as hell but for later prediction, these need to be loaded into the workspace
@@ -299,13 +300,16 @@ embed_posteriors <- function(level, which_measure="Sigma", indiv=NULL) {
 
   cat("Embedding posterior samples...\n")  
   fit <- cmdscale(distance_mat, eig=TRUE, k=6) # k is the number of dim
-  cat("\tEigenvalue #1:",fit$eig[1],"\n")
-  cat("\tEigenvalue #2:",fit$eig[2],"\n")
-  cat("\tEigenvalue #3:",fit$eig[3],"\n")
-  cat("\tEigenvalue #4:",fit$eig[4],"\n")
-  cat("\tEigenvalue #5:",fit$eig[5],"\n")
-  cat("\tEigenvalue #6:",fit$eig[6],"\n")
-  cat("\tEigenvalue #7:",fit$eig[7],"\n")
+  # I believe in this case the magnitude of the eigenvalues is proportional to the variance
+  # explained (properly its differs by a factor of n-1 [the DOF] I think)
+  eig_tot <- sum(abs(fit$eig))
+  cat("\tEigenvalue #1:",fit$eig[1]," (% variance:",round(abs(fit$eig[1])/eig_tot,2),")\n")
+  cat("\tEigenvalue #2:",fit$eig[2]," (% variance:",round(abs(fit$eig[2])/eig_tot,2),")\n")
+  cat("\tEigenvalue #3:",fit$eig[3]," (% variance:",round(abs(fit$eig[3])/eig_tot,2),")\n")
+  cat("\tEigenvalue #4:",fit$eig[4]," (% variance:",round(abs(fit$eig[4])/eig_tot,2),")\n")
+  cat("\tEigenvalue #5:",fit$eig[5]," (% variance:",round(abs(fit$eig[5])/eig_tot,2),")\n")
+  cat("\tEigenvalue #6:",fit$eig[6]," (% variance:",round(abs(fit$eig[6])/eig_tot,2),")\n")
+  cat("\tEigenvalue #7:",fit$eig[7]," (% variance:",round(abs(fit$eig[7])/eig_tot,2),")\n")
   
   # save first 6 coordinates (arbitrarily)
   df <- data.frame(x1=fit$points[,1], x2=fit$points[,2],
@@ -338,7 +342,7 @@ embed_posteriors <- function(level, which_measure="Sigma", indiv=NULL) {
 load_outcomes <- function() {
   outcomes <- read.csv(paste0(data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
   # note: may need to change this filtration eventually
-  outcomes <- outcomes[outcomes$sname %in% over_50,]
+  outcomes <- outcomes[outcomes$sname %in% over_40,]
   # filter to NA-less measures
   outcomes <- outcomes[,apply(outcomes, 2, function(x) sum(is.na(x))==0)]
   return(outcomes) # indexed by sname column
@@ -366,7 +370,7 @@ get_group_labels <- function(data) {
 #   data is the full ABRP phyloseq object
 #   individuals is a list of snames
 #   annotation is the label to grab
-get_other_labels <- function(df, data, individuals, annotation="group") {
+get_other_labels <- function(df, data, individuals, annotation="group", sname_list=NULL) {
   labels <- numeric(nrow(df))
   names(labels) <- df$labels
   if(annotation == "group") {
@@ -485,11 +489,21 @@ get_other_labels <- function(df, data, individuals, annotation="group") {
       labels[df$labels == indiv] <- round(sum(season_vec == "Wet")/length(season_vec),1) # discretize
     }
   }
+  if(annotation == "metagenomics") {
+    for(indiv in individuals) {
+      if(indiv %in% sname_list) {
+        labels[df$labels == indiv] <- 1
+      } else {
+        labels[df$labels == indiv] <- 0
+      }
+    }
+    labels <- as.factor(labels)
+  }
 
   df2 <- data.frame(x1=df$mean_x1, x2=df$mean_x2,
                     x3=df$mean_x3, x4=df$mean_x4,
                     x5=df$mean_x5, x6=df$mean_x6,
-                    labels=as.factor(labels))
+                    labels=labels)
   return(df2)
 }
 
@@ -532,7 +546,7 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
 
 # wrapper to plot ordination with 
 # allowable (label_types) values are: individual, group, counts, density
-plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv=NULL) {
+plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv=NULL, sname_list=NULL) {
   if(is.null(indiv)) {
     df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
     df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
@@ -542,7 +556,8 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv
   }
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
-    df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels), annotation=label_type))
+    df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels),
+                                            annotation=label_type, sname_list=sname_list))
   }
   plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend, save_tag=indiv)
   plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend, save_tag=indiv)
@@ -729,7 +744,7 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NUL
 
 plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=NULL) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+  subsetted_data <- subset_samples(glom_data, sname %in% over_40)
   data <- filter_data(subsetted_data, level=level, verbose=FALSE)
   #data <- load_and_filter(level)
   for(baboon in individuals) {

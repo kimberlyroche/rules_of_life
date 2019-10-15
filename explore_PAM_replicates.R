@@ -11,7 +11,7 @@ library(Rtsne)
 level <- "family"
 data <- load_and_filter(level)
 replicates <- subset_samples(data, sample_status==2)
-cat("Number of replicate samples:",nsamples(replicates),"\n")
+cat("Number of replicate samples:",phyloseq::nsamples(replicates),"\n")
 cat("Taxa in each replicate:",ntaxa(replicates),"\n")
 
 # show replicates by SID, sname, date
@@ -51,7 +51,7 @@ ACA_season <- sample_data(ACA_data)$season
 VIG_data <- subset_samples(data, sname=="VIG")
 VIG_season <- sample_data(VIG_data)$season
 counts <- rbind(otu_table(ACA_data)@.Data, otu_table(VIG_data)@.Data)
-sname_labels <- c(rep("ACA", nsamples(ACA_data)), rep("VIG", nsamples(VIG_data)))
+sname_labels <- c(rep("ACA", phyloseq::nsamples(ACA_data)), rep("VIG", phyloseq::nsamples(VIG_data)))
 season_labels <- c(ACA_season, VIG_season)
 labels <- paste(sname_labels, season_labels)
 rownames(counts) <- labels
