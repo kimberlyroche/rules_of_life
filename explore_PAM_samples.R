@@ -74,14 +74,20 @@ sample_counts <- otu_table(samples)@.Data
 rownames(sample_counts) <- md$sid
 colnames(sample_counts) <- NULL
 
-# embed (Aitchison distance)
-sample_clr <- driver::clr(sample_counts + pc) # CLR
+phylo_dist <- TRUE
+
 if(file.exists("PAM_sample_dist.RData")) {
   cat("Loading existing distance matrix...\n")
   load("PAM_sample_dist.RData")
 } else {
   cat("Calculating distance matrix...\n")
-  sample_dist <- dist(sample_clr)
+  if(phylo_dist) {
+    sample_dist <- UniFrac(samples, weighted=TRUE, normalized=TRUE, parallel=FALSE, fast=TRUE)
+  } else {
+    # embed (Aitchison distance)
+    sample_clr <- driver::clr(sample_counts + pc) # CLR
+    sample_dist <- dist(sample_clr)
+  }
   save(sample_dist, file="PAM_sample_dist.RData")
 }
 cat("Calculating embedding coordinates...\n")
@@ -108,6 +114,7 @@ if(use_tsne) {
 } else {
   df <- data.frame(x=sample_embed[,1], y=sample_embed[,2], sname=md$sname, Medoid=medoids)
 }
+rownames(df) <- as.character(seq(1, nrow(df)))
 
 save_label <- paste0(plot_dir,"PAM_",level,"_")
 if(use_tsne) {

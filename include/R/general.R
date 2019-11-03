@@ -137,16 +137,16 @@ read_metadata <- function(data, write_sample=FALSE) {
 
 load_glommed_data <- function(level="species", replicates=TRUE) {
   if(replicates) {
-    filename <- paste0(data_dir,"glom_data_",level,"_reps.RData")
+    filename <- paste0(data_dir,"glom_data_",level,"_reps_tree.rds")
     if(file.exists(filename)) {
-      load(filename)
+      glom_data <- readRDS(filename)
     } else {
       stop(paste0("Agglomerated data file for ",level," (+replicates) does not exist:",filename))
     }
   } else {
-    filename <- paste0(data_dir,"glom_data_",level,".RData")
+    filename <- paste0(data_dir,"glom_data_",level,".rds")
     if(file.exists(filename)) {
-      load(filename)
+      glom_data <- readRDS(filename)
     } else {
       stop(paste0("Agglomerated data file for ",level," (-replicates) does not exist:",filename))
     }

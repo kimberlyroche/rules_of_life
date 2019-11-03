@@ -29,7 +29,7 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
   plate_vector <- NULL
   conc_vector <- NULL
   
-  within_group_corr <- 0.1
+  within_group_corr <- 0.2
   between_group_corr <- 0
 
   # build kernels for factors of interest
@@ -187,7 +187,8 @@ estimate_variance_components <- function(data, metadata, optim_it=1, use_individ
       } else if(season_vector[i] == "D" && season_vector[j] == "D") {
         season_kernel[i,j] <- within_group_corr
       } else {
-        season_kernel[i,j] <- between_group_corr
+        #season_kernel[i,j] <- between_group_corr
+        season_kernel[i,j] <- -within_group_corr
       }
     }
   }

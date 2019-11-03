@@ -525,6 +525,9 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
     p <- p + geom_text(data=df_centroids, aes_string(x=paste0("mean_",axis1), y=paste0("mean_",axis2), label="labels"),
                        color="black", fontface="bold")
   }
+  if(label_type == "counts" | label_type == "density") {
+    p <- p + scale_color_gradient(low="blue", high="red")
+  }
   if(!legend | label_type == "individual") {
     p <- p + theme(legend.position='none')
   }

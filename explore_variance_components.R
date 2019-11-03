@@ -3,7 +3,7 @@
 source("include/R/general.R")
 source("include/R/VC.R")
 
-include_residual <- TRUE
+include_residual <- FALSE
 
 level <- "genus"
 data <- load_and_filter(level)

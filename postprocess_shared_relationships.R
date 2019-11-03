@@ -5,15 +5,17 @@ source("include/R/general.R")
 
 level <- "genus"
 
-#model_count_limit <- 5
+model_count_limit <- 100
+microbe_limit <- 50
 
 # read all models
 #fns <- list.files(path=paste0(model_dir, level))
 fns <- list.files(path="output/model_fits/genus_prev")
 models <- list()
 ref_model <- NULL
-for(i in 1:length(fns)) {
-#for(i in 1:model_count_limit) {
+#chosen_model_idx <- 1:length(fns)
+chosen_model_idx <- sample(length(fns))[1:model_count_limit]
+for(i in chosen_model_idx) {
   cat("Reading model:",fns[i],"\n")
   #temp <- readRDS(paste0(model_dir, level, "/", fns[i]))
   temp <- readRDS(paste0("output/model_fits/genus_prev/", fns[i]))
@@ -31,10 +33,11 @@ cat("Models read.\n")
 
 cd <- data.frame(m1=c(), m2=c(), microbe=c(), cor=c(), avg_log_abundance=c())
 model_pairs <- combn(length(models), 2)
-for(i in 1:ref_model$fit$D) {
+#for(i in 1:ref_model$fit$D) {
+for(i in sample(ref_model$fit$D)[1:microbe_limit]) {
   cat("Computing correlation over dynamics for microbe",i,"\n")
-  for(j in 1:length(models)) {
-    for(k in 1:length(models)) {
+  for(j in chosen_model_idx) {
+    for(k in chosen_model_idx) {
       if(j != k) {
         cd <- rbind(cd,
               data.frame(m1=j,
