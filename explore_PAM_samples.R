@@ -88,7 +88,7 @@ if(file.exists("PAM_sample_dist.RData")) {
     sample_clr <- driver::clr(sample_counts + pc) # CLR
     sample_dist <- dist(sample_clr)
   }
-  save(sample_dist, file="PAM_sample_dist.RData")
+  save(sample_dist, file=paste0(output_dir,"PAM_sample_dist.RData"))
 }
 cat("Calculating embedding coordinates...\n")
 if(use_tsne) {
@@ -105,7 +105,7 @@ if(file.exists("PAM_sample_cr.RData")) {
 } else {
   cat("Calculating PAM clustering...\n")
   sample_cr <- Cluster_Medoids(as.matrix(sample_dist), k, verbose=TRUE, threads=4)
-  save(sample_cr, file="PAM_sample_cr.RData")
+  save(sample_cr, file=paste0(output_dir,"PAM_sample_cr.RData"))
 }
 medoids <- logical(nrow(sample_counts))
 medoids[sample_cr$medoid_indices] <- TRUE

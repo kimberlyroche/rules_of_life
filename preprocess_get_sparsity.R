@@ -7,13 +7,13 @@ if(FALSE) {
 # HOW MANY INDIVIDUALS DOES THIS TAXON APPEAR IN >0 TIMES AT A >0 COUNT?
 for(level in levels) {
 	glom_data <- load_glommed_data(level)
-	data <- subset_samples(glom_data, sname %in% over_50) # 32 taxa x 9765 samples
+	data <- subset_samples(glom_data, sname %in% sname_list) # 32 taxa x 9765 samples
 
 	# HOW MANY THINGS ONLY APPEAR IN ONE INDIVIDUAL'S SAMPLES?
 	min_count <- 1
 	indiv_appearances <- numeric(ntaxa(data))
-	for(i in 1:length(over_50)) {
-		indiv <- over_50[i]
+	for(i in 1:length(sname_list)) {
+		indiv <- sname_list[i]
 		counts <- otu_table(subset_samples(data, sname == indiv)) # samples x taxa
 		indiv_appearances <- indiv_appearances +
 			apply(counts, 2, function(x) { sum(sapply(x, function(y) y >= min_count)) > 1 } )
@@ -32,12 +32,12 @@ for(level in levels) {
 # HOW MANY TAXA ARE UNIQUE WITHIN THIS INDIVIDUAL?
 for(level in levels) {
 	glom_data <- load_glommed_data(level)
-	data <- subset_samples(glom_data, sname %in% over_50) # 32 taxa x 9765 samples
+	data <- subset_samples(glom_data, sname %in% sname_list) # 32 taxa x 9765 samples
 
         threshold <- 5
 	indiv_percents <- c()
-	for(i in 1:length(over_50)) {
-		indiv <- over_50[i]
+	for(i in 1:length(sname_list)) {
+		indiv <- sname_list[i]
                 cat("Parsing",indiv,"\n")
 		counts_in <- otu_table(subset_samples(data, sname == indiv)) # samples x taxa
 		counts_out <- otu_table(subset_samples(data, sname != indiv)) # samples x taxa

@@ -13,7 +13,7 @@ sample_threshold <- 0.05
 cat("Testing presence between hosts...\n")
 for(level in levels) {
   glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  glom_data_subset <- subset_samples(glom_data, sname %in% over_50)
+  glom_data_subset <- subset_samples(glom_data, sname %in% sname_list)
   data <- filter_data(glom_data_subset, level=level, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
   cat("^^^Assuming index of OTHER is 2. CHECK THIS.\n")
   for(indiv in c("ZIZ", "GAN")) {
@@ -36,8 +36,8 @@ for(level in levels) {
   data <- filter_data(glom_data, level=level, count_threshold=count_threshold, sample_threshold=sample_threshold, collapse_level=level, verbose=TRUE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
-  for(i in 1:length(over_50)) {
-    data2 <- subset_samples(data, sname==over_50[i])
+  for(i in 1:length(sname_list)) {
+    data2 <- subset_samples(data, sname==sname_list[i])
     threshold <- 1
     counts <- otu_table(data2)@.Data
     taxa <- taxa + as.numeric(as.vector(unlist(apply(counts, 2, function(x) { sum(x != 0) > threshold }))))
@@ -58,8 +58,8 @@ for(level in levels) {
   data <- filter_data(glom_data, level=level, count_threshold=5, sample_threshold=0.2, collapse_level=level, verbose=FALSE)
   # what proportion of taxa are present (non-zero) in at least 10% of all individual's samples?
   taxa <- numeric(ntaxa(data))
-  for(i in 1:length(over_50)) {
-    data2 <- subset_samples(data, sname==over_50[i])
+  for(i in 1:length(sname_list)) {
+    data2 <- subset_samples(data, sname==sname_list[i])
     threshold <- 0.1*length(phyloseq::nsamples(data2))
     counts <- otu_table(data2)@.Data
     taxa <- taxa + as.numeric(as.vector(unlist(apply(counts, 2, function(x) { sum(x != 0) > threshold }))))
@@ -94,7 +94,7 @@ for(level in levels) {
     wn_weight <- sqrt(0.416)
   }
 
-  baboons <- over_50
+  baboons <- sname_list
   all_samples_Sigma <- NULL
   all_samples_Lambda <- NULL
   P <- NULL

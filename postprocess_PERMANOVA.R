@@ -25,8 +25,7 @@ for(level in levels) {
     wn_weight <- sqrt(0.416)
   }
 
-  baboons <- sort(over_50)
-  #baboons <- sort(best_sampled)
+  baboons <- sort(sname_list)
   all_samples_Sigma <- NULL
   all_samples_Lambda <- NULL
   P <- NULL

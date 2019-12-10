@@ -8,7 +8,7 @@ if(length(args) < 1) {
 
 level <- args[1]
 
-source("include/general.R")
+source("include/R/general.R")
 
 if(level != "species") {
   load(paste0(data_dir,"glom_data_species_reps.RData"))

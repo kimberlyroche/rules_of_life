@@ -100,6 +100,9 @@ over_1 <- c("DUI", "ECH", "LOG", "VET", "DUX", "LEB", "ACA", "OPH", "THR", "VAI"
             "GAE", "GEN", "GOV", "GWA", "HAZ", "HIA", "HIN", "HYR", "JIJ", "LAR", "LIV", "LYL", "MEG",
             "NGA", "NOA", "RAZ", "RUB", "RUE", "SUE", "TOF", "USI", "VAT", "WID", "YAB", "YEN", "YUM", "ZAP", "ZAW")
 
+# designate which of the individual/sname subsets to use throughout!
+sname_list <- over_40
+
 # ====================================================================================================================
 # ACCESSORS
 # ====================================================================================================================
@@ -164,7 +167,7 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
-filter_data <- function(data, level="genus", count_threshold=50, sample_threshold=20, verbose=TRUE) {
+filter_data <- function(data, level="genus", count_threshold=5, sample_threshold=20, verbose=TRUE) {
   cat("Filtering data at level",level,"with count threshold",count_threshold,"and sample threshold",sample_threshold,"\n")
   filter_fn <- paste0(data_dir,"filtered_",level,"_",count_threshold,"_",sample_threshold,".rds")
   if(!file.exists(filter_fn)) {
@@ -178,7 +181,7 @@ filter_data <- function(data, level="genus", count_threshold=50, sample_threshol
       sname <<- sname
       indiv_data <- subset_samples(data, sname==sname)
       # these are the indices to remove!
-      keep_indices_indiv <- apply(counts, 2, function(x) sum(x >= count_threshold)/ntaxa(indiv_data) >= sample_threshold/100)
+      keep_indices_indiv <- apply(counts, 2, function(x) sum(x >= count_threshold)/phyloseq::nsamples(indiv_data) >= sample_threshold/100)
       keep_indices <- keep_indices & keep_indices_indiv
     }
     collapse_indices <- !keep_indices
@@ -243,8 +246,11 @@ reorient_count_matrix <- function(Y, alr_ref) {
   return(Y)
 }
 
-pick_alr_ref <- function(no_taxa) {
-  return(round(no_taxa/2))
+# assumes samples x taxa
+pick_alr_ref <- function(data) {
+  counts <- otu_table(data)@.Data
+  median <- which(order(apply(counts, 2, mean)) == round(ncol(counts)/2))
+  return(median)
 }
 
 default_ALR_prior <- function(D, log_var_scale=1) {

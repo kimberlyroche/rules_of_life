@@ -12,3 +12,6 @@ if(length(args) == 3) {
 }
 
 embed_posteriors(level, which_measure, indiv=indiv)
+
+# Euclidean distance in ILR
+# embed_posteriors_alt(level, indiv=indiv)

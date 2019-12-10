@@ -2,7 +2,7 @@ source("include/R/general.R")
 
 level <- "genus"
 glom_data <- load_glommed_data(level=level, replicates=TRUE)
-subsetted_data <- subset_samples(glom_data, sname %in% over_50)
+subsetted_data <- subset_samples(glom_data, sname %in% sname_list)
 
 filter_data_alt <- function(data, count_threshold=100, sample_threshold=10, verbose=TRUE) {
   snames <- unique(sample_data(data)$sname)
