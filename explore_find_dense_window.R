@@ -1,17 +1,22 @@
 library(phyloseq)
 
+source("include/R/general.R")
+
 data <- readRDS("data/filtered_family_5_20.rds")
 metadata <- sample_data(data)
 hosts <- unique(metadata$sname)
 
-fileout <- file("abc.txt")
+span <- "24mo"
 
-writeLines(c("lower\tupper\tmean\tsd\tdense10\tdense15\tdense20\tdense25\tdense30\n"), fileout)
+fileout <- paste0(output_dir,"windowed_sample_density_",span,".txt")
+
+cat("lower\tupper\tmean\tsd\tdense10\tdense15\tdense20\tdense25\tdense30",
+    file=fileout,
+    append=FALSE,
+    sep="\n")
 
 lower_date <- as.Date(min(metadata$collection_date))
 max_date <- as.Date(max(metadata$collection_date))
-
-span <- "24mo"
 
 while(lower_date < max_date) {
   if(span == "12mo") {
@@ -26,7 +31,6 @@ while(lower_date < max_date) {
   upper_date <- lower_date + as.difftime(days, unit="days")
   sample_dist <- c()
   for(h in hosts) {
-    #cat("Host:",h,"\n")
     indiv_samples <- subset_samples(data, sname==h)
     result = tryCatch({
       indiv_samples <- subset_samples(indiv_samples, (collection_date >= lower_date & collection_date <= upper_date))
@@ -43,11 +47,15 @@ while(lower_date < max_date) {
   dense20 <- sum(sample_dist >= 20)
   dense25 <- sum(sample_dist >= 25)
   dense30 <- sum(sample_dist >= 30)
-  writeLines(c(paste0(lower_date,"\t",upper_date,"\t",mean_val,"\t",sd_val,"\t",
-             dense10,"\t",dense15,"\t",dense20,"\t",dense25,"\t",dense30,"\n")), fileout)
+  cat(paste0(lower_date,"\t",upper_date,"\t",mean_val,"\t",sd_val,"\t",
+             dense10,"\t",dense15,"\t",dense20,"\t",dense25,"\t",dense30),
+    file=fileout,
+    append=TRUE,
+    sep="\n")
   lower_date <- lower_date + as.difftime(14, unit="days")
 }
-close(fileout)
+
+cat("Plotting results...\n")
 
 # dumb
 data <- read.csv(paste0(output_dir,"windowed_sample_density_",span,".txt"), header=TRUE, sep="\t")

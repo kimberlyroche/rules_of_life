@@ -24,6 +24,18 @@ if(length(args) >= 4) {
     wn_weight <- sqrt(0)
     alr_ref <- 9
   }
+  if(level == "class") {
+    se_weight <- sqrt(2.177)
+    per_weight <- sqrt(0.242)
+    wn_weight <- sqrt(0)
+    alr_ref <- 15
+  }
+  if(level == "order") {
+    se_weight <- sqrt(2.52)
+    per_weight <- sqrt(0.28)
+    wn_weight <- sqrt(0)
+    alr_ref <- 17
+  }
   if(level == "family") {
     se_weight <- sqrt(2.586)
     per_weight <- sqrt(0.287)

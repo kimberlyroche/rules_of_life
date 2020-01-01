@@ -167,7 +167,11 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 #    return(fit_obj)
 #  } else {
      # otherwise, save the full posterior sample set
-     saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
+     if(mean_only) {
+       saveRDS(fit_obj, paste0(model_dir,level,"_MAP/",baboon,"_bassetfit",save_append,".rds"))
+     } else {
+       saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
+     }
 #  }
 
 }
@@ -188,22 +192,32 @@ get_predictions <- function(X, fit, n_samples=100) {
 # ====================================================================================================================
 
 # get filename list for all fitted basset models
-get_fitted_modellist <- function(level="family") {
+get_fitted_modellist <- function(level="family", MAP=FALSE) {
   pattern_str <- "*_bassetfit.rds"
   regexpr_str <- "_bassetfit.rds"
-  fitted_models <- list.files(path=paste0(model_dir,level), pattern=pattern_str, full.names=TRUE, recursive=FALSE)
+  if(MAP) {
+    level_dir <- paste0(model_dir,level,"_MAP")
+  } else {
+    level_dir <- paste0(model_dir,level)
+  }
+  fitted_models <- list.files(path=level_dir, pattern=pattern_str, full.names=TRUE, recursive=FALSE)
   return(list(fitted_models=fitted_models,
               pattern_str=pattern_str,
               regexpr_str=regexpr_str))
 }
 
 # get filename list for all fitted basset models and do some extra result parsing
-get_fitted_modellist_details <- function(level="family") {
+get_fitted_modellist_details <- function(level="family", MAP=FALSE) {
   fitted_models <- get_fitted_modellist(level)
   individuals <- sapply(fitted_models$fitted_models, function(x) { idx <- regexpr(fitted_models$regexpr_str, x); return(substr(x, idx-3, idx-1)) } )
   names(individuals) <- NULL
   # parse dimensions
-  fit_obj <- readRDS(paste0(model_dir,level,"/",individuals[1],fitted_models$regexpr_str))
+  if(MAP) {
+    path <- paste0(model_dir,level,"_MAP/",individuals[1],fitted_models$regexpr_str)
+  } else {
+    path <- paste0(model_dir,level,"/",individuals[1],fitted_models$regexpr_str)
+  }
+  fit_obj <- readRDS(path)
   return(list(individuals=individuals,
               pattern_str=fitted_models$pattern_str,
               regexpr_str=fitted_models$regexpr_str,
@@ -217,9 +231,9 @@ get_fitted_modellist_details <- function(level="family") {
 # POSTERIOR EMBEDDING
 # ====================================================================================================================
 
-calc_posterior_distances <- function(level, which_measure="Sigma", indiv=NULL, mean_distance=FALSE) {
+calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL) {
   # grab all fitted models
-  indiv_obj <- get_fitted_modellist_details(level=level)
+  indiv_obj <- get_fitted_modellist_details(level=level, MAP=MAP)
   individuals <- indiv_obj$individuals
   if(!is.null(indiv)) {
     individuals <- c(indiv)
@@ -284,7 +298,11 @@ calc_posterior_distances <- function(level, which_measure="Sigma", indiv=NULL, m
   save_sz <- format(object.size(distance_mat), units="Gb")
   cat("\nDistance matrix save size:",save_sz,"\n")
   if(save_sz < 50) {
-    saveRDS(distance_mat, paste0(output_dir,"saved_distance_Sigma.rds"))
+    if(MAP) {
+      saveRDS(distance_mat, paste0(output_dir,"saved_distance_Sigma_",level,"_MAP.rds"))
+    } else {
+      saveRDS(distance_mat, paste0(output_dir,"saved_distance_Sigma_",level,".rds"))
+    }
   }
 
   upper_threshold <- 1e160
@@ -352,11 +370,11 @@ embed_posteriors_alt <- function(level, indiv=NULL) {
 
 # embed posterior samples of (which_measure) using MDS and the appropriate distance metric
 #   which_measure: Sigma | Lambda
-embed_posteriors <- function(level, which_measure="Sigma", indiv=NULL) {
+embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL) {
   if(!is.null(indiv)) {
     cat(paste0("Embedding: ",indiv,"\n"))
   }
-  post_dist_obj <- calc_posterior_distances(level, which_measure=which_measure, indiv=indiv)
+  post_dist_obj <- calc_posterior_distances(level, which_measure=which_measure, MAP=MAP, indiv=indiv)
   indiv_labels <- post_dist_obj$indiv_labels
   distance_mat <- post_dist_obj$distance_mat
 
@@ -857,6 +875,15 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       rho_per <<- fit_obj$kernelparams$rho_per
       period <<- fit_obj$kernelparams$period
       wn_weight <<- fit_obj$kernelparams$wn_weight
+
+      cat("se_weight:",se_weight,"\n")
+      cat("se_sigma:",se_sigma,"\n")
+      cat("rho_se:",rho_se,"\n")
+      cat("per_weight:",per_weight,"\n")
+      cat("per_sigma:",per_sigma,"\n")
+      cat("rho_per:",rho_per,"\n")
+      cat("period:",period,"\n")
+      cat("wn_weight:",wn_weight,"\n")
 
       # note: this function CLR transforms by default!
       predict_obj <- get_predictions(fit_obj$X, fix_dims_fit(fit_obj$fit), n_samples=100)

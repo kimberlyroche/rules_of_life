@@ -5,37 +5,52 @@ source("include/R/visualization.R")
 
 # additional clustering/ordination stuff
 library(ClusterR)
-#library(cluster)
-#library(psych)
-#library(Rcpp)
-library(Rtsne)
+# library(Rtsne) # t-SNE if desired
 
-# read in and filter full data set at this phylogenetic level
+# ======================================================================================
+#   filter to individuals with solid fitness annotations
+# ======================================================================================
+
+# pass target sample number
+args <- commandArgs(trailingOnly=TRUE)
+if(length(args) < 1) {
+  stop("Arguments: (target sample number)", call.=FALSE)
+}
+k <- as.numeric(args[1])
+
+# read in data and filter full data set at [level] phylogenetic level
 level <- "family"
-use_tsne <- FALSE
+use_tsne <- FALSE # if TRUE ordinate via t-SNE; if FALSE use PCoA
 data <- load_and_filter(level=level)
 
-# filter on annotations first
 # get group labels
 group_labels <- get_group_labels(data)
 
 outcomes <- read.csv(paste0(data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
+# filter to individuals with > 1 sample
 temp <- outcomes[outcomes$sname %in% over_1,]
-temp <- temp[!is.na(temp$LRS_livebirths) & temp$LRS_livebirths > 0 &
-                   !is.na(temp$LRS_survbirths) & temp$LRS_survbirths > 0 &
-                   !is.na(temp$lifetime_rateLiveBirths) & temp$lifetime_rateLiveBirths > 0 &
-                   !is.na(temp$lifetime_rateSurvBirths) & temp$lifetime_rateSurvBirths > 0,]
-temp <- temp[!is.na(temp$known_lifespan) & temp$known_lifespan > 0,]
-temp <- temp[!is.na(temp$age_first_live_birth) & temp$age_first_live_birth > 0,]
+# filter to individuals with data on live or surviving births
+temp <- temp[!is.na(temp$LRS_livebirths) &
+                   !is.na(temp$LRS_survbirths) &
+                   !is.na(temp$lifetime_rateLiveBirths) &
+                   !is.na(temp$lifetime_rateSurvBirths),]
+temp <- temp[!is.na(temp$known_lifespan),]
+temp <- temp[!is.na(temp$age_first_live_birth),]
 cat(paste0("There are ",nrow(temp)," individuals matching fitness annotation selection criteria!\n"))
 
 filtered_snames <- unique(as.vector(temp$sname))
+subsetted_data <- subset_samples(data, sname %in% filtered_snames)
+n_samples <- phyloseq::nsamples(subsetted_data)
 
-# filter on minimum counts next
+# the minimum sample number is heuristic; we'd like each individual to retain ~35 samples
+# how many remain after selection is dynamic
+# this seems to be a good choice but we probably want to parameter sweep this
 min_count_threshold <- 65
 
-subsetted_data <- subset_samples(data, sname %in% filtered_snames)
-md <- sample_data(data)
+# further filter on DNA concentration >= 3 ng.
+subsetted_data <- subset_samples(subsetted_data, extract_dna_conc_ng >= 3)
+md <- sample_data(subsetted_data)
+
 per_indiv_counts <- md %>%
   group_by(sname) %>%
   count()
@@ -44,41 +59,34 @@ samples <- subset_samples(subsetted_data, sname %in% indiv_list)
 cat("Number of samples:",phyloseq::nsamples(samples),"\n")
 cat("Taxa in each sample:",ntaxa(samples),"\n")
 
-# show replicates by SID, sname, date
+# show selected samples grouped by sname
 md <- sample_data(samples)
 temp <- table(md[,"sname"])
 temp
 
-# show group breakdown
+# show selected individuals grouped by grp
 table(group_labels[indiv_list])
 
-# estimate average retention of samples (after PAM) assuming uniform selection
-# 75 starting samples establish a minimum of about 28-30 retained for a given individual
-#png("test.png")
-#plot(hist(round(2000*(temp/sum(temp)))))
-#dev.off()
+cat("Number of starting samples:",phyloseq::nsamples(samples),"\n")
 
-print(sort(round(2000*(temp/sum(temp))))[1:5])
-
-cat("Number of samples:",phyloseq::nsamples(samples),"\n")
-
-# we'll choose 2000 of these ^^^ samples
-
-#d <- as.data.frame(rep_meta) %>% select(c(sid, sname, collection_date, season))
-#d %>%
-#  group_by(sname, season) %>%
-#  tally()
+# ======================================================================================
+#   select samples from these filtered ones
+# ======================================================================================
 
 md <- sample_data(samples)
 sample_counts <- otu_table(samples)@.Data
 rownames(sample_counts) <- md$sid
 colnames(sample_counts) <- NULL
 
-phylo_dist <- TRUE
+phylo_dist <- FALSE # if TRUE use weighted Unifrac; if FALSE use Aitchison distance;
+                    # a caution: the root of the tree seems to be randomly initialized
+                    # so the sample selection is not fully reproducible
 
-if(file.exists("PAM_sample_dist.RData")) {
+# calculate distances
+
+if(file.exists(paste0(output_dir,"PAM_sample_dist_",k,".RData"))) {
   cat("Loading existing distance matrix...\n")
-  load("PAM_sample_dist.RData")
+  load(paste0(output_dir,"PAM_sample_dist_",k,".RData"))
 } else {
   cat("Calculating distance matrix...\n")
   if(phylo_dist) {
@@ -88,8 +96,10 @@ if(file.exists("PAM_sample_dist.RData")) {
     sample_clr <- driver::clr(sample_counts + pc) # CLR
     sample_dist <- dist(sample_clr)
   }
-  save(sample_dist, file=paste0(output_dir,"PAM_sample_dist.RData"))
+  save(sample_dist, file=paste0(output_dir,"PAM_sample_dist_",k,".RData"))
 }
+
+# calculating embedding for later visualization of included/excluded samples
 cat("Calculating embedding coordinates...\n")
 if(use_tsne) {
   sample_embed <- Rtsne(sample_dist)
@@ -97,16 +107,17 @@ if(use_tsne) {
   sample_embed <- cmdscale(sample_dist)
 }
 
-# cluster an re-label
-k <- 2000
-if(file.exists("PAM_sample_cr.RData")) {
+# cluster via PAM
+if(file.exists(paste0(output_dir,"PAM_clustering_",k,".RData"))) {
   cat("Loading existing PAM clustering...\n")
-  load("PAM_sample_cr.RData")
+  load(paste0(output_dir,"PAM_clustering_",k,".RData"))
 } else {
   cat("Calculating PAM clustering...\n")
   sample_cr <- Cluster_Medoids(as.matrix(sample_dist), k, verbose=TRUE, threads=4)
-  save(sample_cr, file=paste0(output_dir,"PAM_sample_cr.RData"))
+  save(sample_cr, file=paste0(output_dir,"PAM_clustering_",k,".RData"))
 }
+
+# extract medoids/exemplars and label the embedding with these
 medoids <- logical(nrow(sample_counts))
 medoids[sample_cr$medoid_indices] <- TRUE
 if(use_tsne) {
@@ -116,19 +127,23 @@ if(use_tsne) {
 }
 rownames(df) <- as.character(seq(1, nrow(df)))
 
+# ======================================================================================
+#   plotting/visualization
+# ======================================================================================
+
 save_label <- paste0(plot_dir,"PAM_",level,"_")
 if(use_tsne) {
-  save_label <- paste0(save_label, "tsne_")
+  save_label <- paste0(save_label,"tsne_")
 }
-save_label <- paste0(save_label, "diagnostic")
+save_label <- paste0(save_label,"diagnostic")
 p <- ggplot() +
   geom_point(data=df, aes(x=x, y=y, color=sname), size=1)
-ggsave(paste0(save_label,"1.png"), plot=p, scale=1, width=12, height=10, units="in", dpi=100)
+ggsave(paste0(save_label,"_individual_",k,".png"), plot=p, scale=1, width=12, height=10, units="in", dpi=100)
 
 p <- ggplot(data=df, aes(color=Medoid)) +
-  geom_point(data=df[df$Medoid==FALSE,], aes(x=x, y=y), size=1, alpha=0.5) +
-  geom_point(data=df[df$Medoid==TRUE,], aes(x=x, y=y), size=1)
-ggsave(paste0(save_label,"1.png"), plot=p, scale=1, width=12, height=10, units="in", dpi=100)
+  geom_point(data=df[df$Medoid==FALSE,], aes(x=x, y=y), size=2, alpha=0.5) +
+  geom_point(data=df[df$Medoid==TRUE,], aes(x=x, y=y), size=2)
+ggsave(paste0(save_label,"_medoid_",k,".png"), plot=p, scale=1, width=12, height=10, units="in", dpi=100)
 
 per_indiv_medoids <- df %>%
   filter(Medoid == TRUE) %>%
@@ -137,7 +152,7 @@ per_indiv_medoids <- df %>%
 # plot a few high-level distributions
 p <- ggplot(per_indiv_medoids, aes(n)) +
   geom_histogram()
-ggsave(paste0(plot_dir,"PAM_",level,"_diagnostic_indivcount.png"), plot=p, scale=1, width=6, height=6, units="in", dpi=100)
+ggsave(paste0(plot_dir,"PAM_",level,"_diagnostic_indivcount_",k,".png"), plot=p, scale=1, width=6, height=6, units="in", dpi=100)
 
 per_indiv_percent <- data.frame(sname=c(), percent=c())
 for(sn in per_indiv_medoids$sname) {
@@ -147,19 +162,19 @@ for(sn in per_indiv_medoids$sname) {
 }
 p <- ggplot(per_indiv_percent, aes(percent)) +
   geom_histogram()
-ggsave(paste0(plot_dir,"PAM_",level,"_diagnostic_indivpercent.png"), plot=p, scale=1, width=6, height=6, units="in", dpi=100)
+ggsave(paste0(plot_dir,"PAM_",level,"_diagnostic_indivpercent_",k,".png"), plot=p, scale=1, width=6, height=6, units="in", dpi=100)
 
 # plot time courses for 5 random selected individuals
+# random_indiv <- as.character(per_indiv_medoids$sname[sample(nrow(per_indiv_medoids))[1:5]])
+# for(indiv in random_indiv) {
+#   selected_indices <- as.numeric(rownames(df[df$sname==indiv & df$Medoid==TRUE,]))
+#   selected_samples <- md$sid[selected_indices]
+#   indiv_data <- subset_samples(samples, sname==indiv)
+#   plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_random_",indiv), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
+# }
 
-random_indiv <- as.character(per_indiv_medoids$sname[sample(nrow(per_indiv_medoids))[1:5]])
-for(indiv in random_indiv) {
-  selected_indices <- as.numeric(rownames(df[df$sname==indiv & df$Medoid==TRUE,]))
-  selected_samples <- md$sid[selected_indices]
-  indiv_data <- subset_samples(samples, sname==indiv)
-  plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_random_",indiv), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
-}
-
-# plot time courses for MIN and MAX sampled individuals
+# plot time courses for individuals with the minimum number of samples selected
+# and the maximum number of samples selected
 
 min_sample_indiv <- as.vector(per_indiv_medoids$sname[which(per_indiv_medoids$n == min(per_indiv_medoids$n))])
 cat("Minimally sampled individuals (PAM):\n")
@@ -173,13 +188,13 @@ for(indiv in min_sample_indiv) {
   selected_indices <- as.numeric(rownames(df[df$sname==indiv & df$Medoid==TRUE,]))
   selected_samples <- md$sid[selected_indices]
   indiv_data <- subset_samples(samples, sname==indiv)
-  plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_min_",indiv), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
+  plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_min_",indiv,"_",k), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
 }
 
 for(indiv in max_sample_indiv) {
   selected_indices <- as.numeric(rownames(df[df$sname==indiv & df$Medoid==TRUE,]))
   selected_samples <- md$sid[selected_indices]
   indiv_data <- subset_samples(samples, sname==indiv)
-  plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_max_",indiv), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
+  plot_timecourse_phyloseq(indiv_data, paste0(plot_dir,"PAM_",level,"_max_",indiv,"_",k), gapped=FALSE, legend=TRUE, legend_level="family", selected_samples=selected_samples, are_replicates=FALSE)
 }
 

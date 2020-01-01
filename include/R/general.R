@@ -13,6 +13,7 @@ library(tidyverse)
 library(stringr)
 
 data_dir <- "data/"
+output_dir <- "output/"
 model_dir <- "output/model_fits/"
 plot_dir <- "output/plots/"
 
@@ -185,6 +186,7 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
       keep_indices <- keep_indices & keep_indices_indiv
     }
     collapse_indices <- !keep_indices
+    saveRDS(collapse_indices, paste0(data_dir,"filtered_idx_",level,"_",count_threshold,"_",sample_threshold,".rds"))
     # collapse mitochondria too
     tt <- tax_table(data)@.Data
     collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE

@@ -22,6 +22,9 @@ Eigen::MatrixXd Riemann_dist_samples(Eigen::MatrixXd samples, int n_indiv, int n
   for(int i=0; i < n_indiv*n_samples_per; i++) {
     for (int j=0; j < n_indiv*n_samples_per; j++) {
       if(j >= i) {
+        //if(i % 100 == 0 && j % 100 == 0) {
+        //  Rcout << "Calculating distance between samples " << i << ", " << j << std::endl;
+        //}
         // get samples A and B
         int a_idx = i*P;
         MatrixXd A = samples.middleCols(a_idx, P);

@@ -5,6 +5,9 @@ source("include/R/data_transform.R")
 source("include/R/visualization.R")
 
 levels <- c("phylum", "family", "genus")
+levels <- c("class")
+
+sname_list <- best_sampled
 
 for(level in levels) {
   # estimate noise in replicates
