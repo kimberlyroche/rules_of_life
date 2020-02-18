@@ -40,6 +40,9 @@ for(baboon in indiv_list) {
   rownames(Y) <- NULL
   D <- nrow(Y)
 
+  cat("D x N:",D,",",N,"\n")
+  quit()
+
   # stray uses the D^th element as the ALR reference by default
   # do some row shuffling in Y to put the reference at the end
   if(!is.null(alr_ref)) {

@@ -11,7 +11,7 @@ level <- args[1]
 distmat <- readRDS(paste0(output_dir,"saved_distance_Sigma_",level,".rds"))
 
 df <- data.frame(k=c(), ss=c())
-for(k in 40:round(length(sname_list)/2)) {
+for(k in 69:round(length(sname_list)/2)) {
   cat("Clustering into",k,"components...\n")
   sample_cr <- Cluster_Medoids(distmat, k, verbose=FALSE, threads=1)
   intra_dist <- sample_cr$silhouette_matrix$intra_clust_dissim

@@ -162,17 +162,13 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   fit_obj$fit$Lambda <- fit_obj$fit$Lambda[,,1:fit_obj$fit$iter]
   fit_obj$fit$Sigma <- fit_obj$fit$Sigma[,,1:fit_obj$fit$iter]
 
-#  if(mean_only) {
-#    # just return this small, summary of the GP fit
-#    return(fit_obj)
-#  } else {
-     # otherwise, save the full posterior sample set
-     if(mean_only) {
-       saveRDS(fit_obj, paste0(model_dir,level,"_MAP/",baboon,"_bassetfit",save_append,".rds"))
-     } else {
-       saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
-     }
-#  }
+  # otherwise, save the full posterior sample set
+  if(mean_only) {
+    saveRDS(fit_obj, paste0(model_dir,level,"_MAP/",baboon,"_bassetfit",save_append,".rds"))
+    return(fit_obj)
+  } else {
+    saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
+  }
 
 }
 
@@ -280,10 +276,23 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
     }
   }
   
+  dist_fn <- paste0(output_dir,"saved_distance_",which_measure,"_",level)
+  if(MAP) {
+    dist_fn <- paste0(dist_fn, "_MAP")
+  }
+  dist_fn <- paste0(dist_fn, ".rds")
   if(which_measure == "Sigma") {
-    distance_mat <- Riemann_dist_samples(all_samples, n_indiv, n_samples)
+    if(file.exists(dist_fn)) {
+      distance_mat <- readRDS(dist_fn)
+    } else {
+      distance_mat <- Riemann_dist_samples(all_samples, n_indiv, n_samples)
+    }
   } else {
-    distance_mat <- as.matrix(dist(all_samples))
+    if(file.exists(dist_fn)) {
+      distance_mat <- readRDS(dist_fn)
+    } else {
+      distance_mat <- as.matrix(dist(all_samples))
+    }
   }
 
   # look for NAs
@@ -297,12 +306,8 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
 
   save_sz <- format(object.size(distance_mat), units="Gb")
   cat("\nDistance matrix save size:",save_sz,"\n")
-  if(save_sz < 50) {
-    if(MAP) {
-      saveRDS(distance_mat, paste0(output_dir,"saved_distance_Sigma_",level,"_MAP.rds"))
-    } else {
-      saveRDS(distance_mat, paste0(output_dir,"saved_distance_Sigma_",level,".rds"))
-    }
+  if(save_sz < 50 & !file.exists(dist_fn)) {
+    saveRDS(distance_mat, dist_fn)
   }
 
   upper_threshold <- 1e160
@@ -321,53 +326,6 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
   return(list(indiv_labels=indiv_labels, distance_mat=distance_mat))
 }
 
-# (1) embed MAP only
-# (2) spike in the "inverse" of extreme individuals
-embed_posteriors_alt <- function(level, indiv=NULL) {
-  if(!is.null(indiv)) {
-    cat(paste0("Embedding: ",indiv,"\n"))
-  }
-  post_dist_obj <- calc_posterior_distances_alt(level, indiv=indiv)
-  indiv_labels <- post_dist_obj$indiv_labels
-  distance_mat <- post_dist_obj$distance_mat
-
-  cat("Embedding posterior samples...\n")  
-  fit <- cmdscale(distance_mat, eig=TRUE, k=6) # k is the number of dim
-  # I believe in this case the magnitude of the eigenvalues is proportional to the variance
-  # explained (properly its differs by a factor of n-1 [the DOF] I think)
-  eig_tot <- sum(abs(fit$eig))
-  cat("\tEigenvalue #1:",fit$eig[1]," (% variance:",round(abs(fit$eig[1])/eig_tot,2),")\n")
-  cat("\tEigenvalue #2:",fit$eig[2]," (% variance:",round(abs(fit$eig[2])/eig_tot,2),")\n")
-  cat("\tEigenvalue #3:",fit$eig[3]," (% variance:",round(abs(fit$eig[3])/eig_tot,2),")\n")
-  cat("\tEigenvalue #4:",fit$eig[4]," (% variance:",round(abs(fit$eig[4])/eig_tot,2),")\n")
-  cat("\tEigenvalue #5:",fit$eig[5]," (% variance:",round(abs(fit$eig[5])/eig_tot,2),")\n")
-  cat("\tEigenvalue #6:",fit$eig[6]," (% variance:",round(abs(fit$eig[6])/eig_tot,2),")\n")
-  cat("\tEigenvalue #7:",fit$eig[7]," (% variance:",round(abs(fit$eig[7])/eig_tot,2),")\n")
-  
-  # save first 6 coordinates (arbitrarily)
-  df <- data.frame(x1=fit$points[,1], x2=fit$points[,2],
-                   x3=fit$points[,3], x4=fit$points[,4],
-                   x5=fit$points[,5], x6=fit$points[,6],
-                   labels=indiv_labels)
-  if(is.null(indiv)) {
-    saveRDS(df, paste0(GP_plot_dir,level,"/Sigma_ordination.rds"))
-  } else {
-    saveRDS(df, paste0(GP_plot_dir,level,"/Sigma_ordination_",indiv,".rds"))
-  }
-  
-  # centroids are useful for labeling plots
-  df_centroids <- df %>%
-    group_by(labels) %>%
-    summarise(mean_x1=mean(x1), mean_x2=mean(x2),
-              mean_x3=mean(x3), mean_x4=mean(x4),
-              mean_x5=mean(x5), mean_x6=mean(x6))
-  if(is.null(indiv)) {
-    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/Sigma_ordination_centroids.rds"))
-  } else {
-    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/Sigma_ordination_centroids_",indiv,".rds"))
-  }
-}
-
 # embed posterior samples of (which_measure) using MDS and the appropriate distance metric
 #   which_measure: Sigma | Lambda
 embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL) {
@@ -379,7 +337,7 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   distance_mat <- post_dist_obj$distance_mat
 
   cat("Embedding posterior samples...\n")  
-  fit <- cmdscale(distance_mat, eig=TRUE, k=6) # k is the number of dim
+  fit <- cmdscale(distance_mat, eig=TRUE, k=2000) # k is the number of dim
   # I believe in this case the magnitude of the eigenvalues is proportional to the variance
   # explained (properly its differs by a factor of n-1 [the DOF] I think)
   eig_tot <- sum(abs(fit$eig))
@@ -390,12 +348,15 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   cat("\tEigenvalue #5:",fit$eig[5]," (% variance:",round(abs(fit$eig[5])/eig_tot,2),")\n")
   cat("\tEigenvalue #6:",fit$eig[6]," (% variance:",round(abs(fit$eig[6])/eig_tot,2),")\n")
   cat("\tEigenvalue #7:",fit$eig[7]," (% variance:",round(abs(fit$eig[7])/eig_tot,2),")\n")
+
+  saveRDS(fit, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_raw.rds"))
+  cat("Embedding has",ncol(fit$points),"dimensions...\n")
   
   # save first 6 coordinates (arbitrarily)
-  df <- data.frame(x1=fit$points[,1], x2=fit$points[,2],
-                   x3=fit$points[,3], x4=fit$points[,4],
-                   x5=fit$points[,5], x6=fit$points[,6],
-                   labels=indiv_labels)
+  df <- data.frame(coord=c(), value=c(), labels=c())
+  for(i in 1:ncol(fit$points)) {
+    df <- rbind(df, data.frame(coord=rep(i, nrow(fit$points)), value=fit$points[,i], labels=indiv_labels))
+  }
   if(is.null(indiv)) {
     saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
   } else {
@@ -403,11 +364,26 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   }
   
   # centroids are useful for labeling plots
-  df_centroids <- df %>%
-    group_by(labels) %>%
-    summarise(mean_x1=mean(x1), mean_x2=mean(x2),
-              mean_x3=mean(x3), mean_x4=mean(x4),
-              mean_x5=mean(x5), mean_x6=mean(x6))
+  #df_centroids <- df %>%
+  #  group_by(labels) %>%
+  #  summarise(mean_x1=mean(x1), mean_x2=mean(x2),
+  #            mean_x3=mean(x3), mean_x4=mean(x4),
+  #            mean_x5=mean(x5), mean_x6=mean(x6))
+
+  # centroids are useful for labeling plots
+  df_centroids <- NULL
+  for(i in 1:max(df$coord)) {
+    temp <- df[df$coord == i,] %>%
+      group_by(labels) %>%
+      summarise(mean=mean(value))
+    names(temp) <- c("labels", paste0("mean_x",i))
+    if(is.null(df_centroids)) {
+      df_centroids <- temp
+    } else {
+      df_centroids <- left_join(df_centroids, temp, by="labels")
+    }
+  } 
+
   if(is.null(indiv)) {
     saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
   } else {
@@ -582,11 +558,8 @@ get_other_labels <- function(df, data, individuals, annotation="group", sname_li
     labels <- as.factor(labels)
   }
 
-  df2 <- data.frame(x1=df$mean_x1, x2=df$mean_x2,
-                    x3=df$mean_x3, x4=df$mean_x4,
-                    x5=df$mean_x5, x6=df$mean_x6,
-                    labels=labels)
-  return(df2)
+  df$labels <- labels
+  return(df)
 }
 
 # plot 2D embedding using desired coordinate pair as (x,y)
@@ -595,16 +568,20 @@ get_other_labels <- function(df, data, individuals, annotation="group", sname_li
 #   axis1 is the x-axis surrogate
 #   axis2 is the y-axis surrogate
 #   label_type is the annotation/label to grab
-plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type="individual", legend=TRUE, save_tag=NULL) {
+plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="individual", legend=TRUE, save_tag=NULL) {
   point_size <- 1
   if(label_type != "individual") {
     # i.e. we're plotting from df_centroids
     point_size <- 3
   }
-  p <- ggplot() + geom_point(data=df, aes_string(x=axis1, y=axis2, color="labels"), size=point_size)
+  plot_df <- data.frame(ax1=df[df$coord == axis1,]$value,
+                        ax2=df[df$coord == axis2,]$value,
+                        labels=df[df$coord == axis1,]$labels)
+  p <- ggplot() + geom_point(data=plot_df, aes(x=ax1, y=ax2, color=labels), size=point_size)
+
   if(label_type == "individual") {
     # label the centroids directly
-    p <- p + geom_text(data=df_centroids, aes_string(x=paste0("mean_",axis1), y=paste0("mean_",axis2), label="labels"),
+    p <- p + geom_text(data=df_centroids, aes_string(x=paste0("mean_x",axis1), y=paste0("mean_x",axis2), label="labels"),
                        color="black", fontface="bold")
   }
   if(label_type == "counts" | label_type == "density") {
@@ -614,16 +591,16 @@ plot_axes <- function(df, df_centroids=NULL, axis1="x1", axis2="x2", label_type=
     p <- p + theme(legend.position='none')
   }
   if(is.null(save_tag)) {
-    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,".png")
+    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_x",axis1,"x",axis2,".png")
   } else {
-    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_",axis1,axis2,"_",indiv,".png")
+    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_x",axis1,"x",axis2,"_",indiv,".png")
   }
   img_width <- 4
   if(legend) {
     img_width <- 4.5
   }
-  aspect_ratio <- max(df_centroids[,paste0("mean_",axis2)]) - min(df_centroids[,paste0("mean_",axis2)])
-  aspect_ratio <- aspect_ratio/(max(df_centroids[,paste0("mean_",axis1)]) - min(df_centroids[,paste0("mean_",axis1)]))
+  aspect_ratio <- max(df_centroids[,paste0("mean_x",axis2)]) - min(df_centroids[,paste0("mean_x",axis2)])
+  aspect_ratio <- aspect_ratio/(max(df_centroids[,paste0("mean_x",axis1)]) - min(df_centroids[,paste0("mean_x",axis1)]))
   img_height <- aspect_ratio*img_width
   ggsave(paste0(GP_plot_dir,level,"/",plot_save_name), plot=p, scale=2,
          width=img_width, height=img_height, units="in", dpi=100)
@@ -644,11 +621,11 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv
     df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels),
                                             annotation=label_type, sname_list=sname_list))
   }
-  plot_axes(df, df_centroids, "x1", "x2", label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, "x2", "x3", label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, "x3", "x4", label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, "x4", "x5", label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, "x5", "x6", label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 1, 2, label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 2, 3, label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 3, 4, label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 100, 101, label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 200, 201, label_type, legend=legend, save_tag=indiv)
 }
 
 # ====================================================================================================================

@@ -20,8 +20,10 @@ if(length(individuals) == 0) {
 
 # update plot_ribbons_individual to facet_wrap multiple individuals!
 
-plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=predict_coords)
+#plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=predict_coords)
 
 #plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=TRUE, predict_coords=NULL)
 
 #plot_ribbons_individuals(individuals, level, timecourse=TRUE, covcor=TRUE, predict_coords=NULL)
+
+plot_ribbons_individuals(individuals, level, timecourse=TRUE, covcor=FALSE, predict_coords=NULL)

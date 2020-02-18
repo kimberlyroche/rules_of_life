@@ -4,25 +4,24 @@ source("include/R/general.R")
 source("include/R/GP.R")
 
 levels <- c("phylum", "family", "genus")
-levels <- c("genus")
 
 for(level in levels) {
   cat("Level:",level,"\n\n")
 
   if(level == "phylum") {
-    se_weight <- sqrt(1.956)
-    per_weight <- sqrt(0.217)
-    wn_weight <- sqrt(0.233)
+    se_weight <- sqrt(2.052)
+    per_weight <- sqrt(0.228)
+    alr_ref <- 9
   }
   if(level == "family") {
-    se_weight <- sqrt(2.090)
-    per_weight <- sqrt(0.232)
-    wn_weight <- sqrt(0.381)
+    se_weight <- sqrt(2.586)
+    per_weight <- sqrt(0.287)
+    alr_ref <- 22
   }
   if(level == "genus") {
-    se_weight <- sqrt(2.048)
-    per_weight <- sqrt(0.228)
-    wn_weight <- sqrt(0.416)
+    se_weight <- sqrt(2.632)
+    per_weight <- sqrt(0.292)
+    alr_ref <- 59
   }
 
   baboons <- sort(sname_list)
@@ -32,8 +31,8 @@ for(level in levels) {
   V <- NULL
   for(i in 1:length(baboons)) {
     baboon <- baboons[i]
-    fit_obj <- fit_GP(baboon, level, se_weight=se_weight, per_weight=per_weight, wn_weight=wn_weight,
-                      dd_se=90, save_append="", date_lower_limit=NULL, date_upper_limit=NULL, verbose=FALSE, mean_only=TRUE)
+    fit_obj <- fit_GP(baboon, level, se_weight=se_weight, per_weight=per_weight, wn_weight=0,
+                      alr_ref=alr_ref, dd_se=90, save_append="", date_lower_limit=NULL, date_upper_limit=NULL, verbose=FALSE, mean_only=TRUE)
     dim(fit_obj$fit$Eta) <- c(nrow(fit_obj$fit$Eta), ncol(fit_obj$fit$Eta), 1)
     dim(fit_obj$fit$Lambda) <- c(nrow(fit_obj$fit$Lambda), ncol(fit_obj$fit$Lambda), 1)
     dim(fit_obj$fit$Sigma) <- c(nrow(fit_obj$fit$Sigma), ncol(fit_obj$fit$Sigma), 1)
