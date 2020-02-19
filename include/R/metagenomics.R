@@ -1,4 +1,6 @@
-source("include/R/general.R")
+base_path <- "/data/mukherjeelab/rulesoflife"
+
+source(file.path(base_path,"include/R/general.R"))
 
 # ====================================================================================================================
 # METAGENOMICS FILE HANDLING
@@ -9,11 +11,11 @@ source("include/R/general.R")
 # returns a matrix where rows (and rownames) are enzymes and columns (and column names) are unordered samples
 read_metagenomics <- function(metadata, subset=TRUE) {
   # subset=TRUE -- just read in the "Filtered_enzymes.txt" shortlist
-  piphillin_dir <- paste0(data_dir,"Piphillin_20190222")
+  piphillin_dir <- file.path(data_dir,"Piphillin_20190222")
   if(subset) {
     piphillin_file <- "Filtered_enzymes.txt"
     # removed "Enzymes" header at (1,1) in Filtered_enzymes.txt
-    whole_dataset <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
+    whole_dataset <- as.matrix(read.table(file=file.path(piphillin_dir,piphillin_file), sep='\t',
                                            stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
     samples <- colnames(whole_dataset)
   } else {
@@ -21,7 +23,7 @@ read_metagenomics <- function(metadata, subset=TRUE) {
     for(i in 1:12) {
       cat("Reading part",i,"\n")
       piphillin_file <- paste("enzymes_pt",i,".txt",sep="")
-      data.piphillin <- as.matrix(read.table(file=paste(piphillin_dir,piphillin_file,sep="/"), sep='\t',
+      data.piphillin <- as.matrix(read.table(file=file.path(piphillin_dir,piphillin_file), sep='\t',
                                              stringsAsFactors=FALSE, header=TRUE, check.names=FALSE))
       enzymes <- data.piphillin[,1]
       data.piphillin <- data.piphillin[,2:dim(data.piphillin)[2]]

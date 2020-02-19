@@ -1,8 +1,11 @@
-source("include/R/general.R")
-source("include/R/metagenomics.R")
-sourceCpp("include/cpp/Riemann_dist.cpp")
+base_path <- "/data/mukherjeelab/rulesoflife"
 
-GP_plot_dir <- paste0(plot_dir,"basset/")
+source(file.path(base_path,"include/R/general.R"))
+#source(file.path(base_path,"include/R/metagenomics.R"))
+
+sourceCpp(file.path(base_path,"include/cpp/Riemann_dist.cpp"))
+
+GP_plot_dir <- file.path(plot_dir,"basset")
 
 # ====================================================================================================================
 # ADDITIONAL GP KERNELS
@@ -164,10 +167,10 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 
   # otherwise, save the full posterior sample set
   if(mean_only) {
-    saveRDS(fit_obj, paste0(model_dir,level,"_MAP/",baboon,"_bassetfit",save_append,".rds"))
+    saveRDS(fit_obj, file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,"_bassetfit",save_append,".rds")))
     return(fit_obj)
   } else {
-    saveRDS(fit_obj, paste0(model_dir,level,"/",baboon,"_bassetfit",save_append,".rds"))
+    saveRDS(fit_obj, file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit",save_append,".rds")))
   }
 
 }
@@ -192,9 +195,9 @@ get_fitted_modellist <- function(level="family", MAP=FALSE) {
   pattern_str <- "*_bassetfit.rds"
   regexpr_str <- "_bassetfit.rds"
   if(MAP) {
-    level_dir <- paste0(model_dir,level,"_MAP")
+    level_dir <- file.path(base_path,model_dir,paste0(level,"_MAP"))
   } else {
-    level_dir <- paste0(model_dir,level)
+    level_dir <- file.path(base_path,model_dir,level)
   }
   fitted_models <- list.files(path=level_dir, pattern=pattern_str, full.names=TRUE, recursive=FALSE)
   return(list(fitted_models=fitted_models,
@@ -209,9 +212,9 @@ get_fitted_modellist_details <- function(level="family", MAP=FALSE) {
   names(individuals) <- NULL
   # parse dimensions
   if(MAP) {
-    path <- paste0(model_dir,level,"_MAP/",individuals[1],fitted_models$regexpr_str)
+    path <- file.path(base_path,model_dir,paste0(level,"_MAP/",individuals[1],fitted_models$regexpr_str))
   } else {
-    path <- paste0(model_dir,level,"/",individuals[1],fitted_models$regexpr_str)
+    path <- file.path(base_path,model_dir,paste0(level,"/",individuals[1],fitted_models$regexpr_str))
   }
   fit_obj <- readRDS(path)
   return(list(individuals=individuals,
@@ -276,11 +279,11 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
     }
   }
   
-  dist_fn <- paste0(output_dir,"saved_distance_",which_measure,"_",level)
+  dist_fn <- file.path(base_path,output_dir,paste0("saved_distance_",which_measure,"_",level))
   if(MAP) {
-    dist_fn <- paste0(dist_fn, "_MAP")
+    dist_fn <- paste0(dist_fn,"_MAP")
   }
-  dist_fn <- paste0(dist_fn, ".rds")
+  dist_fn <- paste0(dist_fn,".rds")
   if(which_measure == "Sigma") {
     if(file.exists(dist_fn)) {
       distance_mat <- readRDS(dist_fn)
@@ -349,7 +352,7 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   cat("\tEigenvalue #6:",fit$eig[6]," (% variance:",round(abs(fit$eig[6])/eig_tot,2),")\n")
   cat("\tEigenvalue #7:",fit$eig[7]," (% variance:",round(abs(fit$eig[7])/eig_tot,2),")\n")
 
-  saveRDS(fit, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_raw.rds"))
+  saveRDS(fit, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_raw.rds")))
   cat("Embedding has",ncol(fit$points),"dimensions...\n")
   
   # save first 6 coordinates (arbitrarily)
@@ -358,9 +361,9 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
     df <- rbind(df, data.frame(coord=rep(i, nrow(fit$points)), value=fit$points[,i], labels=indiv_labels))
   }
   if(is.null(indiv)) {
-    saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
+    saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination.rds")))
   } else {
-    saveRDS(df, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_",indiv,".rds"))
+    saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_",indiv,".rds")))
   }
   
   # centroids are useful for labeling plots
@@ -385,9 +388,9 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   } 
 
   if(is.null(indiv)) {
-    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+    saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids.rds")))
   } else {
-    saveRDS(df_centroids, paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids_",indiv,".rds"))
+    saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids_",indiv,".rds")))
   }
 }
 
@@ -396,7 +399,7 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
 # ====================================================================================================================
 
 load_outcomes <- function() {
-  outcomes <- read.csv(paste0(data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
+  outcomes <- read.csv(file.path(base_path,data_dir,"fitness/IndividualTraits_ForKim.csv"), header=TRUE)
   # note: may need to change this filtration eventually
   outcomes <- outcomes[outcomes$sname %in% sname_list,]
   # filter to NA-less measures
@@ -602,7 +605,7 @@ plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="indiv
   aspect_ratio <- max(df_centroids[,paste0("mean_x",axis2)]) - min(df_centroids[,paste0("mean_x",axis2)])
   aspect_ratio <- aspect_ratio/(max(df_centroids[,paste0("mean_x",axis1)]) - min(df_centroids[,paste0("mean_x",axis1)]))
   img_height <- aspect_ratio*img_width
-  ggsave(paste0(GP_plot_dir,level,"/",plot_save_name), plot=p, scale=2,
+  ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",plot_save_name)), plot=p, scale=2,
          width=img_width, height=img_height, units="in", dpi=100)
 }
 
@@ -610,11 +613,11 @@ plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="indiv
 # allowable (label_types) values are: individual, group, counts, density
 plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv=NULL, sname_list=NULL) {
   if(is.null(indiv)) {
-    df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination.rds"))
-    df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids.rds"))
+    df <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination.rds")))
+    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids.rds")))
   } else {
-    df <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_",indiv,".rds"))
-    df_centroids <- readRDS(paste0(GP_plot_dir,level,"/",which_measure,"_ordination_centroids_",indiv,".rds"))
+    df <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_",indiv,".rds")))
+    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids_",indiv,".rds")))
   }
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
@@ -638,7 +641,7 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv
 #   level is taxonomic level (e.g. family)
 #   no_indiv are # individuals at each extreme to visualize
 plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="extreme_Lambda") {
-  df_centroids <- readRDS(paste0(GP_plot_dir,level,"/Lambda_ordination_centroids.rds"))
+  df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/Lambda_ordination_centroids.rds")))
   min_sort <- df_centroids %>% arrange(get(coordinate))
   min_cohort <- as.vector(unlist(min_sort[1:no_indiv,"labels"]))
   max_sort <- df_centroids %>% arrange(desc(get(coordinate)))
@@ -649,7 +652,7 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
   allLambda <- NULL
   for(baboon in c(min_cohort, max_cohort)) {
     cat("Loading individual",baboon,"(1)\n")
-    fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
+    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
     fit.clr <- to_clr(fix_dims_fit(fit_obj$fit))
     Lambda <- fit.clr$Lambda
     collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
@@ -675,7 +678,7 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
   
   for(baboon in c(min_cohort, max_cohort)) {
     cat("Loading individual",baboon,"(2)\n")
-    fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
+    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
     fit.clr <- to_clr(fix_dims_fit(fit_obj$fit))
     Lambda <- fit.clr$Lambda
     collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
@@ -686,7 +689,7 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
                                enzyme=as.factor(1:length(avgProp)), proportion=avgProp))
   }
   df$sample <- as.factor(df$sample)
-  plot_timecourse_metagenomics(df, save_filename=paste0(GP_plot_dir,level,"/",save_filename,"_",coordinate), legend=TRUE)
+  plot_timecourse_metagenomics(df, save_filename=file.path(base_path,GP_plot_dir,paste0(level,"/",save_filename,"_",coordinate)), legend=TRUE)
 }
 
 # plot the diagonal of the element-wise mean covariance across individuals in a single heatmap
@@ -699,7 +702,7 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
   pattern_str <- indiv_obj$pattern_str
   regexpr_str <- indiv_obj$regexpr_str
   
-  fit_obj <- readRDS(paste0(model_dir,level,"/",individuals[1],regexpr_str))
+  fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",individuals[1],regexpr_str)))
   D <- nrow(fit_obj$Y)
   P <- D
   if(lrtransform == "alr" | lrtransform == "ilr") {
@@ -711,7 +714,7 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
   for(i in 1:length(individuals)) {
     baboon <- individuals[i]
     cat("Loading fit for",baboon,"\n")
-    fit <- fix_dims_fit(readRDS(paste0(model_dir,level,"/",baboon,regexpr_str))$fit)
+    fit <- fix_dims_fit(readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,regexpr_str)))$fit)
     clr_ys <- driver::clr(t(fit$Y) + pc)
     tax_var <- apply(clr_ys, 2, sd)
     if(lrtransform == "clr") {
@@ -743,7 +746,7 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
     geom_tile(aes(fill = value), colour = "white") +
     scale_fill_gradient2(low = "white", high = "darkred") +
     theme(axis.text.x = element_text(face="bold", size=17, angle=90))
-  ggsave(paste0(GP_plot_dir,level,"/all_Sigma_diag_",lrtransform,".png"), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
+  ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/all_Sigma_diag_",lrtransform,".png")), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
 }
 
 # ====================================================================================================================
@@ -800,7 +803,7 @@ plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NUL
   if(is.null(save_filename)) {
     show(p)
   } else {
-    ggsave(paste0(GP_plot_dir,level,"/",save_filename,".png"), scale=2, width=12, height=1.5, units="in", dpi=100)
+    ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",save_filename,".png")), scale=2, width=12, height=1.5, units="in", dpi=100)
   }
 }
 
@@ -815,12 +818,12 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
     indiv_data <- subset_samples(data, sname==baboon)
     if(timecourse) {
       cat("\tPlotting timecourse...\n")
-      plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse"), gapped=FALSE, 
+      plot_timecourse_phyloseq(indiv_data, file.path(base_path,GP_plot_dir,paste0(level,"/",baboon,"_timecourse")), gapped=FALSE, 
                                legend=TRUE, legend_level=level)
-      #plot_timecourse_phyloseq(indiv_data, paste0(GP_plot_dir,level,"/",baboon,"_timecourse_gapped"), gapped=TRUE, 
+      #plot_timecourse_phyloseq(indiv_data, file.path(base_path,GP_plot_dir,paste0(level,"/",baboon,"_timecourse_gapped")), gapped=TRUE, 
       #                         legend=FALSE, legend_level=level)
     }
-    fit_obj <- readRDS(paste0(model_dir,level,"/",baboon,"_bassetfit.rds"))
+    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
     if(covcor) {
       cat(paste0("Plotting element-wise mean covariance/correlation for individual '",baboon,"'...\n"))
       fit_obj$fit <- fix_dims_fit(fit_obj$fit)
@@ -832,13 +835,13 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       p <- ggplot(df, aes(feature_row, feature_col)) +
         geom_tile(aes(fill = value), colour = "white") +
         scale_fill_gradient2(low = "darkblue", mid = "white", high = "darkred")
-      ggsave(paste0(GP_plot_dir,level,"/",baboon,"_mean_cov.png"), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
+      ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",baboon,"_mean_cov.png")), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
       meanSigma_corr <- cov2cor(meanSigma)
       df <- driver::gather_array(meanSigma_corr, "value", "feature_row", "feature_col")
       p <- ggplot(df, aes(feature_row, feature_col)) +
         geom_tile(aes(fill = value), colour = "white") +
         scale_fill_gradient2(low = "darkblue", mid = "white", high = "darkred")
-      ggsave(paste0(GP_plot_dir,level,"/",baboon,"_mean_corr.png"), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
+      ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",baboon,"_mean_corr.png")), plot=p, scale=1.5, width=7, height=6, units="in", dpi=72)
     }
     if(!is.null(predict_coords) & length(predict_coords) > 0) {
       cat(paste0("Generating predictive plots for individual '",baboon,"'...\n"))

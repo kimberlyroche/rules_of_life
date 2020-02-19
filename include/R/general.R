@@ -12,14 +12,18 @@ library(RColorBrewer)
 library(tidyverse)
 library(stringr)
 
-data_dir <- "data/"
-output_dir <- "output/"
-model_dir <- "output/model_fits/"
-plot_dir <- "output/plots/"
+data_dir <- "input"
+output_dir <- "output"
+model_dir <- "output/model_fits"
+plot_dir <- "output/plots"
 
 pc <- 0.5
 
-sourceCpp("include/cpp/fast_corr.cpp")
+base_path <- "/data/mukherjeelab/rulesoflife"
+
+sourceCpp(file.path(base_path,"include/cpp/fast_corr.cpp"))
+
+test <- readRDS(file.path(base_path,data_dir,"filtered_idx_class_5_20.rds"))
 
 # these lists were generated manually
 # 10 max-sampled individuals
@@ -141,14 +145,14 @@ read_metadata <- function(data, write_sample=FALSE) {
 
 load_glommed_data <- function(level="species", replicates=TRUE) {
   if(replicates) {
-    filename <- paste0(data_dir,"glom_data_",level,"_reps_tree.rds")
+    filename <- file.path(base_path,data_dir,paste0("glom_data_",level,"_reps_tree.rds"))
     if(file.exists(filename)) {
       glom_data <- readRDS(filename)
     } else {
       stop(paste0("Agglomerated data file for ",level," (+replicates) does not exist:",filename))
     }
   } else {
-    filename <- paste0(data_dir,"glom_data_",level,".rds")
+    filename <- file.path(base_path,data_dir,paste0("glom_data_",level,".rds"))
     if(file.exists(filename)) {
       glom_data <- readRDS(filename)
     } else {
@@ -170,7 +174,7 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
 
 filter_data <- function(data, level="genus", count_threshold=5, sample_threshold=20, verbose=TRUE) {
   cat("Filtering data at level",level,"with count threshold",count_threshold,"and sample threshold",sample_threshold,"\n")
-  filter_fn <- paste0(data_dir,"filtered_",level,"_",count_threshold,"_",sample_threshold,".rds")
+  filter_fn <- file.path(base_path,data_dir,paste0("filtered_",level,"_",count_threshold,"_",sample_threshold,".rds"))
   if(!file.exists(filter_fn)) {
     snames <- unique(sample_data(data)$sname)
     counts <- otu_table(data)@.Data
@@ -186,7 +190,7 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
       keep_indices <- keep_indices & keep_indices_indiv
     }
     collapse_indices <- !keep_indices
-    saveRDS(collapse_indices, paste0(data_dir,"filtered_idx_",level,"_",count_threshold,"_",sample_threshold,".rds"))
+    saveRDS(collapse_indices, file.path(base_path,data_dir,paste0("filtered_idx_",level,"_",count_threshold,"_",sample_threshold,".rds")))
     # collapse mitochondria too
     tt <- tax_table(data)@.Data
     collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE

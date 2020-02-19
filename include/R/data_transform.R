@@ -1,4 +1,6 @@
-source("include/R/general.R")
+base_path <- "/data/mukherjeelab/rulesoflife"
+
+source(file.path(base_path,"include/R/general.R"))
 
 # ====================================================================================================================
 # DATA TRANSFORMATION, ETC.
@@ -12,7 +14,7 @@ date_to_num <- function(date, baseline="2000-04-21") {
 
 filter_data_omit <- function(count_threshold=3, sample_threshold=0.9, data=NULL) {
   if(is.null(data)) {
-    load("glom_data_genus.RData")
+    load(file.path(data_dir,"glom_data_genus.RData"))
     #cat("Zero counts (glommed data):",(1 - get_tiny_counts(glom_data, 1)),"\n")
     filtered <- filter_counts(glom_data, count_threshold, sample_threshold)
     #cat("Zero counts (filtered data):",(1 - get_tiny_counts(filtered, 1)),"\n")

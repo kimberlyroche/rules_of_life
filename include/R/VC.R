@@ -1,6 +1,9 @@
-source("include/R/general.R")
-source("include/R/data_transform.R")
-sourceCpp("include/cpp/dens_optim.cpp")
+base_path <- "/data/mukherjeelab/rulesoflife"
+
+source(file.path(base_path,"include/R/general.R"))
+source(file.path(base_path,"include/R/data_transform.R"))
+
+sourceCpp(file.path(base_path,"include/cpp/dens_optim.cpp"))
 
 # ====================================================================================================================
 # ESTIMATION OF VARIANCE COMPONENTS
@@ -15,7 +18,7 @@ plot_cov <- function(datamat, filename) {
     ylab("samples") +
     theme_minimal() +
     guides(fill=guide_legend(title="covariance"))
-  ggsave(paste(plot_dir,filename,".png",sep=""), plot=p, scale=1.5, width=4, height=3, units="in")
+  ggsave(file.path(base_path,plot_dir,paste0(filename,".png")), plot=p, scale=1.5, width=4, height=3, units="in")
 }
 
 # pass in zero-filtered data
