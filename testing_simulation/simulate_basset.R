@@ -5,6 +5,8 @@
 # concretely we simulate from two setups:
 #   setup=1: similar base compositions (Theta), different dynamics (Sigma)
 #   setup=2: different base compositions (Theta), same dynamics (Sigma)
+#   setup=3: similar base compositions (Theta), same dynamics (Sigma); this is a sanity check as
+#            the only difference between individuals is noise!
 
 relative_path <- ".."
 
@@ -15,17 +17,19 @@ library(driver)
 library(ggplot2)
 library(gridExtra)
 
+source(file.path(relative_path,"include/R/general.R"))
+
 sourceCpp(file.path(relative_path,"include/cpp/Riemann_dist.cpp"))
 
 # in all cases, simulate data (up to counts), fit model, and assess Sigma true vs.
 # Sigma posteriors via PCoA
 
-setup <- 1
+setup <- 3
 
 D <- 20
 N <- 20
 K <- 10 # number of individuals to simulate 
-n_samples <- 100 # posterior samples
+n_samples <- 50 # posterior samples
 
 # time index
 X <- matrix(1:N, 1, N)
@@ -55,7 +59,7 @@ Sigmas <- matrix(NA, D-1, K*(D-1)*(n_samples+1)) # true + posterior sampled
 # | (D-1) x (D-1) | (D-1) x (D-1) | (D-1) x (D-1) |               | (D-1) x (D-1) | (D-1) x (D-1) |
 # ----------------------------------------------------------------------------------------------------------- -
 #
-# Sigma_list <- list() # this is just redundant (temporary) storage of true Sigmas so I can double check my indexing
+Sigma_list <- list() # this is just redundant (temporary) storage of true Sigmas so I can double check my indexing
 
 # convenience function
 get_Sigma_samples <- function(k, all_samples, D, n_samples) {
@@ -80,7 +84,7 @@ labels <- data.frame(status=c(), k=c())
 
 # construct `Thetas` in a first pass, since Theta_fn will need to reference it
 for(k in 1:K) {
-  if(setup == 1) {
+  if(setup == 1 | setup == 3) {
     # all individuals will have the same baseline composition but different (random) dynamics
     if(k == 1) {
       Theta <- rnorm(D-1, 0, 1.5)
@@ -88,9 +92,9 @@ for(k in 1:K) {
       Theta <- Thetas[,1]
     }
     Thetas[,k] <- Theta
-  } else {
+  } else if(setup == 2) {
     # all individuals will have the different (random) baseline compositions but the same dynamics
-    Theta <- rnorm(D-1, 0, 2)
+    Theta <- rnorm(D-1, 0, 1.5)
     Thetas[,k] <- Theta
   }
 }
@@ -103,10 +107,10 @@ Xs <- list()
 for(k in 1:K) {
   cat("Generating data set",k,"...\n")
   if(setup == 1) {
-    Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
-  } else {
+    Sigma <- matrixsampling::rinvwishart(1, upsilon, Xi)[,,1]
+  } else if(setup == 2 | setup == 3) {
     if(k == 1) {
-      Sigma <- rinvwishart(1, upsilon, Xi)[,,1]
+      Sigma <- matrixsampling::rinvwishart(1, upsilon, Xi)[,,1]
     } else {
       Sigma <- Sigmas[,1:(D-1)]
     }
@@ -116,7 +120,7 @@ for(k in 1:K) {
   truth_idx1 <- (k-1)*(D-1)*(n_samples+1)+1
   truth_idx2 <- truth_idx1 + (D-1) - 1
   Sigmas[,truth_idx1:truth_idx2] <- Sigma
-  #Sigma_list[[k]] <- Sigma
+  Sigma_list[[k]] <- Sigmas[,truth_idx1:truth_idx2]
   Xs[[k]] <- rbind(X, k)
   Lambda <- rmatrixnormal(1, Theta_fn(Xs[[k]]), Sigma, Gamma_fn(rbind(X, k)))[,,1]
   Lambdas[[k]] <- Lambda
@@ -137,8 +141,10 @@ for(k in 1:K) {
     theme(legend.position = "none")
   if(setup == 1) {
     ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_diff_dynamics_path_",k,".png")), p, units="in", dpi=150, height=4, width=10)
-  } else {
+  } else if(setup == 2) {
     ggsave(file.path(relative_path,plot_dir,paste0("diff_baseline_same_dynamics_path_",k,".png")), p, units="in", dpi=150, height=4, width=10)
+  } else {
+    ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_same_dynamics_path_",k,".png")), p, units="in", dpi=150, height=4, width=10)
   }
   
   # sanity check; plot as proportions
@@ -149,8 +155,10 @@ for(k in 1:K) {
     theme(legend.position = "none")
   if(setup == 1) {
     ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_diff_dynamics_barplot_",k,".png")), p, units="in", dpi=150, height=4, width=10)
-  } else {
+  } else if(setup == 2) {
     ggsave(file.path(relative_path,plot_dir,paste0("diff_baseline_same_dynamics_barplot_",k,".png")), p, units="in", dpi=150, height=4, width=10)
+  } else {
+    ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_same_dynamics_barplot_",k,".png")), p, units="in", dpi=150, height=4, width=10)
   }
 
   fit <- basset(Y, rbind(X, k), upsilon, Theta_fn, Gamma_fn, Xi, n_samples=0, ret_mean=TRUE)
@@ -180,7 +188,7 @@ if(do_spike_in) {
     left <- offset + 1
     right <- offset + (D-1)
     upsilon <- (D-1) + 2 + 50
-    spike_in[,left:right] <- rinvwishart(1, upsilon, spike_in[,1:(D-1)]*(upsilon - (D-1) - 1))[,,1]
+    spike_in[,left:right] <- matrixsampling::rinvwishart(1, upsilon, spike_in[,1:(D-1)]*(upsilon - (D-1) - 1))[,,1]
   }
   Sigmas <- cbind(Sigmas, spike_in)
   labels <- rbind(labels, data.frame(status=c("truth", rep("fitted", n_samples)), k=rep(0, n_samples+1)))
@@ -191,19 +199,21 @@ if(do_spike_in) {
   }
 }
 
+d <- Riemann_dist_samples(Sigmas, K, n_samples+1)
+
 # not fast
 # for D=20 / N=20 / K=10 / n_samples=100 this takes about 1 min.
-n_Sigma <- ncol(Sigmas)/(D-1)
-d <- matrix(NA, n_Sigma, n_Sigma)
-for(i in 1:n_Sigma) {
-  for(j in 1:n_Sigma) {
-    if(i <= j) {
-      d[i,j] <- Riemann_dist_pair(Sigmas[,((i-1)*(D-1)+1):(i*(D-1))], Sigmas[,((j-1)*(D-1)+1):(j*(D-1))])
-    } else {
-      d[i,j] <- d[j,i]
-    }
-  }
-}
+# n_Sigma <- ncol(Sigmas)/(D-1)
+# d <- matrix(NA, n_Sigma, n_Sigma)
+# for(i in 1:n_Sigma) {
+#  for(j in 1:n_Sigma) {
+#    if(i <= j) {
+#      d[i,j] <- Riemann_dist_pair(Sigmas[,((i-1)*(D-1)+1):(i*(D-1))], Sigmas[,((j-1)*(D-1)+1):(j*(D-1))])
+#    } else {
+#      d[i,j] <- d[j,i]
+#    }
+#  }
+#}
 
 # embed this inferred Sigmas and the true Sigmas to see if the inferred stuff is "too similar"
 embedding <- cmdscale(d, k=4)
@@ -213,9 +223,9 @@ df <- data.frame(x1=embedding[,1], x2=embedding[,2],
 fitted_point_sz <- 2
 truth_point_size <- 4
 p1 <- ggplot() +
-  geom_point(data=df[df$type=="fitted",], aes(x=x1, y=x2, color=indiv), size=fitted_point_sz) +
   geom_point(data=df[df$type=="truth",], aes(x=x1, y=x2), color="black", size=(truth_point_size*1.3), shape=17) +
   geom_point(data=df[df$type=="truth",], aes(x=x1, y=x2, color=indiv), size=truth_point_size, shape=17) +
+  geom_point(data=df[df$type=="fitted",], aes(x=x1, y=x2, color=indiv), size=fitted_point_sz) +
   xlab("PCoA 1") +
   ylab("PCoA 2")
 
@@ -231,8 +241,10 @@ p2 <- ggplot() +
 p <- grid.arrange(p1, p2, nrow=1)
 if(setup == 1) {
   ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_diff_dynamics_PCA.png")), p, units="in", dpi=150, height=6, width=13)
-} else {
+} else if(setup == 2) {
   ggsave(file.path(relative_path,plot_dir,paste0("diff_baseline_same_dynamics_PCA.png")), p, units="in", dpi=150, height=6, width=13)
+} else {
+  ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_same_dynamics_PCA.png")), p, units="in", dpi=150, height=6, width=13)
 }
 
 plot_Sigma <- function(cov_mat, title) {
@@ -270,8 +282,10 @@ for(k in 1:Kplus) {
 p <- do.call("grid.arrange", c(append(plist_truth, plist_fitted), ncol=(Kplus)))
 if(setup == 1) {
   ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_diff_dynamics_Sigmas.png")), p, units="in", dpi=150, height=3.5, width=15)
-} else {
+} else if(setup == 2) {
   ggsave(file.path(relative_path,plot_dir,paste0("diff_baseline_same_dynamics_Sigmas.png")), p, units="in", dpi=150, height=3.5, width=15)
+} else {
+  ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_same_dynamics_Sigmas.png")), p, units="in", dpi=150, height=3.5, width=15)
 }
 
 # how tight are these posteriors? plot some estimates; eh... not really helpful
@@ -376,7 +390,7 @@ if(FALSE & setup == 2) {
   image(Lambdas[[idx2]])
   image(fits_MAP[[idx2]]$Lambda[,,1])
   
-  # posterior samples of Eta
+  # posterior samples of Lambda
   par(mfrow=c(4,3))
   image(Lambdas[[idx1]])
   for(i in 1:5) {
@@ -387,7 +401,7 @@ if(FALSE & setup == 2) {
     image(fits[[idx2]]$Lambda[,,i])
   }
   
-  # ordination of Eta
+  # ordination of Lambda
   Lambda_samples <- matrix(NA, 2*n_samples+2, (D-1)*N)
   Lambda_samples[1,] <- c(Lambdas[[idx1]])
   Lambda_labels <- c("baseline")
@@ -410,6 +424,36 @@ if(FALSE & setup == 2) {
   p1 <- ggplot() +
     geom_point(data=df[df$label!="baseline",], aes(x=x1, y=x2, color=label), size=fitted_point_sz) +
     geom_point(data=df[df$label=="baseline",], aes(x=x1, y=x2), size=truth_point_size, shape=17) +
+    xlab("PCoA 1") +
+    ylab("PCoA 2")
+  p1
+  
+  # ordination of ALL Lambdas
+  Lambda_samples <- matrix(NA, K*n_samples+K, (D-1)*N)
+  Lambda_labels <- c()
+  Lambda_types <- c()
+  for(k in 1:K) {
+    offset <- ((k-1)*(n_samples+1))+1
+    Lambda_samples[offset,] <- c(Lambdas[[k]])
+    Lambda_labels <- c(Lambda_labels, k)
+    Lambda_types <- c(Lambda_types, "baseline")
+    for(i in 1:n_samples) {
+      Lambda_samples[offset+i,] <- c(fits[[k]]$Lambda[,,i])
+      Lambda_labels <- c(Lambda_labels, k)
+      Lambda_types <- c(Lambda_types, "fit")
+    }
+  }
+  d_Lambda <- dist(Lambda_samples)
+  embedding <- cmdscale(d_Lambda, k=2)
+  df <- data.frame(x1=embedding[,1], x2=embedding[,2],
+                   label=as.factor(Lambda_labels),
+                   type=as.factor(Lambda_types))
+  fitted_point_sz <- 2
+  truth_point_size <- 4
+  p1 <- ggplot() +
+    geom_point(data=df[df$type!="baseline",], aes(x=x1, y=x2, color=label), size=fitted_point_sz) +
+    geom_point(data=df[df$type=="baseline",], aes(x=x1, y=x2), color="black", size=truth_point_size+1, shape=17) +
+    geom_point(data=df[df$type=="baseline",], aes(x=x1, y=x2, color=label), size=truth_point_size, shape=17) +
     xlab("PCoA 1") +
     ylab("PCoA 2")
   p1

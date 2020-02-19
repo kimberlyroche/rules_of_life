@@ -20,10 +20,9 @@ plot_dir <- "output/plots"
 pc <- 0.5
 
 base_path <- "/data/mukherjeelab/rulesoflife"
+base_path <- "C:/Users/kim/Documents/rules_of_life"
 
 sourceCpp(file.path(base_path,"include/cpp/fast_corr.cpp"))
-
-test <- readRDS(file.path(base_path,data_dir,"filtered_idx_class_5_20.rds"))
 
 # these lists were generated manually
 # 10 max-sampled individuals
