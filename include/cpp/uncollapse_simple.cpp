@@ -81,7 +81,18 @@ List uncollapse_simple(const Eigen::Map<Eigen::VectorXd> eta,
   return out;
 }
 
-
+// [[Rcpp::export]]
+Eigen::MatrixXd test_fn(const Eigen::Map<Eigen::MatrixXd> Gamma_oo,
+                                                  const Eigen::Map<Eigen::MatrixXd> Gamma_ou,
+                                                  const Eigen::Map<Eigen::MatrixXd> Gamma_uu){
+  // R code to replicate
+  //   Gamma_ooIou <- solve(Gamma_oo, Gamma_ou)
+  //   Gamma_schur <- Gamma_uu - t(Gamma_ou) %*% Gamma_ooIou 
+  //   U_Gamma_schur <- chol(Gamma_schur)
+  Eigen::MatrixXd Gamma_ooIou = Gamma_oo.lu().solve(Gamma_ou);
+  Eigen::MatrixXd Gamma_schur = Gamma_uu - Gamma_ou.transpose()*Gamma_ooIou;
+  return(Gamma_schur);
+}
 
 
 

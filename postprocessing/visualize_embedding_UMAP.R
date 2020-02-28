@@ -31,7 +31,7 @@ df <- data.frame(x=embedding$layout[,1], y=embedding$layout[,2], group=as.factor
 ggplot(df, aes(x=x, y=y, color=group)) +
   geom_point()
 
-# embed full; takes how long?
+# embed full; this takes a few minutes
 embedding_full <- umap(d_full, config=umap.defaults, method="naive")
 
 host_labels <- c()
@@ -39,6 +39,9 @@ for(host in sname_list) {
   host_labels <- c(host_labels, rep(host, n_samples))
 }
 
-df <- data.frame(x=embedding$layout[,1], y=embedding$layout[,2], host=as.factor(host_labels))
-ggplot(df, aes(x=x, y=y, host=label)) +
+# this is crazy but confirms the main points that individuals are:
+#    (1) fully distinct w/r/t their posteriors and 
+#    (2) continuously different
+df <- data.frame(x=embedding_full$layout[,1], y=embedding_full$layout[,2], host=as.factor(host_labels))
+ggplot(df, aes(x=x, y=y, color=host)) +
   geom_point()

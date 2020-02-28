@@ -8,91 +8,117 @@ relative_path <- ".."
 source(file.path(relative_path,"include/R/GP.R"))
 
 level <- "family"
-# pull all fitted models
-models <- get_fitted_modellist_details(level=level)
 
-Sigmas <- list()
-
-for(i in 1:length(models$individuals)) {
-  host <- models$individuals[i]
-  cat("Processing",host,"\n")
-  fit <- readRDS(models$model_list[i])$fit
-  dim(fit$Eta) <- c(dim(fit$Eta), 1)
-  dim(fit$Lambda) <- c(dim(fit$Lambda), 1)
-  dim(fit$Sigma) <- c(dim(fit$Sigma), 1)
-  fit.clr <- to_clr(fit)
-  Sigmas[[host]] <- fit.clr$Sigma[,,1]
-}
-
-ref <- readRDS(file.path(relative_path,data_dir,"filtered_family_5_20.rds"))
-tax <- tax_table(ref)@.Data
-labels <- as.vector(tax[,5])
-for(i in 1:length(labels)) {
-  if(i == 42) {
-    # this is "Other" category for family-level data filtered at 5-counts in 20% or more samples
-    labels[i] <- "CLR(Other)"
-  } else {
-    if(is.na(labels[i])) {
-      for(j in 4:1) {
-        if(!is.na(tax[i,j])) {
-          if(j == 1) {
-            labels[i] <- paste0("CLR(kingdom ",tax[i,j],")")
-          }
-          if(j == 2) {
-            labels[i] <- paste0("CLR(phylum ",tax[i,j],")")
-          }
-          if(j == 3) {
-            labels[i] <- paste0("CLR(class ",tax[i,j],")")
-          }
-          if(j == 4) {
-            labels[i] <- paste0("CLR(order ",tax[i,j],")")
-          }
-          break
-        }
-      }
+if(FALSE) {
+  
+  # pull all fitted models
+  models <- get_fitted_modellist_details(level=level, MAP=TRUE)
+  
+  Sigmas <- list()
+  
+  for(i in 1:length(models$individuals)) {
+    host <- models$individuals[i]
+    cat("Processing",host,"\n")
+    fit <- readRDS(models$model_list[i])$fit
+    # fit "incorrect number of dimensions error"
+    dim(fit$Eta) <- c(dim(fit$Eta), 1)
+    dim(fit$Lambda) <- c(dim(fit$Lambda), 1)
+    dim(fit$Sigma) <- c(dim(fit$Sigma), 1)
+    fit.clr <- to_clr(fit)
+    Sigmas[[host]] <- fit.clr$Sigma[,,1]
+  }
+  
+  # build some readable labels
+  ref <- readRDS(file.path(relative_path,data_dir,"filtered_family_5_20.rds"))
+  tax <- tax_table(ref)@.Data
+  labels <- as.vector(tax[,5])
+  for(i in 1:length(labels)) {
+    if(i == 42) {
+      # this is "Other" category for family-level data filtered at 5-counts in 20% or more samples
+      labels[i] <- "CLR(Other)"
     } else {
-      labels[i] <- paste0("CLR(family ",labels[i],")")
+      if(is.na(labels[i])) {
+        for(j in 4:1) {
+          if(!is.na(tax[i,j])) {
+            if(j == 1) {
+              labels[i] <- paste0("CLR(kingdom ",tax[i,j],")")
+            }
+            if(j == 2) {
+              labels[i] <- paste0("CLR(phylum ",tax[i,j],")")
+            }
+            if(j == 3) {
+              labels[i] <- paste0("CLR(class ",tax[i,j],")")
+            }
+            if(j == 4) {
+              labels[i] <- paste0("CLR(order ",tax[i,j],")")
+            }
+            break
+          }
+        }
+      } else {
+        labels[i] <- paste0("CLR(family ",labels[i],")")
+      }
     }
   }
-}
-
-# columns are taxa
-ref.clr <- driver::clr(otu_table(ref)@.Data + 0.5)
-mean.clr <- apply(ref.clr, 2, mean)
-
-hosts <- models$individuals
-correlations <- data.frame(taxon=c(), pair=c(), value=c(), meanclr=c())
-for(i in 1:models$D) {
-  for(h1 in 1:(length(hosts)-1)) {
-    for(h2 in (h1+1):length(hosts)) {
-      # unique pair of individuals
-      host1 <- hosts[h1]
-      host2 <- hosts[h2]
-      cat("Comparing",host1,"and",host2,"on taxon",labels[i],"(",i,")...\n")
-      correlations <- rbind(correlations,
-                            data.frame(taxon=labels[i],
-                                       pair=paste0(host1,"x",host2),
-                                       value=cor(Sigmas[[host1]][i,], Sigmas[[host2]][i,]),
-                                       meanclr=mean.clr[i]))
+  
+  # build a map from which we can translate an interaction number with the original pair of taxa
+  # (I'm sure there's a more elegant way to do this)
+  label_pairs <- matrix(NA, models$D, models$D)
+  for(i in 1:models$D) {
+    for(j in 1:models$D) {
+      if(i < j) {
+        label_pairs[i,j] <- paste0(i,"_",j)
+      }
     }
   }
+  label_pairs <- label_pairs[upper.tri(label_pairs, diag=F)]
+  
+  # plot all in heatmap as hosts x pairs of microbial interaction
+  interaction_no <- (models$D^2)/2 - models$D/2
+  interaction_pairs <- matrix(NA, length(models$individuals), interaction_no)
+  for(i in 1:length(models$individuals)) {
+    host <- models$individuals[i]
+    # convert this host's MAP covariance to correlation
+    corr_mat <- cov2cor(Sigmas[[host]])
+    # stack all unique pairwise correlations between microbes in a row associated with this host
+    interaction_pairs[i,] <- corr_mat[upper.tri(Sigmas[[host]], diag=F)]
+  }
+  
+  # get distance of each pair
+  d <- dist(t(interaction_pairs))
+  clustering <- hclust(d)
+  
+  # reorder
+  interaction_pairs <- interaction_pairs[,clustering$order]
+  
+  avg_interaction <- colMeans(interaction_pairs)
+  
+  # get strong-ish average interactions
+  interesting_idx <- which(abs(avg_interaction) >= 0.4)
+  for(p_idx in interesting_idx) {
+    interesting_pair <- label_pairs[p_idx]
+    microbe_pair <- as.numeric(strsplit(interesting_pair, "_")[[1]])
+    cat("Interesting pair (",p_idx,"):",labels[microbe_pair[1]],",",labels[microbe_pair[2]],"\n")
+  }
+  
+  # plot heatmap
+  df <- gather_array(interaction_pairs, "correlation", "host", "pair")
+  p <- ggplot(df, aes(pair, host)) +
+    geom_tile(aes(fill = correlation), colour = "white") +
+    scale_fill_gradient2(low = "darkblue", high = "darkred")
+  ggsave(file.path(relative_path,plot_dir,"microbe_pair_correlations.png"), p, units="in", dpi=150, height=5, width=15)
+  
+  # sample across some random hosts; do these taxa actually appear correlated at the level of log relative abundances?
+  microbe_pair <- as.numeric(strsplit(label_pairs[1], "_")[[1]])
+  sampled_hosts <- models$individuals[sample(1:length(models$individuals))[1:2]]
+  # fits <- list()
+  # for(host in sampled_hosts) {
+  #   # get full posteriors
+  #   fits[[host]] <- readRDS(file.path(relative_path,model_dir,level,paste0(host,"_bassetfit.rds")))
+  #   # sanity check universal pairs via predictive plots
+  #   plot_ribbons_individuals(c("CRU"), level, timecourse=FALSE, covcor=FALSE, predict_coords=c(1))
+  # }
+  
 }
-
-saveRDS(Sigmas, file.path(relative_path,output_dir,"Sigmas.rds"))
-saveRDS(correlations, file.path(relative_path,output_dir,"correlations.rds"))
-
-p <- ggplot(correlations, aes(value)) +
-     geom_density(aes(color=meanclr)) +
-     facet_wrap(~ taxon, ncol=10) +
-     scale_color_gradient(low='blue', high='red')
-ggsave(file.path(relative_path,plot_dir,"universal_microbes.png"), plot=p, dpi=100, units="in", height=10, width=20)
-
-mean_ranked <- as.data.frame(correlations %>% group_by(taxon) %>% summarize(mean_value = mean(value)))
-head(mean_ranked)
-
-med_ranked <- as.data.frame(correlations %>% group_by(taxon) %>% summarize(median_value = median(value)))
-head(med_ranked)
-
-med_ranked[order(med_ranked$median_value),]
 
 

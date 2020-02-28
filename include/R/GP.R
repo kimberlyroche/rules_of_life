@@ -1,7 +1,7 @@
-base_path <- "/data/mukherjeelab/rulesoflife"
+#base_path <- "/data/mukherjeelab/rulesoflife"
+base_path <- "C:/Users/kim/Documents/rules_of_life"
 
 source(file.path(base_path,"include/R/general.R"))
-#source(file.path(base_path,"include/R/metagenomics.R"))
 
 sourceCpp(file.path(base_path,"include/cpp/Riemann_dist.cpp"))
 
