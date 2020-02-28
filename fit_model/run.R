@@ -21,58 +21,56 @@ if(length(args) >= 3) {
   mean_only <- as.logical(args[3])
 }
 if(length(args) >= 4) {
-  se_weight <- as.numeric(args[4])
-  per_weight <- as.numeric(args[5])
-  wn_weight <- as.numeric(args[6])
+  se_sigma <- as.numeric(args[4])
+  per_sigma <- as.numeric(args[5])
+  wn_sigma <- as.numeric(args[6])
 } else {
   # defaults; these were determined by using `formalize_parameters.R` in the preprocessing folder
-  # and are essentially very rough empirical estimates
+  # these are heuristic values based on filtering 5-counts, at 20% min sample representation
   #
-  # the ALR reference is taken to be the taxon with median log abundance, just to prevent it being
-  # something very rare
+  # the ALR reference is taken to be the taxon with median log abundance, just to prevent it being something very rare
   #
-  # wn_weight species the weight of the (unused) white noie kernel
+  # wn_sigma species the scale of the (unused) white noie kernel
   if(level == "phylum") {
-    se_weight <- sqrt(2.052)
-    per_weight <- sqrt(0.228)
-    wn_weight <- sqrt(0)
+    se_sigma <- sqrt(2.052)
+    per_sigma <- sqrt(0.228)
+    wn_sigma <- sqrt(0)
     alr_ref <- 9
   }
   if(level == "class") {
-    se_weight <- sqrt(2.177)
-    per_weight <- sqrt(0.242)
-    wn_weight <- sqrt(0)
+    se_sigma <- sqrt(2.177)
+    per_sigma <- sqrt(0.242)
+    wn_sigma <- sqrt(0)
     alr_ref <- 15
   }
   if(level == "order") {
-    se_weight <- sqrt(2.52)
-    per_weight <- sqrt(0.28)
-    wn_weight <- sqrt(0)
+    se_sigma <- sqrt(2.52)
+    per_sigma <- sqrt(0.28)
+    wn_sigma <- sqrt(0)
     alr_ref <- 17
   }
   if(level == "family") {
-    se_weight <- sqrt(2.586)
-    per_weight <- sqrt(0.287)
-    wn_weight <- sqrt(0)
+    se_sigma <- sqrt(2.586)
+    per_sigma <- sqrt(0.287)
+    wn_sigma <- sqrt(0)
     alr_ref <- 22
   }
   if(level == "genus") {
-    wn_weight <- 0
-    # filter: 5-count, at least 20% samples
-    se_weight <- sqrt(2.632)
-    per_weight <- sqrt(0.292)
+    wn_sigma <- 0
+    se_sigma <- sqrt(2.632)
+    per_sigma <- sqrt(0.292)
     alr_ref <- 59
-    # filter: 5-count x 50%
-    # se_weight <- sqrt(2.601)
-    # per_weight <- sqrt(0.289)
+    # alt filter: 5-count x 50%
+    # se_sigma <- sqrt(2.601)
+    # per_sigma <- sqrt(0.289)
     # alr_ref <- 28
-    # filter: 20-count x 20%
-    # se_weight <- sqrt(2.677)
-    # per_weight <- sqrt(0.297)
+    # alt filter: 20-count x 20%
+    # se_sigma <- sqrt(2.677)
+    # per_sigma <- sqrt(0.297)
     # alr_ref <- 47
-    # filter: 20-count x 50%
-    # se_weight <- sqrt(2.273)
-    # per_weight <- sqrt(0.253)
+    # alt filter: 20-count x 50%
+    # se_sigma <- sqrt(2.273)
+    # per_sigma <- sqrt(0.253)
     # alr_ref <- 24
   }
 }
@@ -88,7 +86,7 @@ if(length(args) >= 8) {
   save_append <- ""
 }
 
-fit_GP(baboon, level, se_weight=se_weight, per_weight=per_weight, wn_weight=wn_weight,
+fit_GP(baboon, level, se_sigma=se_sigma, per_sigma=per_sigma, wn_sigma=wn_sigma,
        dd_se=dd_se, save_append=save_append, date_lower_limit=NULL, date_upper_limit=NULL,
        alr_ref=alr_ref, mean_only=mean_only,
        max_iter=20000, eps_f=1e-11, eps_g=1e-5)
