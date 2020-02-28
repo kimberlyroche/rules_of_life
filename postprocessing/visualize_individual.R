@@ -30,4 +30,4 @@ if(length(individuals) == 0) {
 #                 coordinates to indicate to the function we want to plot Gaussian process predictions 
 #                 for these log relative abundances
 
-plot_ribbons_individuals(individuals, level, timecourse=TRUE, covcor=FALSE, predict_coords=NULL)
+plot_ribbons_individuals(individuals, level, timecourse=FALSE, covcor=FALSE, predict_coords=predict_coords)

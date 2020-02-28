@@ -19,8 +19,8 @@ plot_dir <- "output/plots"
 
 pc <- 0.5
 
-base_path <- "/data/mukherjeelab/rulesoflife"
-base_path <- "C:/Users/kim/Documents/rules_of_life"
+base_path <- "/data/mukherjeelab/rulesoflife"       # HARDAC
+#base_path <- "C:/Users/kim/Documents/rules_of_life" # local
 
 sourceCpp(file.path(base_path,"include/cpp/fast_corr.cpp"))
 

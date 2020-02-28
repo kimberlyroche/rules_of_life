@@ -42,16 +42,16 @@ fix_dims_fit <- function(fit) {
 }
 
 # fit Gaussian process to a single baboon series using stray::basset
-fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_append="",
+fit_GP <- function(baboon, level, se_sigma, per_sigma, wn_sigma, dd_se, save_append="",
                    date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL, verbose=TRUE, mean_only=FALSE,
                    max_iter=NULL, eps_f=NULL, eps_g=NULL) {
   if(verbose) {
     cat(paste0("Fitting stray::basset with with parameters:\n",
              "\tbaboon=",baboon,"\n",
              "\tlevel=",level,"\n",
-             "\tSE kernel weight=",se_weight,"\n",
-             "\tPER kernel weight=",per_weight,"\n",
-             "\tWN kernel weight=",wn_weight,"\n",
+             "\tSE kernel sigma=",se_sigma,"\n",
+             "\tPER kernel sigma=",per_sigma,"\n",
+             "\tWN kernel sigma=",wn_sigma,"\n",
              "\tdd_se=",dd_se,"\n"))
   }
 
@@ -98,18 +98,14 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   
   # square exponential kernel parameters
   dc <- 0.1 # desired minimum correlation
-  se_sigma <- 1
   rho_se <- sqrt(-dd_se^2/(2*log(dc))) # back calculate the decay
   
   # periodic kernel parameters
   period <- 365
-  per_sigma <- 1
   rho_per <- 1
 
-  Gamma <- function(X) se_weight*SE(X, sigma=se_sigma, rho=rho_se, jitter=0) +
-    per_weight*PER(X, sigma=per_sigma, rho=rho_per, period=period, jitter=0) +
-    wn_weight*WHITENOISE(X, sigma=1, jitter=0) +
-    (1e-10)*diag(ncol(X)) # pretty arbitrary
+  Gamma <- function(X) SE(X, sigma=se_sigma, rho=rho_se, jitter=1e-08) +
+    PER(X, sigma=per_sigma, rho=rho_per, period=period, jitter=1e-08)
   
   D <- nrow(Y)
   N <- ncol(Y)
@@ -146,14 +142,12 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
   
   # dumb as hell but for later prediction, these need to be loaded into the workspace
   # for use by Gamma; fix this eventually
-  fit_obj$kernelparams$se_weight <- se_weight
   fit_obj$kernelparams$se_sigma <- se_sigma
   fit_obj$kernelparams$rho_se <- rho_se
-  fit_obj$kernelparams$per_weight <- per_weight
   fit_obj$kernelparams$per_sigma <- per_sigma
   fit_obj$kernelparams$rho_per <- rho_per
   fit_obj$kernelparams$period <- period
-  fit_obj$kernelparams$wn_weight <- wn_weight
+  fit_obj$kernelparams$wn_sigma <- wn_sigma
   
   # chop down for size savings since /data/mukherjeelab is full as shit
   # can't seem to pass desired sample number to stray with any effect; debug this eventually
@@ -167,10 +161,14 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 
   # otherwise, save the full posterior sample set
   if(mean_only) {
-    saveRDS(fit_obj, file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,"_bassetfit",save_append,".rds")))
+    save_path <- file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,"_bassetfit",save_append,".rds"))
+    cat("Saving fitted model to:",save_path,"\n")
+    saveRDS(fit_obj, save_path)
     return(fit_obj)
   } else {
-    saveRDS(fit_obj, file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit",save_append,".rds")))
+    save_path <- file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit",save_append,".rds"))
+    cat("Saving fitted model to:",save_path,"\n")
+    saveRDS(fit_obj, save_path)
   }
 
 }
@@ -181,8 +179,7 @@ fit_GP <- function(baboon, level, se_weight, per_weight, wn_weight, dd_se, save_
 get_predictions <- function(X, fit, n_samples=100) {
   cat("Predicting from 1 to",max(X),"\n")
   X_predict <- t(1:(max(X)))
-  fit.clr <- to_clr(fit)
-  predicted <- predict(fit.clr, X_predict, iter=n_samples) # predicts samples from the posterior (default = 2000)
+  predicted <- predict(fit, X_predict, response="Eta", iter=n_samples) # predicts samples from the posterior (default = 2000)
   return(list(X_predict=X_predict, Y_predict=predicted))
 }
 
@@ -207,7 +204,7 @@ get_fitted_modellist <- function(level="family", MAP=FALSE) {
 
 # get filename list for all fitted basset models and do some extra result parsing
 get_fitted_modellist_details <- function(level="family", MAP=FALSE) {
-  fitted_models <- get_fitted_modellist(level)
+  fitted_models <- get_fitted_modellist(level, MAP=MAP)
   individuals <- sapply(fitted_models$fitted_models, function(x) { idx <- regexpr(fitted_models$regexpr_str, x); return(substr(x, idx-3, idx-1)) } )
   names(individuals) <- NULL
   # parse dimensions
@@ -251,6 +248,7 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
     # posterior will be summarized as one mean vector
     all_samples <- matrix(NA, n_indiv*n_samples, P)
   }
+  cat("Loading models...\n")
   indiv_labels <- c()
   for(i in 1:n_indiv) {
     fit <- fix_dims_fit(readRDS(indiv_obj$model_list[i])$fit)
@@ -286,14 +284,18 @@ calc_posterior_distances <- function(level, which_measure="Sigma", MAP=FALSE, in
   dist_fn <- paste0(dist_fn,".rds")
   if(which_measure == "Sigma") {
     if(file.exists(dist_fn)) {
+      cat("Reusing existing distance in:",dist_fn,"\n")
       distance_mat <- readRDS(dist_fn)
     } else {
+      cat("Calculating distances to save in:",dist_fn,"\n")
       distance_mat <- Riemann_dist_samples(all_samples, n_indiv, n_samples)
     }
   } else {
     if(file.exists(dist_fn)) {
+      cat("Reusing existing distance in:",dist_fn,"\n")
       distance_mat <- readRDS(dist_fn)
     } else {
+      cat("Calculating distances to save in:",dist_fn,"\n")
       distance_mat <- as.matrix(dist(all_samples))
     }
   }
@@ -340,7 +342,7 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   distance_mat <- post_dist_obj$distance_mat
 
   cat("Embedding posterior samples...\n")  
-  fit <- cmdscale(distance_mat, eig=TRUE, k=2000) # k is the number of dim
+  fit <- cmdscale(distance_mat, eig=TRUE, k=100) # k is the number of dim
   # I believe in this case the magnitude of the eigenvalues is proportional to the variance
   # explained (properly its differs by a factor of n-1 [the DOF] I think)
   eig_tot <- sum(abs(fit$eig))
@@ -352,7 +354,11 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   cat("\tEigenvalue #6:",fit$eig[6]," (% variance:",round(abs(fit$eig[6])/eig_tot,2),")\n")
   cat("\tEigenvalue #7:",fit$eig[7]," (% variance:",round(abs(fit$eig[7])/eig_tot,2),")\n")
 
-  saveRDS(fit, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_raw.rds")))
+  if(MAP) {
+    saveRDS(fit, file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination_raw.rds")))
+  } else {
+    saveRDS(fit, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_raw.rds")))
+  }
   cat("Embedding has",ncol(fit$points),"dimensions...\n")
   
   # save first 6 coordinates (arbitrarily)
@@ -361,9 +367,17 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
     df <- rbind(df, data.frame(coord=rep(i, nrow(fit$points)), value=fit$points[,i], labels=indiv_labels))
   }
   if(is.null(indiv)) {
-    saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination.rds")))
+    if(MAP) {
+      saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination.rds")))
+    } else {
+      saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination.rds")))
+    }
   } else {
-    saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_",indiv,".rds")))
+    if(MAP) {
+      saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination_",indiv,".rds")))
+    } else {
+      saveRDS(df, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_",indiv,".rds")))
+    }
   }
   
   # centroids are useful for labeling plots
@@ -388,9 +402,17 @@ embed_posteriors <- function(level, which_measure="Sigma", MAP=FALSE, indiv=NULL
   } 
 
   if(is.null(indiv)) {
-    saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids.rds")))
+    if(MAP) {
+      saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination_centroids.rds")))
+    } else {
+      saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids.rds")))
+    }
   } else {
-    saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids_",indiv,".rds")))
+    if(MAP) {
+      saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination_centroids_",indiv,".rds")))
+    } else {
+      saveRDS(df_centroids, file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids_",indiv,".rds")))
+    }
   }
 }
 
@@ -571,7 +593,7 @@ get_other_labels <- function(df, data, individuals, annotation="group", sname_li
 #   axis1 is the x-axis surrogate
 #   axis2 is the y-axis surrogate
 #   label_type is the annotation/label to grab
-plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="individual", legend=TRUE, save_tag=NULL) {
+plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="individual", legend=TRUE, MAP=FALSE) {
   point_size <- 1
   if(label_type != "individual") {
     # i.e. we're plotting from df_centroids
@@ -593,11 +615,7 @@ plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="indiv
   if(!legend | label_type == "individual") {
     p <- p + theme(legend.position='none')
   }
-  if(is.null(save_tag)) {
-    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_x",axis1,"x",axis2,".png")
-  } else {
-    plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_x",axis1,"x",axis2,"_",indiv,".png")
-  }
+  plot_save_name <- paste0(which_measure,"_ordination_",label_type,"_x",axis1,"x",axis2,".png")
   img_width <- 4
   if(legend) {
     img_width <- 4.5
@@ -605,30 +623,35 @@ plot_axes <- function(df, df_centroids=NULL, axis1=1, axis2=2, label_type="indiv
   aspect_ratio <- max(df_centroids[,paste0("mean_x",axis2)]) - min(df_centroids[,paste0("mean_x",axis2)])
   aspect_ratio <- aspect_ratio/(max(df_centroids[,paste0("mean_x",axis1)]) - min(df_centroids[,paste0("mean_x",axis1)]))
   img_height <- aspect_ratio*img_width
-  ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",plot_save_name)), plot=p, scale=2,
-         width=img_width, height=img_height, units="in", dpi=100)
+  if(MAP) {
+    ggsave(file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",plot_save_name)), plot=p, scale=2,
+           width=img_width, height=img_height, units="in", dpi=100)
+  } else {
+    ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/",plot_save_name)), plot=p, scale=2,
+           width=img_width, height=img_height, units="in", dpi=100)
+  }
 }
 
 # wrapper to plot ordination with 
 # allowable (label_types) values are: individual, group, counts, density
-plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv=NULL, sname_list=NULL) {
-  if(is.null(indiv)) {
+plot_ordination <- function(level, which_measure, label_type, legend=TRUE, MAP=FALSE, sname_list=NULL) {
+  if(MAP) {
+    df <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination.rds")))
+    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",which_measure,"_ordination_centroids.rds")))
+  } else {
     df <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination.rds")))
     df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids.rds")))
-  } else {
-    df <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_",indiv,".rds")))
-    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/",which_measure,"_ordination_centroids_",indiv,".rds")))
   }
   if(label_type != "individual") {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
     df <- suppressWarnings(get_other_labels(df_centroids, glom_data, unique(df_centroids$labels),
                                             annotation=label_type, sname_list=sname_list))
   }
-  plot_axes(df, df_centroids, 1, 2, label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, 2, 3, label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, 3, 4, label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, 100, 101, label_type, legend=legend, save_tag=indiv)
-  plot_axes(df, df_centroids, 200, 201, label_type, legend=legend, save_tag=indiv)
+  plot_axes(df, df_centroids, 1, 2, label_type, legend=legend, MAP=MAP)
+  plot_axes(df, df_centroids, 2, 3, label_type, legend=legend, MAP=MAP)
+  plot_axes(df, df_centroids, 3, 4, label_type, legend=legend, MAP=MAP)
+  plot_axes(df, df_centroids, 49, 50, label_type, legend=legend, MAP=MAP)
+  plot_axes(df, df_centroids, 99, 100, label_type, legend=legend, MAP=MAP)
 }
 
 # ====================================================================================================================
@@ -640,8 +663,12 @@ plot_ordination <- function(level, which_measure, label_type, legend=TRUE, indiv
 #   coordinate is 1...K
 #   level is taxonomic level (e.g. family)
 #   no_indiv are # individuals at each extreme to visualize
-plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="extreme_Lambda") {
-  df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/Lambda_ordination_centroids.rds")))
+plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="extreme_Lambda", MAP=FALSE) {
+  if(MAP) {
+    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"_MAP/Lambda_ordination_centroids.rds")))
+  } else {
+    df_centroids <- readRDS(file.path(base_path,GP_plot_dir,paste0(level,"/Lambda_ordination_centroids.rds")))
+  }
   min_sort <- df_centroids %>% arrange(get(coordinate))
   min_cohort <- as.vector(unlist(min_sort[1:no_indiv,"labels"]))
   max_sort <- df_centroids %>% arrange(desc(get(coordinate)))
@@ -652,7 +679,11 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
   allLambda <- NULL
   for(baboon in c(min_cohort, max_cohort)) {
     cat("Loading individual",baboon,"(1)\n")
-    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
+    if(MAP) {
+      fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,"_bassetfit.rds")))
+    } else {
+      fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
+    }
     fit.clr <- to_clr(fix_dims_fit(fit_obj$fit))
     Lambda <- fit.clr$Lambda
     collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
@@ -678,7 +709,11 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
   
   for(baboon in c(min_cohort, max_cohort)) {
     cat("Loading individual",baboon,"(2)\n")
-    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
+    if(MAP) {
+      fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,"_bassetfit.rds")))
+    } else {
+      fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,"_bassetfit.rds")))
+    }
     fit.clr <- to_clr(fix_dims_fit(fit_obj$fit))
     Lambda <- fit.clr$Lambda
     collLambda <- t(apply(Lambda, 3, function(X) { apply(X, 1, mean) }))
@@ -689,20 +724,28 @@ plot_extreme_Lambda <- function(coordinate, level, no_indiv=10, save_filename="e
                                enzyme=as.factor(1:length(avgProp)), proportion=avgProp))
   }
   df$sample <- as.factor(df$sample)
-  plot_timecourse_metagenomics(df, save_filename=file.path(base_path,GP_plot_dir,paste0(level,"/",save_filename,"_",coordinate)), legend=TRUE)
+  if(MAP) {
+    plot_timecourse_metagenomics(df, save_filename=file.path(base_path,GP_plot_dir,paste0(level,"_MAP/",save_filename,"_",coordinate)), legend=TRUE)
+  } else {
+    plot_timecourse_metagenomics(df, save_filename=file.path(base_path,GP_plot_dir,paste0(level,"/",save_filename,"_",coordinate)), legend=TRUE)
+  }
 }
 
 # plot the diagonal of the element-wise mean covariance across individuals in a single heatmap
 # the idea here is to compare at a glance the total variation for each log ratio across all individuals
 #   level is taxonomic level (e.g. family)
 #   lrtransform is clr, alr, ilr
-plot_diag_Sigma <- function(level, lrtransform="clr") {
+plot_diag_Sigma <- function(level, lrtransform="clr", MAP=FALSE) {
   indiv_obj <- get_fitted_modellist_details(level=level)
   individuals <- indiv_obj$individuals
   pattern_str <- indiv_obj$pattern_str
   regexpr_str <- indiv_obj$regexpr_str
   
-  fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",individuals[1],regexpr_str)))
+  if(MAP) {
+    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"_MAP/",individuals[1],regexpr_str)))
+  } else {
+    fit_obj <- readRDS(file.path(base_path,model_dir,paste0(level,"/",individuals[1],regexpr_str)))
+  }
   D <- nrow(fit_obj$Y)
   P <- D
   if(lrtransform == "alr" | lrtransform == "ilr") {
@@ -714,7 +757,11 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
   for(i in 1:length(individuals)) {
     baboon <- individuals[i]
     cat("Loading fit for",baboon,"\n")
-    fit <- fix_dims_fit(readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,regexpr_str)))$fit)
+    if(MAP) {
+      fit <- fix_dims_fit(readRDS(file.path(base_path,model_dir,paste0(level,"_MAP/",baboon,regexpr_str)))$fit)
+    } else {
+      fit <- fix_dims_fit(readRDS(file.path(base_path,model_dir,paste0(level,"/",baboon,regexpr_str)))$fit)
+    }
     clr_ys <- driver::clr(t(fit$Y) + pc)
     tax_var <- apply(clr_ys, 2, sd)
     if(lrtransform == "clr") {
@@ -746,7 +793,11 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
     geom_tile(aes(fill = value), colour = "white") +
     scale_fill_gradient2(low = "white", high = "darkred") +
     theme(axis.text.x = element_text(face="bold", size=17, angle=90))
-  ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/all_Sigma_diag_",lrtransform,".png")), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
+  if(MAP) {
+    ggsave(file.path(base_path,GP_plot_dir,paste0(level,"_MAP/all_Sigma_diag_",lrtransform,".png")), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
+  } else {
+    ggsave(file.path(base_path,GP_plot_dir,paste0(level,"/all_Sigma_diag_",lrtransform,".png")), plot=p, scale=2, width=16, height=8, units="in", dpi=72)
+  }
 }
 
 # ====================================================================================================================
@@ -759,14 +810,13 @@ plot_diag_Sigma <- function(level, lrtransform="clr") {
 #   LR_coord is the logratio coordinate to plot
 plot_predictions <- function(fit_obj, predict_obj, LR_coord=1, save_filename=NULL) {
   observations <- fit_obj$X
-  # clr_ys <- driver::clr(t(fit_obj$Y) + pc)
-  # use the etas instead; there's an issue for low abundance taxa when using the direct
-  # CLR transformed counts here, they don't resemble the trajectory presumably (?)
-  # because the etas for low abundance taxa are heavily corrected
-  fit.clr <- to_clr(fit_obj$fit)
-  clr_ys <- t(apply(fit.clr$Eta, c(1,2), mean))
-  lr_tidy <- gather_array(clr_ys, "LR_value", "timepoint", "LR_coord")
-  
+  #fit.clr <- to_clr(fit_obj$fit)
+  #clr_ys <- t(apply(fit.clr$Eta, c(1,2), mean))
+  #lr_tidy <- gather_array(clr_ys, "LR_value", "timepoint", "LR_coord")
+  fit <- fit_obj$fit
+  alr_ys <- fit_obj$alr_ys
+  lr_tidy <- gather_array(alr_ys, "LR_value", "timepoint", "LR_coord")
+
   # replace timepoints with observation dates
   map <- data.frame(timepoint=1:length(observations), observation=c(observations))
   lr_tidy <- merge(lr_tidy, map, by="timepoint")
@@ -847,25 +897,21 @@ plot_ribbons_individuals <- function(individuals, level, timecourse=FALSE, covco
       cat(paste0("Generating predictive plots for individual '",baboon,"'...\n"))
       
       # a dumb hack for now; these need to be global
-      se_weight <<- fit_obj$kernelparams$se_weight
       se_sigma <<- fit_obj$kernelparams$se_sigma
       rho_se <<- fit_obj$kernelparams$rho_se
-      per_weight <<- fit_obj$kernelparams$per_weight
       per_sigma <<- fit_obj$kernelparams$per_sigma
       rho_per <<- fit_obj$kernelparams$rho_per
       period <<- fit_obj$kernelparams$period
-      wn_weight <<- fit_obj$kernelparams$wn_weight
+      wn_sigma <<- fit_obj$kernelparams$wn_sigma
 
-      cat("se_weight:",se_weight,"\n")
       cat("se_sigma:",se_sigma,"\n")
       cat("rho_se:",rho_se,"\n")
-      cat("per_weight:",per_weight,"\n")
       cat("per_sigma:",per_sigma,"\n")
       cat("rho_per:",rho_per,"\n")
       cat("period:",period,"\n")
-      cat("wn_weight:",wn_weight,"\n")
+      cat("wn_sigma:",wn_sigma,"\n")
 
-      # note: this function CLR transforms by default!
+      # note: these predictions are in the ALR
       predict_obj <- get_predictions(fit_obj$X, fix_dims_fit(fit_obj$fit), n_samples=100)
 
       for(coord in predict_coords) {
