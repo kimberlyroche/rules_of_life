@@ -98,8 +98,9 @@ p <- do.call("grid.arrange", c(plist, ncol=6))
 # --------------------------------------------------------------------------------------------------
 
 m <- 50
+n <- 20
 A <- matrix(rnorm(m*m, 0, scalar*sqrt(1/m)), m, m)
-props <- seq(0, 0.99, length.out=20)
+props <- seq(0, 0.99, length.out=n)
 no_samples <- 100
 sweep_output <- sweep_noise_proportions(A, props, no_samples, scalar)
 
@@ -107,6 +108,41 @@ ggplot(sweep_output$df, aes(color=measure)) +
   geom_ribbon(aes(x=noise_prop, ymin=min_distance, ymax=max_distance), alpha=0.33) +
   geom_path(aes(x=noise_prop, y=mean_distance), size=1)
 
+# --------------------------------------------------------------------------------------------------
+# ordinate the output of the sweep so we can see how these distances behave;
+# I don't know how instructive these really all
+# --------------------------------------------------------------------------------------------------
+
+include_sweeps <- c(1)
+include_sweeps <- c(1, 2, 3)
+
+all_samples <- t(A)%*%A
+labels <- c("truth")
+for(s in include_sweeps) {
+  for(i in 1:n) {
+    all_samples <- cbind(all_samples, sweep_output$samples[[s]][,,i])
+    if(s == 1) {
+      labels <- c(labels, "0.05 noise")
+    } else if(s == 2) {
+      labels <- c(labels, "0.33 noise")
+    } else {
+      labels <- c(labels, "0.99 noise")
+    }
+  }
+}
+d <- Riemann_dist_samples(all_samples, (length(include_sweeps)*n)+1, 1)
+
+embedding <- cmdscale(d, k=2)
+df <- data.frame(x1=embedding[,1], x2=embedding[,2],
+                 type=labels)
+fitted_point_sz <- 2
+truth_point_size <- 4
+p1 <- ggplot() +
+  geom_point(data=df[df$type=="truth",], aes(x=x1, y=x2), size=(truth_point_size*1.3), shape=17) +
+  geom_point(data=df[df$type!="truth",], aes(x=x1, y=x2, color=type), size=fitted_point_sz) +
+  xlab("PCoA 1") +
+  ylab("PCoA 2")
+p1
 
 # old: calculate distances over all proportions x samples; distance matrix with have this order
 # note, this code is crazy inefficient

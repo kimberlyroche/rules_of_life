@@ -163,11 +163,21 @@ for(i in 1:length(models$individuals)) {
 # ======================================================================================================
 
 # order of interaction_pairs.clr is (1x1) (1x3) ... (1xD) (2x1) (2x2) ...
-# as pairs these are:                 1     2   ...   D    D+1   D+2  ...
-df <- gather_array(interaction_pairs.clr, "correlation", "host", "pair")
+# as pairs these are:                 1     2   ...   D   1*D+1 1*D+2 ...
+# insert "spacers" for visualization
+spacer_width <- 10
+spaced.clr <- matrix(NA, nrow(interaction_pairs.clr), ncol(interaction_pairs.clr)+(models$D-1)*spacer_width)
+for(i in 1:models$D) {
+  offset.1_1 <- (i-1)*models$D + (i-1)*spacer_width + 1
+  offset.2_1 <- offset.1_1 + models$D - 1
+  offset.1_2 <- (i-1)*models$D + 1
+  offset.2_2 <- offset.1_2 + models$D - 1
+  spaced.clr[,offset.1_1:offset.2_1] <- interaction_pairs.clr[,offset.1_2:offset.2_2]
+}
+df <- gather_array(spaced.clr, "correlation", "host", "pair")
 p <- ggplot(df, aes(pair, host)) +
   geom_tile(aes(fill = correlation)) +
-  scale_fill_gradient2(low = "darkblue", high = "darkred")
+  scale_fill_gradient2(low = "darkblue", high = "darkred", na.value='#888888')
 ggsave(file.path(relative_path,plot_dir,paste0("microbe_pair_correlations_",level,"_blocked.png")),
        p, units="in", dpi=150, height=5, width=20)
 
@@ -180,33 +190,56 @@ label_pairs.alr.tri <- label_pairs.alr[upper.tri(label_pairs.alr, diag=F)]
 #   how coherent is this family over all its interactions over all individuals?
 # ======================================================================================================
 
-idx <- 1 # family Bifidobacteraceae
-idx <- 4 # family Prevotellaceae
-retain_idx <- c()
-for(i in 1:ncol(interaction_pairs.clr.tri)) {
-  microbe_pair <- as.numeric(strsplit(label_pairs.clr.tri[i], "_")[[1]])
-  if(microbe_pair[1] == idx | microbe_pair[2] == idx) {
-    #cat("retaining:",microbe_pair[1],"x",microbe_pair[2],"\n")
-    retain_idx <- c(retain_idx, i)
-  }
+if(level == "family") {
+  idx <- 7 # family Muribaculaceae
+  idx <- 22 # family Erysipelotrichaceae
+  idx <- 31 # family Family XI_2II
+  idx <- 35 # family Helicobacteraceae
+  idx <- 40 # family Streptococcaceae
 }
-# subset to the interactions that include this component (should be D-1)
-subset_interaction_pairs.clr <- interaction_pairs.clr[,retain_idx]
-
-# get distance of each pair
-d <- dist(t(subset_interaction_pairs.clr))
-clustering <- hclust(d)
+if(level == "genus") {
+  idx <- 32 # genus Solobacterium
+  idx <- 44 # genus Coriobacteriaceae UCG-003
+  idx <- 69 # genus Lachnospiraceae ND3007 group
+  idx <- 76 # genus [Eubacterium] oxidoreducens group
+  idx <- 84 # genus Butyricicoccus
+}
 
 # plot heatmap
-df <- gather_array(subset_interaction_pairs.clr, "correlation", "host", "pair")
+df <- gather_array(interaction_pairs.clr[,((idx-1)*models$D+1):(idx*models$D)], "correlation", "host", "pair")
 p <- ggplot(df, aes(pair, host)) +
   geom_tile(aes(fill = correlation), colour = "white") +
   scale_fill_gradient2(low = "darkblue", high = "darkred")
 ggsave(file.path(relative_path,plot_dir,paste0("microbe_pair_correlations_",level,"_",idx,".png")),
        p, units="in", dpi=150, height=5, width=10)
 
+# delete this once we're sure we don't need it
+
+#retain_idx <- c()
+#for(i in 1:ncol(interaction_pairs.clr.tri)) {
+#  microbe_pair <- as.numeric(strsplit(label_pairs.clr.tri[i], "_")[[1]])
+#  if(microbe_pair[1] == idx | microbe_pair[2] == idx) {
+#    #cat("retaining:",microbe_pair[1],"x",microbe_pair[2],"\n")
+#    retain_idx <- c(retain_idx, i)
+#  }
+#}
+# subset to the interactions that include this component (should be D-1)
+#subset_interaction_pairs.clr <- interaction_pairs.clr[,retain_idx]
+
+# get distance of each pair
+#d <- dist(t(subset_interaction_pairs.clr))
+#clustering <- hclust(d)
+
+# plot heatmap
+#df <- gather_array(subset_interaction_pairs.clr, "correlation", "host", "pair")
+#p <- ggplot(df, aes(pair, host)) +
+#  geom_tile(aes(fill = correlation), colour = "white") +
+#  scale_fill_gradient2(low = "darkblue", high = "darkred")
+#ggsave(file.path(relative_path,plot_dir,paste0("microbe_pair_correlations_",level,"_",idx,".png")),
+#       p, units="in", dpi=150, height=5, width=10)
+
 # ======================================================================================================
-#   plot heatmap over all components, hierarchically clustered
+#   gather some data and hierarchically cluster interactions
 # ======================================================================================================
 
 # average CLR abundance
@@ -224,28 +257,215 @@ label_pairs.clr.reordered <- label_pairs.clr.tri[clustering$order]
 
 avg_interaction.clr <- colMeans(interaction_pairs.clr.reordered)
 
-# get strong-ish average interactions in the CLR; grab min and max 10
-# these will be around indices 1...10 and 490...500 (family)
-#                           or 630 and 3200 (genus)
-interesting_idx.clr <- order(avg_interaction.clr)[c(1:10, (length(avg_interaction.clr)-9):length(avg_interaction.clr))]
-for(p_idx in interesting_idx.clr) {
-  interesting_pair <- label_pairs.clr.tri[p_idx]
-  microbe_pair <- as.numeric(strsplit(interesting_pair, "_")[[1]])
-  cat("Interesting pair (",p_idx,"):",labels.clr[microbe_pair[1]],",",labels.clr[microbe_pair[2]],"\n")
-  # rank these interactors by their avg CLR abundance
-  avg_clr.1 <- avg_clr_abundance[microbe_pair[1]]
-  avg_clr.2 <- avg_clr_abundance[microbe_pair[2]]
-  cat("\tCLR abundance:",(models$D - which(sort(avg_clr_abundance) == avg_clr.1) + 1),"/",models$D,"x",
-      (models$D - which(sort(avg_clr_abundance) == avg_clr.2) + 1),"/",models$D,"\n")
+
+# here I'm using indices manually identified from
+#   plot(avg_interaction.clr)
+# to pull spans of strong negative, positive, and neural correlations
+if(level == "genus") {
+  neg_span <- 582:674
+  pos_span <- 3193:3367
+  neu_span <- 2500:2700
+  whole_span <- 1:length(label_pairs.clr.reordered)
 }
 
-# plot heatmap
+# ======================================================================================================
+#   render NEGATIVE interaction biplots
+# ======================================================================================================
+
+if(level == "genus") {
+  # get strong-ish average NEGATIVE interactions in the CLR
+  interesting_idx.clr <- c(neg_span)
+  df <- data.frame(x=c(), y=c(), sign=c(), value=c())
+  for(p_idx in interesting_idx.clr) {
+    interesting_pair <- label_pairs.clr.tri[p_idx]
+    microbe_pair <- as.numeric(strsplit(interesting_pair, "_")[[1]])
+    label.1 <- labels.clr[microbe_pair[1]]
+    label.2 <- labels.clr[microbe_pair[2]]
+    df <- rbind(df, data.frame(x=label.1, y=label.2, sign=sign(avg_interaction.clr[p_idx]),
+                               value=2*abs(avg_interaction.clr[p_idx])))
+    cat(paste0("Interesting pair (",p_idx,"): ",label.1,", ",label.2,"\n"))
+  }
+  
+  text_df.left <- data.frame(y=1:length(unique(df$x)), label=unique(df$x))
+  text_df.right <- data.frame(y=seq(1, length(unique(df$x)), length.out=length(unique(df$y))), label=unique(df$y))
+  
+  df <- cbind(df, node1=text_df.left$y[as.numeric(df$x)])
+  df <- cbind(df, node2=text_df.right$y[as.numeric(df$y)])
+  df$sign <- as.factor(df$sign)
+  
+  p <- ggplot() +
+    geom_segment(data=df, aes(x=1, y=node1, xend=4, yend=node2, color=sign, size=value), alpha=0.2) +
+    scale_color_manual(values=c("#E6194B")) +
+    scale_size_identity() + # use the width specified by `weight`
+    geom_text(data=text_df.left, aes(x=1, y=y, label=label), size=4) +
+    geom_text(data=text_df.right, aes(x=4, y=y, label=label), size=4) +
+    xlim(0, 5) +
+    theme(legend.position = "none",
+          panel.grid = element_blank(),
+          axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          panel.background = element_blank()) 
+  ggsave(file.path(relative_path,plot_dir,paste0("negative_interactions_",level,".png")),
+         p, units="in", dpi=150, height=10, width=10)
+}
+
+# ======================================================================================================
+#   render POSITIVE interaction biplots
+# ======================================================================================================
+
+if(level == "genus") {
+  # get strong-ish average POSITIVE interactions in the CLR
+  interesting_idx.clr <- c(pos_span)
+  df <- data.frame(x=c(), y=c(), sign=c(), value=c())
+  for(p_idx in interesting_idx.clr) {
+    interesting_pair <- label_pairs.clr.tri[p_idx]
+    microbe_pair <- as.numeric(strsplit(interesting_pair, "_")[[1]])
+    label.1 <- labels.clr[microbe_pair[1]]
+    label.2 <- labels.clr[microbe_pair[2]]
+    df <- rbind(df, data.frame(x=label.1, y=label.2, sign=sign(avg_interaction.clr[p_idx]),
+                               value=2*abs(avg_interaction.clr[p_idx])))
+    cat(paste0("Interesting pair (",p_idx,"): ",label.1,", ",label.2,"\n"))
+  }
+  
+  text_df.left <- data.frame(y=1:length(unique(df$x)), label=unique(df$x))
+  text_df.right <- data.frame(y=seq(1, length(unique(df$x)), length.out=length(unique(df$y))), label=unique(df$y))
+  
+  df <- cbind(df, node1=text_df.left$y[as.numeric(df$x)])
+  df <- cbind(df, node2=text_df.right$y[as.numeric(df$y)])
+  df$sign <- as.factor(df$sign)
+  
+  p <- ggplot() +
+    geom_segment(data=df, aes(x=1, y=node1, xend=4, yend=node2, color=sign, size=value), alpha=0.2) +
+    scale_color_manual(values=c("#3CB44B")) +
+    scale_size_identity() + # use the width specified by `weight`
+    geom_text(data=text_df.left, aes(x=1, y=y, label=label), size=4) +
+    geom_text(data=text_df.right, aes(x=4, y=y, label=label), size=4) +
+    xlim(0, 5) +
+    theme(legend.position = "none",
+          panel.grid = element_blank(),
+          axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          panel.background = element_blank()) 
+  ggsave(file.path(relative_path,plot_dir,paste0("positive_interactions_",level,".png")),
+         p, units="in", dpi=150, height=12, width=10)
+}
+
+# ======================================================================================================
+#   plot heatmap over all components, hierarchically clustered
+# ======================================================================================================
+
 df <- gather_array(interaction_pairs.clr.reordered, "correlation", "host", "pair")
 p <- ggplot(df, aes(pair, host)) +
   geom_tile(aes(fill = correlation)) +
   scale_fill_gradient2(low = "darkblue", high = "darkred")
 ggsave(file.path(relative_path,plot_dir,paste0("microbe_pair_correlations_",level,"_clustered.png")),
        p, units="in", dpi=150, height=5, width=15)
+
+# make average relative abundance visualization
+if(level == "genus") {
+  neg_pairs <- label_pairs.clr.reordered[neg_span]
+  neg_clr.1 <- c(); neg_clr.2 <- c()
+  for(pair in neg_pairs) {
+    microbe_pair <- as.numeric(strsplit(pair, "_")[[1]])
+    temp.1 <- avg_clr_abundance[microbe_pair[1]]
+    temp.2 <- avg_clr_abundance[microbe_pair[2]]
+    if(temp.1 < temp.2) {
+      neg_clr.1 <- c(neg_clr.1, temp.1)
+      neg_clr.2 <- c(neg_clr.2, temp.2)
+    } else {
+      neg_clr.1 <- c(neg_clr.1, temp.2)
+      neg_clr.2 <- c(neg_clr.2, temp.1)
+    }
+  }
+  p <- ggplot(data.frame(x=1:length(neg_span), y=1, value=neg_clr.1), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_neg_1_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  p <- ggplot(data.frame(x=1:length(neg_span), y=1, value=neg_clr.2), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_neg_2_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  
+  pos_pairs <- label_pairs.clr.reordered[pos_span]
+  pos_clr.1 <- c(); pos_clr.2 <- c()
+  for(pair in pos_pairs) {
+    microbe_pair <- as.numeric(strsplit(pair, "_")[[1]])
+    temp.1 <- avg_clr_abundance[microbe_pair[1]]
+    temp.2 <- avg_clr_abundance[microbe_pair[2]]
+    if(temp.1 < temp.2) {
+      pos_clr.1 <- c(pos_clr.1, temp.1)
+      pos_clr.2 <- c(pos_clr.2, temp.2)
+    } else {
+      pos_clr.1 <- c(pos_clr.1, temp.2)
+      pos_clr.2 <- c(pos_clr.2, temp.1)
+    }
+  }
+  p <- ggplot(data.frame(x=1:length(pos_span), y=1, value=pos_clr.1), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_pos_1_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  p <- ggplot(data.frame(x=1:length(pos_span), y=1, value=pos_clr.2), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_pos_2_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  
+  neu_pairs <- label_pairs.clr.reordered[neu_span]
+  neu_clr.1 <- c(); neu_clr.2 <- c()
+  for(pair in neu_pairs) {
+    microbe_pair <- as.numeric(strsplit(pair, "_")[[1]])
+    temp.1 <- avg_clr_abundance[microbe_pair[1]]
+    temp.2 <- avg_clr_abundance[microbe_pair[2]]
+    if(temp.1 < temp.2) {
+      neu_clr.1 <- c(neu_clr.1, temp.1)
+      neu_clr.2 <- c(neu_clr.2, temp.2)
+    } else {
+      neu_clr.1 <- c(neu_clr.1, temp.2)
+      neu_clr.2 <- c(neu_clr.2, temp.1)
+    }
+  }
+  p <- ggplot(data.frame(x=1:length(neu_span), y=1, value=neu_clr.1), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_neu_1_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  p <- ggplot(data.frame(x=1:length(neu_span), y=1, value=neu_clr.2), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_neu_2_",level,".png")),
+         p, units="in", dpi=150, height=1, width=5)
+  
+  whole_pairs <- label_pairs.clr.reordered[whole_span]
+  whole_clr.1 <- c(); whole_clr.2 <- c()
+  for(pair in whole_pairs) {
+    microbe_pair <- as.numeric(strsplit(pair, "_")[[1]])
+    temp.1 <- avg_clr_abundance[microbe_pair[1]]
+    temp.2 <- avg_clr_abundance[microbe_pair[2]]
+    if(temp.1 < temp.2) {
+      whole_clr.1 <- c(whole_clr.1, temp.1)
+      whole_clr.2 <- c(whole_clr.2, temp.2)
+    } else {
+      whole_clr.1 <- c(whole_clr.1, temp.2)
+      whole_clr.2 <- c(whole_clr.2, temp.1)
+    }
+  }
+  p <- ggplot(data.frame(x=1:length(whole_span), y=1, value=whole_clr.1), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_whole_1_",level,".png")),
+         p, units="in", dpi=150, height=3, width=15)
+  p <- ggplot(data.frame(x=1:length(whole_span), y=1, value=whole_clr.2), aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="darkgreen", high="darkorange", limits=c(min(avg_clr_abundance), max(avg_clr_abundance)))
+  ggsave(file.path(relative_path,plot_dir,paste0("colorbar_whole_2_",level,".png")),
+         p, units="in", dpi=150, height=3, width=15)
+}
+
 
 # ======================================================================================================
 #   sanity check strong interactions by plotting some strongly correlated ALR features
@@ -274,41 +494,38 @@ for(p_idx in interesting_idx.alr) {
 
 # let's look at features matched at the same level of resolution; i.e. I'm not sure it makes sense
 # to compare a microbial family to a group of other taxa resolved only to order
-resolved_idx <- as.vector(!is.na(tax[,level_no]))
+#resolved_idx <- as.vector(!is.na(tax[,level_no]))
 
 host_prop_thresholds <- seq(0.5, 0.7, by=0.05)
 interaction_prop_thresholds <- seq(0.5, 0.7, by=0.05)
 
-host_prop_thresholds <- c(0.6)
-interaction_prop_thresholds <- c(0.6)
+if(level == "family") {
+  host_prop_thresholds <- c(0.65)
+  interaction_prop_thresholds <- c(0.65)
+}
+if(level == "genus") {
+  host_prop_thresholds <- c(0.65)
+  interaction_prop_thresholds <- c(0.6)
+}
 
 for(host_prop_threshold in host_prop_thresholds) {
   for(interaction_prop_threshold in interaction_prop_thresholds) {
-    universal_count <- 0
+    count <- 0
     for(i in 1:models$D) {
-      if(resolved_idx[i]) {
-        correlations <- matrix(NA, length(models$individuals), sum(resolved_idx)-1) # exclude 
-        # iterate individuals
-        for(j in 1:length(models$individuals)) {
-          correlations[j,] <- Sigmas.clr[[models$individuals[j]]][setdiff((1:models$D)[resolved_idx],c(i))]
-        }
-        signed <- apply(correlations, c(1,2), sign)
-        # `host_agreements` is a (D-1)-length vector where each element is the proportion of hosts that
-        # agree in sign about this interaction
-        host_agreements <- abs(colSums(signed)/nrow(signed))
-        if(sum(host_agreements >= host_prop_threshold)/ncol(signed) >= interaction_prop_threshold) {
-          universal_count <- universal_count + 1
-          #cat("Microbe",i,"is universal.\n")
-        }
+      offset.1 <- (i-1)*models$D + 1
+      offset.2 <- offset.1 + models$D - 1
+      temp <- interaction_pairs.clr[,offset.1:offset.2]
+      temp2 <- apply(temp, c(1,2), sign)
+      prop <- abs(colSums(temp2))/nrow(temp2)
+      host_agreement <- sum(prop >= host_prop_threshold)/length(prop)
+      if(host_agreement >= interaction_prop_threshold) {
+        cat(paste0(labels.clr[i]," (",i,") is universal!\n"))
+        count <- count + 1
       }
     }
-    cat("\t",round(host_prop_threshold, 2),"x",round(interaction_prop_threshold, 2),":",universal_count,"\n")
+    cat(host_prop_threshold,"x",interaction_prop_threshold,", count:",count,"\n")
   }
 }
-
-
-
-
 
 
 

@@ -3,9 +3,9 @@
 #   do different compositions always give different dynamics?
 #
 # concretely we simulate from two setups:
-#   setup=1: similar base compositions (Theta), different dynamics (Sigma)
+#   setup=1: same base compositions (Theta), different dynamics (Sigma)
 #   setup=2: different base compositions (Theta), same dynamics (Sigma)
-#   setup=3: similar base compositions (Theta), same dynamics (Sigma); this is a sanity check as
+#   setup=3: same base compositions (Theta), same dynamics (Sigma); this is a sanity check as
 #            the only difference between individuals is noise!
 
 relative_path <- ".."
@@ -24,10 +24,10 @@ sourceCpp(file.path(relative_path,"include/cpp/Riemann_dist.cpp"))
 # in all cases, simulate data (up to counts), fit model, and assess Sigma true vs.
 # Sigma posteriors via PCoA
 
-setup <- 3
+setup <- 2
 
 D <- 20
-N <- 20
+N <- 50
 K <- 10 # number of individuals to simulate 
 n_samples <- 50 # posterior samples
 
@@ -199,24 +199,10 @@ if(do_spike_in) {
   }
 }
 
+# embed the full posterior sample sets
 d <- Riemann_dist_samples(Sigmas, K, n_samples+1)
 
-# not fast
-# for D=20 / N=20 / K=10 / n_samples=100 this takes about 1 min.
-# n_Sigma <- ncol(Sigmas)/(D-1)
-# d <- matrix(NA, n_Sigma, n_Sigma)
-# for(i in 1:n_Sigma) {
-#  for(j in 1:n_Sigma) {
-#    if(i <= j) {
-#      d[i,j] <- Riemann_dist_pair(Sigmas[,((i-1)*(D-1)+1):(i*(D-1))], Sigmas[,((j-1)*(D-1)+1):(j*(D-1))])
-#    } else {
-#      d[i,j] <- d[j,i]
-#    }
-#  }
-#}
-
-# embed this inferred Sigmas and the true Sigmas to see if the inferred stuff is "too similar"
-embedding <- cmdscale(d, k=4)
+embedding <- cmdscale(d, k=100)
 df <- data.frame(x1=embedding[,1], x2=embedding[,2],
                  x3=embedding[,3], x4=embedding[,4],
                  type=as.factor(labels$status), indiv=as.factor(labels$k))
@@ -228,9 +214,6 @@ p1 <- ggplot() +
   geom_point(data=df[df$type=="fitted",], aes(x=x1, y=x2, color=indiv), size=fitted_point_sz) +
   xlab("PCoA 1") +
   ylab("PCoA 2")
-
-p1
-
 p2 <- ggplot() +
   geom_point(data=df[df$type=="fitted",], aes(x=x3, y=x4, color=indiv), size=fitted_point_sz) +
   geom_point(data=df[df$type=="truth",], aes(x=x3, y=x4), color="black", size=(truth_point_size*1.3), shape=17) +
@@ -238,6 +221,7 @@ p2 <- ggplot() +
   theme(legend.position = "none") +
   xlab("PCoA 3") +
   ylab("PCoA 4")
+
 p <- grid.arrange(p1, p2, nrow=1)
 if(setup == 1) {
   ggsave(file.path(relative_path,plot_dir,paste0("same_baseline_diff_dynamics_PCA.png")), p, units="in", dpi=150, height=6, width=13)
