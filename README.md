@@ -56,6 +56,7 @@ Assortment of posterior visualizations.
 Of interest:
 * `calculate_posterior_distances.R`: wrapper to calculate Riemannian distance over posterior samples assumed to exist in model\_dir directory specified in `include/R/general.R`
 * `embed_posteriors.R`: embeds posterior samples using pre-calculated distances and multidimensional scaling; UMAP version available now
+* `find_universal_microbes.R`: plot hosts x interactions heatmaps to visually identify "universal" interactions across hosts and use thresholding (on MAP-estimate interactions) to identify "universal" microbes across hosts (hote: the reality is few/no bacterial genera or families appear universal by this method)
 * `visualize_embedding.R`: plots embedding and labels according to specified annotation (e.g. host, group)
 
 ## Other analyses
