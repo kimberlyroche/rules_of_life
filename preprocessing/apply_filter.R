@@ -17,7 +17,11 @@ sample_threshold <- as.numeric(args[3])
 
 cat(paste0("Filtering data at the ",level," level...\n"))
 
-glom_data <- readRDS(file.path(relative_path,data_dir,paste0("glom_data_",level,"_reps_tree.rds")))
+if(level == "ASV" | is.null(level)) {
+	glom_data <- read_data(replicates=FALSE)
+} else {
+	glom_data <- readRDS(file.path(relative_path,data_dir,paste0("glom_data_",level,"_reps_tree.rds")))
+}
 subsetted_data <- subset_samples(glom_data, sname %in% sname_list)
 filtered_data <- filter_data(subsetted_data, level=level,
                              count_threshold=count_threshold, sample_threshold=sample_threshold,

@@ -111,8 +111,8 @@ sname_list <- over_40
 # ACCESSORS
 # ====================================================================================================================
 
-# read current 16S data into a phyloseq object
-read_data <- function(write_sample=FALSE, replicates=TRUE) {
+# read unagglomerated, unfiltered 16S data
+read_data <- function(replicates=TRUE) {
   # rows are samples, columns are taxa
   if(replicates) {
     cat("Using replicates...\n")
@@ -123,25 +123,19 @@ read_data <- function(write_sample=FALSE, replicates=TRUE) {
   }
   # for now, just remove non-Bacterial domain
   data <- subset_taxa(data, domain=="Bacteria")
-  if(write_sample) {
-    write.table(otu_table(data)[1:10,1:10], file="otu_sample.txt", sep="\t")
-    write.table(tax_table(data)[1:10,], file="tax_sample.txt", sep="\t")
-  }
   return(data)
 }
 
 # pull metadata from phyloseq object
-read_metadata <- function(data, write_sample=FALSE) {
+read_metadata <- function(data) {
   # metadata: rows are samples, "sample-specific variables" are columns
   metadata <- phyloseq::sample_data(data)
   # sort ASC by collection date
   metadata <- metadata[order(metadata$sname,metadata$collection_date),]
-  if(write_sample) {
-    write.table(sample_data(data)[1:10,1:10], file="samp_sample.txt", sep="\t")
-  }
   return(metadata)
 }
 
+# load agglomerated data
 load_glommed_data <- function(level="species", replicates=TRUE) {
   if(replicates) {
     filename <- file.path(base_path,data_dir,paste0("glom_data_",level,"_reps_tree.rds"))
@@ -171,6 +165,8 @@ get_tiny_counts <- function(data, threshold, use_ns=500) {
   return(sum(apply(otu_table(data)@.Data[sids,], c(1,2), function(x) { x >= threshold } ))/(ntaxa(data)*use_ns))
 }
 
+# filters `data` to exclude Mitochondrial and Chloroplast counts and puts low counts (below the thresholds
+# specified by `count_threshold` and `sample_threshold`) into an "Other" category
 filter_data <- function(data, level="genus", count_threshold=5, sample_threshold=20, verbose=TRUE) {
   cat("Filtering data at level",level,"with count threshold",count_threshold,"and sample threshold",sample_threshold,"\n")
   filter_fn <- file.path(base_path,data_dir,paste0("filtered_",level,"_",count_threshold,"_",sample_threshold,".rds"))
@@ -193,6 +189,7 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
     # collapse mitochondria too
     tt <- tax_table(data)@.Data
     collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
+    collapse_indices[which(tt[,colnames(tt) == "order"] == "Chloroplast")] <- TRUE
     merged_data <- merge_taxa(data, which(collapse_indices == TRUE), 1)
     saveRDS(merged_data, file=filter_fn)
     retained_counts <- sum(counts[,!collapse_indices])
@@ -213,7 +210,12 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
 }
 
 load_and_filter <- function(level="family") {
-  glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  if(level == "ASV" | is.null(level)) {
+    level <- "ASV"
+    glom_data <- read_data(write_sample=FALSE, replicates=FALSE)
+  } else {
+    glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  }
   data <- filter_data(glom_data, level=level, verbose=FALSE)
   return(data)
 }
