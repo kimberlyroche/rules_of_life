@@ -19,8 +19,8 @@ plot_dir <- "output/plots"
 
 pc <- 0.5
 
-#base_path <- "/data/mukherjeelab/rulesoflife"
-base_path <- "C:/Users/kim/Documents/rules_of_life"
+base_path <- "/data/mukherjeelab/rulesoflife"
+#base_path <- "C:/Users/kim/Documents/rules_of_life"
 
 sourceCpp(file.path(base_path,"include/cpp/fast_corr.cpp"))
 
@@ -116,10 +116,10 @@ read_data <- function(replicates=TRUE) {
   # rows are samples, columns are taxa
   if(replicates) {
     cat("Using replicates...\n")
-    data <- readRDS("original_data/emp_baboon_pool_T_w_techReps.RDS")
+    data <- readRDS(file.path(base_path,data_dir,"original_16S/emp_baboon_pool_T_w_techReps.RDS"))
   } else {
     cat("NOT using replicates...\n")
-    data <- readRDS("original_data/emp_baboon_NewFiltr.RDS")
+    data <- readRDS(file.path(base_path,data_dir,"original_16S/emp_baboon_NewFiltr.RDS"))
   }
   # for now, just remove non-Bacterial domain
   data <- subset_taxa(data, domain=="Bacteria")
@@ -191,7 +191,6 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
     collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
     collapse_indices[which(tt[,colnames(tt) == "order"] == "Chloroplast")] <- TRUE
     merged_data <- merge_taxa(data, which(collapse_indices == TRUE), 1)
-    saveRDS(merged_data, file=filter_fn)
     retained_counts <- sum(counts[,!collapse_indices])
     if(verbose) {
       cat("Collapsing",sum(collapse_indices == TRUE),"taxa of",ntaxa(data),"\n")
@@ -202,7 +201,10 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
       cat("\tTaxonomy of collapsed (AFTER):",tax_table(merged_data)@.Data[collapse_tidx,],"\n")
       cat("\tCollapsed counts:",(total_counts-retained_counts),"of",total_counts,"(",(total_counts-retained_counts)/total_counts,"total )\n")
       cat("\tPercent zero-count in data set:",(1 - get_tiny_counts(merged_data, 1)),"\n")
+    } else {
+      tax_table(merged_data)@.Data[collapse_tidx,] <- rep("Collapsed",7)
     }
+    saveRDS(merged_data, file=filter_fn)
   } else {
     merged_data <- readRDS(filter_fn)
   }
@@ -212,7 +214,7 @@ filter_data <- function(data, level="genus", count_threshold=5, sample_threshold
 load_and_filter <- function(level="family") {
   if(level == "ASV" | is.null(level)) {
     level <- "ASV"
-    glom_data <- read_data(write_sample=FALSE, replicates=FALSE)
+    glom_data <- read_data(replicates=FALSE)
   } else {
     glom_data <- load_glommed_data(level=level, replicates=TRUE)
   }

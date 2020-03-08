@@ -364,13 +364,21 @@ calc_autocorrelation <- function(data,
   }
   lags <- matrix(0, nrow=lag.max, ncol=rounds)
 
+  if("phyloseq" %in% class(data)) {
+    # strip out counts
+    data <- otu_table(data)@.Data # N samples x D taxa
+  }
+
   # TBD: try various CoDa proportionality measures
   if(use_lr == "clr") {
-    log_ratios <- apply_clr(data)
+    log_ratios <- driver::clr(data + 0.5)
   } else if(use_lr == "alr") {
-    log_ratios <- apply_alr(data, d=alr_ref)
+    if(!is.null(alr_ref)) {
+      data <- data[c(setdiff(1:nrow(data),alr_ref),alr_ref),]
+    }
+    log_ratios <- driver::alr(data + 0.5)
   } else {
-    log_ratios <- apply_ilr(data)
+    log_ratios <- driver::ilr(data + 0.5)
   }
   log_ratios <- scale(log_ratios, center=TRUE, scale=FALSE)
 

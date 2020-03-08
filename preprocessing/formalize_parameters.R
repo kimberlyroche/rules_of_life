@@ -6,14 +6,13 @@ source(file.path(relative_path,"include/R/data_transform.R"))
 source(file.path(relative_path,"include/R/visualization.R"))
 
 levels <- c("phylum", "family", "genus")
+levels <- c("ASV")
 
 for(level in levels) {
   # estimate noise in replicates
   # we want variance between samples!
   #data <- load_and_filter(level)
-  glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  data <- filter_data(glom_data, level=level, verbose=FALSE)
-  subsetted_data <- subset_samples(data, sname %in% best_sampled)
+  subsetted_data <- load_and_filter(level)
   cat("Data loaded...\n")
   md <- read_metadata(subsetted_data)
   sample_status <- md$sample_status

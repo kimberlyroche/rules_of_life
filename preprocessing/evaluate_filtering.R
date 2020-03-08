@@ -25,7 +25,10 @@ local_filter <- function(data, count_threshold=100, sample_threshold=10, verbose
   collapse_indices <- !keep_indices
   # collapse mitochondria too
   tt <- tax_table(data)@.Data
-  collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
+  if(level != "ASV") {
+    # mitochondria have been filtered out of ASV level count table but not others yet (3/5/2020)
+    collapse_indices[which(tt[,colnames(tt) == "family"] == "Mitochondria")] <- TRUE
+  }
   merged_data <- merge_taxa(data, which(collapse_indices == TRUE), 1)
   retained_counts <- sum(counts[,!collapse_indices])
   if(verbose) {

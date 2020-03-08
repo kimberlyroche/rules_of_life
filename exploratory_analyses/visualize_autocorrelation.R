@@ -3,17 +3,21 @@
 
 relative_path <- ".."
 
-source(file.path(relative_path,"include/R/general.R"))
+source(file.path(relative_path,"include/R/visualization.R"))
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 5) {
-  stop("Arguments: (16S | metagenomics) (level) (lag) (lag units) (resample)\n")
+  stop("Arguments: (16S | metagenomics) (level) (lag) (lag units) (resample) (OPT: alr ref)\n")
 }
 data_type <- args[1] # 16S, metagenomics
 level <- args[2] # species, genus, family
 lag.max <- as.numeric(args[3]) # e.g. 26
 lag.units <- args[4] # weeks, months, seasons
 resample <- as.logical(args[5])
+alr_ref <- NULL
+if(length(args) > 5) {
+  alr_ref <- as.numeric(args[6])
+}
 
 data <- load_and_filter(level)
 metadata <- read_metadata(data)
@@ -26,20 +30,26 @@ if(data_type == "metagenomics") {
   metadata <- metadata.metagenomics
 }
 
+use_lr <- "ilr"
+if(!is.null(alr_ref)) {
+  use_lr <- "alr"
+}
 lags <- calc_autocorrelation(data,
                              metadata,
                              lag.max=lag.max,
                              date_diff_units=lag.units,
                              resample=resample,
-                             use_lr="alr")
+                             use_lr=use_lr,
+                             alr_ref=alr_ref)
+
 if(resample) {
   plot_bounded_autocorrelation(lags,
-                               filename=file.path(relative_path,plot_dir,paste0("autocorrelation_",lag.max,lag.units,"_",data_type,"_bounded")),
+                               filename=paste0("autocorrelation_",lag.max,lag.units,"_",data_type,"_bounded"),
                                width=10,
                                height=4)
 } else {
   plot_mean_autocorrelation(lags,
-                            filename=file.path(relative_path,plot_dir,paste0("autocorrelation_",lag.max,lag.units,"_",data_type)),
+                            filename=paste0("autocorrelation_",lag.max,lag.units,"_",data_type),
                             width=10,
                             height=4)
 }

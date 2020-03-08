@@ -1,5 +1,5 @@
-#base_path <- "/data/mukherjeelab/rulesoflife"
-base_path <- "C:/Users/kim/Documents/rules_of_life"
+base_path <- "/data/mukherjeelab/rulesoflife"
+#base_path <- "C:/Users/kim/Documents/rules_of_life"
 
 source(file.path(base_path,"include/R/general.R"))
 
@@ -44,7 +44,7 @@ fix_dims_fit <- function(fit) {
 # fit Gaussian process to a single baboon series using stray::basset
 fit_GP <- function(baboon, level, se_sigma, per_sigma, wn_sigma, dd_se, save_append="",
                    date_lower_limit=NULL, date_upper_limit=NULL, alr_ref=NULL, verbose=TRUE, mean_only=FALSE,
-                   max_iter=NULL, eps_f=NULL, eps_g=NULL) {
+                   max_iter=NULL, eps_f=NULL, eps_g=NULL, optim_method="lbfgs", decomp_method="cholesky", jitter=0) {
   if(verbose) {
     cat(paste0("Fitting stray::basset with with parameters:\n",
              "\tbaboon=",baboon,"\n",
@@ -56,10 +56,11 @@ fit_GP <- function(baboon, level, se_sigma, per_sigma, wn_sigma, dd_se, save_app
   }
 
   # read in and filter full data set at this phylogenetic level
-  glom_data <- load_glommed_data(level=level, replicates=TRUE)
-  subsetted_data <- subset_samples(glom_data, sname %in% sname_list)
+  # glom_data <- load_glommed_data(level=level, replicates=TRUE)
+  # subsetted_data <- subset_samples(glom_data, sname %in% sname_list)
+  # data <- filter_data(subsetted_data, level=level, verbose=FALSE)
 
-  data <- filter_data(subsetted_data, level=level, verbose=FALSE)
+  data <- load_and_filter(level)
   
   # global var hack still necessary for phyloseq subset_samples (I think)
   baboon <<- baboon
@@ -125,16 +126,17 @@ fit_GP <- function(baboon, level, se_sigma, per_sigma, wn_sigma, dd_se, save_app
   if(mean_only) {
     if(!is.null(max_iter) & !is.null(eps_f) & !is.null(eps_g)) {
       fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE,
-                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g)
+                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g, optim_method=optim_method, decomp_method=decomp_method, jitter=jitter)
     } else {
-      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE)
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, n_samples=0, ret_mean=TRUE,
+                           optim_method=optim_method, decomp_method=decomp_method, jitter=jitter)
     }
   } else {
     if(!is.null(max_iter) & !is.null(eps_f) & !is.null(eps_g)) {
       fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi,
-                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g)
+                           max_iter=max_iter, eps_f=eps_f, eps_g=eps_g, optim_method=optim_method, decomp_method=decomp_method, jitter=jitter)
     } else {
-      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi)
+      fit <- stray::basset(Y, observations, prior_obj$upsilon, Theta, Gamma, prior_obj$Xi, optim_method=optim_method, decomp_method=decomp_method, jitter=jitter)
     }
   }
 

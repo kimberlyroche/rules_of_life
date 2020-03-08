@@ -73,6 +73,12 @@ if(length(args) >= 4) {
     # per_sigma <- sqrt(0.253)
     # alr_ref <- 24
   }
+  if(level == "ASV") {
+    wn_sigma <- 0
+    se_sigma <- sqrt(3.111)
+    per_sigma <- sqrt(0.346)
+    alr_ref <- 171
+  }
 }
 
 if(length(args) >= 7) {
@@ -88,5 +94,6 @@ if(length(args) >= 8) {
 
 fit_GP(baboon, level, se_sigma=se_sigma, per_sigma=per_sigma, wn_sigma=wn_sigma,
        dd_se=dd_se, save_append=save_append, date_lower_limit=NULL, date_upper_limit=NULL,
-       alr_ref=alr_ref, mean_only=mean_only,
-       max_iter=20000, eps_f=1e-11, eps_g=1e-5)
+       alr_ref=alr_ref, mean_only=mean_only, optim_method="adam", decomp_method="cholesky")
+
+# alternate optimization params: max_iter=20000, eps_f=1e-11, eps_g=1e-5
